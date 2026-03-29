@@ -2,7 +2,11 @@
   "schemaVersion": 1,
   "ui": {
     "title": "Workspace Homepage",
-    "subtitle": "Visual entry point for the vault",
+    "titleSize": 38,
+    "search": {
+      "provider": "omnisearch",
+      "openInNewTab": false
+    },
     "theme": {
       "mode": "preset",
       "preset": "soft",
@@ -14,7 +18,9 @@
       "enabled": true,
       "title": "Bookmarks",
       "showPath": false,
-      "showType": false
+      "showType": false,
+      "openInNewTab": false,
+      "cardMaxWidth": 240
     },
     "clock": {
       "enabled": true,

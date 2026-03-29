@@ -56,6 +56,7 @@ obsidian web url="http://127.0.0.1:4174/settings.html"
 - `GET /api/bookmarks`: Liest `.obsidian/bookmarks.json` fuer Bookmark-Modul.
 - `POST /api/bookmarks/open`: Oeffnet Bookmark in Obsidian ueber Bookmark-Plugin-API.
 - `GET /api/obsidian/theme`: Liefert einen Theme-Snapshot aus Obsidian (fuer `mirror-obsidian`).
+- `POST /api/search/open`: Oeffnet konfigurierte Header-Suche in Obsidian.
 
 ## Konfigurationsprinzip
 
@@ -70,6 +71,8 @@ Damit sind spaetere Features stabil erweiterbar (neue Module, neue Optionen).
 - `bookmarks`: Visuelle Bookmark-Navigation.
   - Optional: Pfadanzeige (`showPath`) an/aus.
   - Optional: Typ-Badge (`showType`) an/aus.
+  - Optional: Oeffnen in neuem Tab (`openInNewTab`) an/aus.
+  - Optional: Kartenbreite (`cardMaxWidth`, 205-420 px).
 - `clock` (Uhrzeit): Live-Digitaluhr im Header/Banner.
 
 ## UI-Theming (Homepage + Settings)
@@ -83,11 +86,17 @@ Damit sind spaetere Features stabil erweiterbar (neue Module, neue Optionen).
 
 ### Theme-Settings (Schema)
 
-Theme-Optionen liegen unter `ui.theme` in den Settings:
+UI-Optionen liegen unter `ui` in den Settings:
 
 ```json
 {
   "ui": {
+    "title": "Workspace Homepage",
+    "titleSize": 38,
+    "search": {
+      "provider": "omnisearch",
+      "openInNewTab": false
+    },
     "theme": {
       "mode": "preset",
       "preset": "soft",
@@ -127,6 +136,7 @@ Theme-Optionen liegen unter `ui.theme` in den Settings:
 - Obsidian-Mirror-Modus hinzugefuegt (via `GET /api/obsidian/theme`).
 - Theme gilt jetzt fuer `home.html` und `settings.html`.
 - First-paint Theme-Bootstrap via `localStorage` hinzugefuegt (`homepage-theme-bootstrap-v1`) zur Vermeidung von Theme-Flash.
+- Header angepasst: kein Untertitel mehr, Titelgroesse konfigurierbar (`ui.titleSize`), neue Such-Icon-Aktion fuer Omnisearch.
 
 ## Neue Module ergaenzen
 

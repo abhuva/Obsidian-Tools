@@ -33,7 +33,11 @@ const DEFAULT_SETTINGS_FALLBACK = {
   schemaVersion: 1,
   ui: {
     title: "Workspace Homepage",
-    subtitle: "Visual entry point for the vault",
+    titleSize: 38,
+    search: {
+      provider: "omnisearch",
+      openInNewTab: false
+    },
     theme: {
       mode: "preset",
       preset: "soft",
@@ -45,7 +49,9 @@ const DEFAULT_SETTINGS_FALLBACK = {
       enabled: true,
       title: "Bookmarks",
       showPath: false,
-      showType: false
+      showType: false,
+      openInNewTab: false,
+      cardMaxWidth: 240
     },
     clock: {
       enabled: true,
@@ -133,6 +139,12 @@ function toCleanString(value, fallback) {
   return cleaned || fallback;
 }
 
+function toIntInRange(value, fallback, min, max) {
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
 function oneOf(value, allowed, fallback) {
   const normalized = String(value || "").trim().toLowerCase();
   return allowed.includes(normalized) ? normalized : fallback;
@@ -145,7 +157,18 @@ function normalizeSettings(input) {
     schemaVersion: 1,
     ui: {
       title: toCleanString(merged?.ui?.title, DEFAULT_SETTINGS_FALLBACK.ui.title),
-      subtitle: toCleanString(merged?.ui?.subtitle, DEFAULT_SETTINGS_FALLBACK.ui.subtitle),
+      titleSize: toIntInRange(merged?.ui?.titleSize, DEFAULT_SETTINGS_FALLBACK.ui.titleSize, 18, 72),
+      search: {
+        provider: oneOf(
+          merged?.ui?.search?.provider,
+          ["omnisearch", "obsidian-search", "quick-file"],
+          DEFAULT_SETTINGS_FALLBACK.ui.search.provider
+        ),
+        openInNewTab: toBool(
+          merged?.ui?.search?.openInNewTab,
+          DEFAULT_SETTINGS_FALLBACK.ui.search.openInNewTab
+        )
+      },
       theme: {
         mode: oneOf(merged?.ui?.theme?.mode, ["preset", "mirror-obsidian"], DEFAULT_SETTINGS_FALLBACK.ui.theme.mode),
         preset: oneOf(
@@ -177,6 +200,16 @@ function normalizeSettings(input) {
         showType: toBool(
           merged?.modules?.bookmarks?.showType,
           DEFAULT_SETTINGS_FALLBACK.modules.bookmarks.showType
+        ),
+        openInNewTab: toBool(
+          merged?.modules?.bookmarks?.openInNewTab,
+          DEFAULT_SETTINGS_FALLBACK.modules.bookmarks.openInNewTab
+        ),
+        cardMaxWidth: toIntInRange(
+          merged?.modules?.bookmarks?.cardMaxWidth,
+          DEFAULT_SETTINGS_FALLBACK.modules.bookmarks.cardMaxWidth,
+          205,
+          420
         )
       },
       clock: {
@@ -282,7 +315,7 @@ function getItemByIndexPath(rootItems, indexPath) {
   return current || null;
 }
 
-function openBookmarkById(id) {
+function openBookmarkById(id, openInNewTab = false) {
   const indexPath = parseBookmarkId(id);
   if (!indexPath) {
     throw new Error("Invalid bookmark id");
@@ -295,17 +328,19 @@ function openBookmarkById(id) {
   }
 
   const indexExpr = JSON.stringify(indexPath);
+  const openTarget = openInNewTab ? "tab" : false;
   const js = `
 const plugin = app.internalPlugins.plugins.bookmarks?.instance;
 if (!plugin) throw new Error("Bookmarks plugin not available");
 const idx = ${indexExpr};
+const openTarget = ${JSON.stringify(openTarget)};
 let item = plugin.items[idx[0]];
 for (let i = 1; i < idx.length; i++) {
   if (!item || !Array.isArray(item.items)) throw new Error("Bookmark not found");
   item = item.items[idx[i]];
 }
 if (!item) throw new Error("Bookmark not found");
-plugin.openBookmark(item);
+plugin.openBookmark(item, openTarget);
 "ok";
 `.trim();
 
@@ -318,6 +353,7 @@ plugin.openBookmark(item);
   return {
     ok: true,
     id: String(id),
+    openInNewTab: Boolean(openInNewTab),
     type: String(targetItem.type || "unknown"),
     title: defaultTitleForItem(targetItem)
   };
@@ -357,6 +393,65 @@ JSON.stringify({
 
   const clean = String(raw || "").replace(/^=>\s*/, "").trim();
   return JSON.parse(clean);
+}
+
+function openConfiguredSearch(provider = "omnisearch", openInNewTab = false) {
+  const selected = oneOf(provider, ["omnisearch", "obsidian-search", "quick-file"], "omnisearch");
+  const commandMap = {
+    omnisearch: "omnisearch:show-modal",
+    "obsidian-search": "global-search:open",
+    "quick-file": "switcher:open"
+  };
+  const commandId = commandMap[selected];
+  const js = `
+const provider = ${JSON.stringify(selected)};
+const openInNewTab = ${JSON.stringify(Boolean(openInNewTab))};
+const commandId = ${JSON.stringify(commandId)};
+
+function safeSetActiveLeaf(leaf) {
+  if (!leaf) return;
+  try {
+    app.workspace.setActiveLeaf(leaf, true, true);
+    return;
+  } catch {}
+  try {
+    app.workspace.setActiveLeaf(leaf, true);
+    return;
+  } catch {}
+  try {
+    app.workspace.setActiveLeaf(leaf);
+  } catch {}
+}
+
+if (provider === "obsidian-search" && openInNewTab) {
+  const leaf = app.workspace.getLeaf("tab");
+  if (!leaf) throw new Error("Could not create tab leaf");
+  leaf.setViewState({ type: "search", active: true });
+  safeSetActiveLeaf(leaf);
+  JSON.stringify({ ok: true, provider, commandId, mode: "view-state" });
+} else {
+  if (openInNewTab) {
+    const tabLeaf = app.workspace.getLeaf("tab");
+    safeSetActiveLeaf(tabLeaf);
+  }
+  if (!app?.commands?.commands?.[commandId]) throw new Error("Search command not found: " + commandId);
+  app.commands.executeCommandById(commandId);
+  JSON.stringify({ ok: true, provider, commandId, mode: "command" });
+}
+`.trim();
+
+  const raw = execFileSync("obsidian", ["eval", `code=${js}`], {
+    cwd: VAULT_ROOT,
+    encoding: "utf8",
+    stdio: "pipe"
+  });
+  const clean = String(raw || "").replace(/^=>\s*/, "").trim();
+  const parsed = JSON.parse(clean);
+  return {
+    ok: Boolean(parsed?.ok),
+    provider: String(parsed?.provider || selected),
+    commandId: String(parsed?.commandId || commandId)
+  };
 }
 
 function sendJson(res, statusCode, payload) {
@@ -444,9 +539,10 @@ const server = http.createServer((req, res) => {
           sendText(res, 400, "Missing bookmark id");
           return;
         }
+        const openInNewTab = toBool(payload.openInNewTab, false);
 
         try {
-          const result = openBookmarkById(id);
+          const result = openBookmarkById(id, openInNewTab);
           sendJson(res, 200, result);
         } catch (error) {
           sendText(res, 502, error.message || "Could not open bookmark");
@@ -454,6 +550,32 @@ const server = http.createServer((req, res) => {
       })
       .catch((error) => {
         sendText(res, 500, error.message || "Unknown error while opening bookmark");
+      });
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/search/open") {
+    readRequestBody(req)
+      .then((rawBody) => {
+        let payload;
+        try {
+          payload = JSON.parse(rawBody || "{}");
+        } catch {
+          sendText(res, 400, "Invalid JSON payload");
+          return;
+        }
+
+        const provider = String(payload.provider || "omnisearch");
+        const openInNewTab = toBool(payload.openInNewTab, false);
+        try {
+          const result = openConfiguredSearch(provider, openInNewTab);
+          sendJson(res, 200, result);
+        } catch (error) {
+          sendText(res, 502, error.message || "Could not open configured search");
+        }
+      })
+      .catch((error) => {
+        sendText(res, 500, error.message || "Unknown error while opening configured search");
       });
     return;
   }
@@ -483,6 +605,6 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`Homepage preview server: http://${HOST}:${PORT}/home.html`);
   console.log(
-    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open"
+    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open"
   );
 });

@@ -42,10 +42,15 @@ function buildGroups(rawItems) {
 
 export async function renderBookmarksModule(shell, moduleSettings) {
   let groupedData = [];
-  let selectedGroup = "__all__";
+  let selectedGroup = "";
   let query = "";
   const showPath = Boolean(moduleSettings?.showPath);
   const showType = Boolean(moduleSettings?.showType);
+  const openInNewTab = Boolean(moduleSettings?.openInNewTab);
+  const parsedCardMaxWidth = Number.parseInt(String(moduleSettings?.cardMaxWidth ?? ""), 10);
+  const cardMaxWidth = Number.isFinite(parsedCardMaxWidth)
+    ? Math.max(205, Math.min(420, parsedCardMaxWidth))
+    : 240;
 
   const toolbar = document.createElement("div");
   toolbar.className = "bookmarks-toolbar";
@@ -57,17 +62,21 @@ export async function renderBookmarksModule(shell, moduleSettings) {
 
   const refreshBtn = document.createElement("button");
   refreshBtn.type = "button";
-  refreshBtn.className = "btn btn-primary";
-  refreshBtn.textContent = "Neu laden";
-
-  const allBtn = document.createElement("button");
-  allBtn.type = "button";
-  allBtn.className = "btn btn-ghost";
-  allBtn.textContent = "Alle Gruppen";
+  refreshBtn.className = "module-head-icon-btn";
+  refreshBtn.textContent = "\u21bb";
+  refreshBtn.title = "Neu laden";
+  refreshBtn.setAttribute("aria-label", "Neu laden");
+  refreshBtn.addEventListener("click", (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    loadBookmarks();
+  });
 
   toolbar.appendChild(searchInput);
-  toolbar.appendChild(refreshBtn);
-  toolbar.appendChild(allBtn);
+  const headActions = document.createElement("div");
+  headActions.className = "module-head-actions";
+  headActions.appendChild(refreshBtn);
+  shell.head.appendChild(headActions);
 
   const status = document.createElement("div");
   status.className = "status";
@@ -80,6 +89,7 @@ export async function renderBookmarksModule(shell, moduleSettings) {
 
   const cards = document.createElement("div");
   cards.className = "cards";
+  cards.style.setProperty("--bookmark-card-max-width", `${cardMaxWidth}px`);
 
   layout.appendChild(groupList);
   layout.appendChild(cards);
@@ -125,6 +135,17 @@ export async function renderBookmarksModule(shell, moduleSettings) {
       });
       groupList.appendChild(btn);
     }
+
+    const allBtn = document.createElement("button");
+    allBtn.type = "button";
+    allBtn.className = "group-btn group-filter-btn" + (selectedGroup === "__all__" ? " active" : "");
+    allBtn.textContent = "Alle Gruppen";
+    allBtn.addEventListener("click", () => {
+      selectedGroup = "__all__";
+      renderGroups();
+      renderCards();
+    });
+    groupList.appendChild(allBtn);
   }
 
   function renderCards() {
@@ -169,7 +190,7 @@ export async function renderBookmarksModule(shell, moduleSettings) {
           const response = await fetch("/api/bookmarks/open", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ id: entry.id })
+            body: JSON.stringify({ id: entry.id, openInNewTab })
           });
           if (!response.ok) {
             const errorText = await response.text();
@@ -197,12 +218,12 @@ export async function renderBookmarksModule(shell, moduleSettings) {
       const payload = await response.json();
       groupedData = buildGroups(payload.items || []);
       if (!groupedData.find((group) => group.id === selectedGroup)) {
-        selectedGroup = "__all__";
+        const mainGroup = groupedData.find((group) => String(group.title || "").trim().toLowerCase() === "main");
+        selectedGroup = mainGroup?.id || "__all__";
       }
       renderGroups();
       renderCards();
-      const total = groupedData.reduce((acc, group) => acc + group.entries.length, 0);
-      setStatus(`Bereit: ${total} Bookmarks`, "ok");
+      setStatus("");
     } catch (error) {
       setStatus(`Fehler: ${error.message || error}`, "err");
       cards.innerHTML = '<div class="empty">Bookmarks konnten nicht geladen werden.</div>';
@@ -211,12 +232,6 @@ export async function renderBookmarksModule(shell, moduleSettings) {
 
   searchInput.addEventListener("input", () => {
     query = String(searchInput.value || "").trim();
-    renderCards();
-  });
-  refreshBtn.addEventListener("click", () => loadBookmarks());
-  allBtn.addEventListener("click", () => {
-    selectedGroup = "__all__";
-    renderGroups();
     renderCards();
   });
 

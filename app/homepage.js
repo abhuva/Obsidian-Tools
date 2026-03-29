@@ -2,13 +2,17 @@ import { renderBookmarksModule } from "../modules/bookmarks.js";
 import { renderClockInElement } from "../modules/clock.js";
 
 const pageTitleEl = document.getElementById("pageTitle");
-const pageSubtitleEl = document.getElementById("pageSubtitle");
 const moduleGridEl = document.getElementById("moduleGrid");
 const headerClockEl = document.getElementById("headerClock");
+const openSearchBtnEl = document.getElementById("openSearchBtn");
 
 const activeCleanups = [];
 const rootEl = document.documentElement;
 const THEME_CACHE_KEY = "homepage-theme-bootstrap-v1";
+let searchConfig = {
+  provider: "omnisearch",
+  openInNewTab: false
+};
 
 function addCleanup(fn) {
   if (typeof fn === "function") activeCleanups.push(fn);
@@ -44,6 +48,41 @@ function createModuleShell(title) {
   return { root, head, body };
 }
 
+function makeShellCollapsible(shell, startCollapsed = false) {
+  if (!shell?.root || !shell?.head || !shell?.body) return () => {};
+
+  shell.root.classList.add("module-collapsible");
+  shell.head.setAttribute("role", "button");
+  shell.head.tabIndex = 0;
+
+  const applyState = (collapsed) => {
+    shell.root.classList.toggle("module-collapsed", collapsed);
+    shell.head.setAttribute("aria-expanded", String(!collapsed));
+  };
+
+  const toggle = () => {
+    const collapsed = !shell.root.classList.contains("module-collapsed");
+    applyState(collapsed);
+  };
+
+  const onClick = () => toggle();
+  const onKeyDown = (event) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      toggle();
+    }
+  };
+
+  shell.head.addEventListener("click", onClick);
+  shell.head.addEventListener("keydown", onKeyDown);
+  applyState(Boolean(startCollapsed));
+
+  return () => {
+    shell.head.removeEventListener("click", onClick);
+    shell.head.removeEventListener("keydown", onKeyDown);
+  };
+}
+
 const moduleRegistry = {
   bookmarks: {
     render: renderBookmarksModule
@@ -58,6 +97,35 @@ async function loadSettings() {
   }
   const payload = await response.json();
   return payload.settings || {};
+}
+
+function toTitleSize(value, fallback = 38) {
+  const parsed = Number.parseInt(String(value), 10);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(18, Math.min(72, parsed));
+}
+
+function cleanSearchProvider(value) {
+  const raw = String(value || "").trim().toLowerCase();
+  if (raw === "omnisearch") return "omnisearch";
+  if (raw === "obsidian-search") return "obsidian-search";
+  if (raw === "quick-file") return "quick-file";
+  return "omnisearch";
+}
+
+async function openConfiguredSearch() {
+  const response = await fetch("/api/search/open", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider: cleanSearchProvider(searchConfig?.provider),
+      openInNewTab: Boolean(searchConfig?.openInNewTab)
+    })
+  });
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Could not open configured search");
+  }
 }
 
 function cleanThemeValue(value, allowed, fallback) {
@@ -221,7 +289,11 @@ async function renderPage() {
     const settings = await loadSettings();
     await applyUiTheme(settings?.ui?.theme);
     pageTitleEl.textContent = settings?.ui?.title || "Workspace Homepage";
-    pageSubtitleEl.textContent = settings?.ui?.subtitle || "";
+    rootEl.style.setProperty("--hero-title-size", `${toTitleSize(settings?.ui?.titleSize, 38)}px`);
+    searchConfig = {
+      provider: cleanSearchProvider(settings?.ui?.search?.provider),
+      openInNewTab: Boolean(settings?.ui?.search?.openInNewTab)
+    };
 
     if (settings?.modules?.clock?.enabled) {
       addCleanup(renderClockInElement(headerClockEl, settings.modules.clock));
@@ -247,6 +319,9 @@ async function renderPage() {
       const title = String(moduleCfg?.title || moduleKey);
       const shell = createModuleShell(title);
       moduleGridEl.appendChild(shell.root);
+      if (moduleKey === "bookmarks") {
+        addCleanup(makeShellCollapsible(shell, false));
+      }
 
       try {
         const cleanup = await definition.render(shell, moduleCfg);
@@ -262,4 +337,12 @@ async function renderPage() {
 }
 
 window.addEventListener("beforeunload", cleanupAllModules);
+if (openSearchBtnEl) {
+  openSearchBtnEl.addEventListener("click", () => {
+    openConfiguredSearch().catch((error) => {
+      // Keep UI quiet, but visible in devtools.
+      console.error(error);
+    });
+  });
+}
 renderPage();

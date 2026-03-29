@@ -98,10 +98,10 @@
       }
 
       html[data-theme-shape="sharp"] {
-        --radius-hero: 4px;
-        --radius-panel: 3px;
-        --radius-card: 3px;
-        --radius-control: 3px;
+        --radius-hero: 0px;
+        --radius-panel: 0px;
+        --radius-card: 0px;
+        --radius-control: 0px;
       }
 
       * {
@@ -166,20 +166,84 @@
         background: var(--surface);
         border: 1px solid var(--border);
         border-radius: var(--radius-panel);
-        padding: 14px;
+        overflow: hidden;
       }
 
-      .panel h2 {
-        margin: 0 0 12px;
+      .panel-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 11px 13px;
+        border-bottom: 1px solid var(--border);
+        background: var(--row-bg);
+      }
+
+      .panel-collapsible .panel-head {
+        cursor: pointer;
+        user-select: none;
+      }
+
+      .panel-collapsible .panel-head::after {
+        content: "▾";
+        font-size: 0.9rem;
+        color: var(--text-soft);
+        margin-top: 2px;
+      }
+
+      .panel-collapsible.panel-collapsed .panel-head::after {
+        content: "▸";
+      }
+
+      .panel-collapsible.panel-collapsed .panel-body {
+        display: none;
+      }
+
+      .panel-title {
+        margin: 0;
         font-size: 0.85rem;
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: var(--text-soft);
       }
 
-      .row {
-        display: grid;
-        grid-template-columns: 1fr auto;
+      .panel-help {
+        margin-top: 4px;
+        color: var(--text-soft);
+        font-size: 0.9rem;
+      }
+
+      .panel-body {
+        padding: 12px 13px 13px;
+      }
+
+      .section-divider {
+        margin: 18px 0 8px;
+        position: relative;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: var(--text-soft);
+        font-size: 0.78rem;
+      }
+
+      .section-divider::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        border-top: 1px solid var(--border);
+      }
+
+      .section-divider span {
+        position: relative;
+        background: linear-gradient(155deg, var(--bg-a), var(--bg-b));
+        padding-right: 10px;
+      }
+
+      .toggle-line {
+        display: flex;
+        align-items: flex-start;
         gap: 10px;
         padding: 10px;
         border: 1px solid var(--border);
@@ -187,15 +251,21 @@
         background: var(--row-bg);
       }
 
-      .row + .row {
+      .toggle-line + .toggle-line {
         margin-top: 9px;
       }
 
-      .row-title {
+      .toggle-copy {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+      }
+
+      .toggle-title {
         font-weight: 600;
       }
 
-      .row-help {
+      .toggle-help {
         color: var(--text-soft);
         font-size: 0.9rem;
       }
@@ -203,12 +273,20 @@
       .switch {
         width: 20px;
         height: 20px;
+        margin: 0;
+        margin-top: 1px;
+        flex: 0 0 auto;
       }
 
       .field {
         display: flex;
         flex-direction: column;
         gap: 6px;
+      }
+
+      .field + .field,
+      .toggle-line + .field,
+      .field + .toggle-line {
         margin-top: 9px;
       }
 
@@ -218,6 +296,7 @@
       }
 
       .field input[type="text"],
+      .field input[type="number"],
       .field select {
         border: 1px solid var(--border);
         border-radius: var(--radius-control);
@@ -287,100 +366,168 @@
         </div>
       </section>
 
-      <section class="panel">
-        <h2>Allgemein</h2>
-        <div class="field">
-          <label for="titleInput">Titel</label>
-          <input id="titleInput" type="text" />
+      <section class="panel panel-collapsible">
+        <header class="panel-head">
+          <div>
+            <h2 class="panel-title">Allgemein</h2>
+            <div class="panel-help">Basiseinstellungen fuer Titel, Suche und Theme.</div>
+          </div>
+        </header>
+        <div class="panel-body">
+          <div class="field">
+            <label for="titleInput">Titel</label>
+            <input id="titleInput" type="text" />
+          </div>
+          <div class="field">
+            <label for="titleSizeInput">Titelgroesse (px)</label>
+            <input id="titleSizeInput" type="number" min="18" max="72" step="1" />
+          </div>
+          <div class="field">
+            <label for="searchProvider">Header-Suche: Typ</label>
+            <select id="searchProvider">
+              <option value="omnisearch">Omnisearch (Vault)</option>
+              <option value="obsidian-search">Obsidian Suche (global)</option>
+              <option value="quick-file">Quick File Opener</option>
+            </select>
+          </div>
+          <label class="toggle-line" for="searchOpenInNewTab">
+            <input id="searchOpenInNewTab" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Header-Suche in neuem Tab</span>
+              <span class="toggle-help">Bei aktivem Toggle wird die Suche in einem neuen Tab gestartet.</span>
+            </span>
+          </label>
+          <div class="field">
+            <label for="themeMode">Theme-Modus</label>
+            <select id="themeMode">
+              <option value="preset">Preset</option>
+              <option value="mirror-obsidian">Obsidian-Theme spiegeln</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="themePreset">Preset</label>
+            <select id="themePreset">
+              <option value="soft">Soft (aktuell)</option>
+              <option value="flat">Flat</option>
+              <option value="high-contrast">High Contrast</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="themeShape">Formen</label>
+            <select id="themeShape">
+              <option value="rounded">Rounded</option>
+              <option value="comfortable">Comfortable</option>
+              <option value="sharp">Sharp</option>
+            </select>
+          </div>
         </div>
-        <div class="field">
-          <label for="subtitleInput">Untertitel</label>
-          <input id="subtitleInput" type="text" />
+      </section>
+
+      <div class="section-divider"><span>Module</span></div>
+
+      <section class="panel panel-collapsible">
+        <header class="panel-head">
+          <div>
+            <h2 class="panel-title">Bookmarks</h2>
+            <div class="panel-help">Konfiguration der Bookmark-Kartenansicht.</div>
+          </div>
+        </header>
+        <div class="panel-body">
+          <label class="toggle-line" for="bookmarksEnabled">
+            <input id="bookmarksEnabled" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Modul aktiv</span>
+              <span class="toggle-help">Zeigt die aktuellen Obsidian-Bookmarks auf der Homepage.</span>
+            </span>
+          </label>
+          <label class="toggle-line" for="bookmarksShowPath">
+            <input id="bookmarksShowPath" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Voller Zielpfad</span>
+              <span class="toggle-help">Blendet den kompletten Dateipfad oder Link unter dem Titel ein.</span>
+            </span>
+          </label>
+          <label class="toggle-line" for="bookmarksShowType">
+            <input id="bookmarksShowType" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Typ-Badge anzeigen</span>
+              <span class="toggle-help">Zeigt Dateityp wie Datei, Link, Graph oder Search.</span>
+            </span>
+          </label>
+          <label class="toggle-line" for="bookmarksOpenInNewTab">
+            <input id="bookmarksOpenInNewTab" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">In neuem Tab oeffnen</span>
+              <span class="toggle-help">Oeffnet Bookmark-Ziele standardmaessig in einem neuen Tab.</span>
+            </span>
+          </label>
+          <div class="field">
+            <label for="bookmarksCardMaxWidth">Kartenbreite max (px)</label>
+            <input id="bookmarksCardMaxWidth" type="number" min="205" max="420" step="5" />
+          </div>
         </div>
-        <div class="field">
-          <label for="themeMode">Theme-Modus</label>
-          <select id="themeMode">
-            <option value="preset">Preset</option>
-            <option value="mirror-obsidian">Obsidian-Theme spiegeln</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="themePreset">Preset</label>
-          <select id="themePreset">
-            <option value="soft">Soft (aktuell)</option>
-            <option value="flat">Flat</option>
-            <option value="high-contrast">High Contrast</option>
-          </select>
-        </div>
-        <div class="field">
-          <label for="themeShape">Formen</label>
-          <select id="themeShape">
-            <option value="rounded">Rounded</option>
-            <option value="comfortable">Comfortable</option>
-            <option value="sharp">Sharp</option>
-          </select>
+      </section>
+
+      <section class="panel panel-collapsible">
+        <header class="panel-head">
+          <div>
+            <h2 class="panel-title">Uhrzeit</h2>
+            <div class="panel-help">Steuert die Header-Uhr auf der Homepage.</div>
+          </div>
+        </header>
+        <div class="panel-body">
+          <label class="toggle-line" for="clockEnabled">
+            <input id="clockEnabled" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Modul aktiv</span>
+              <span class="toggle-help">Zeigt die Live-Uhr mit Datum in der Kopfzeile.</span>
+            </span>
+          </label>
+          <label class="toggle-line" for="clockSeconds">
+            <input id="clockSeconds" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Sekunden anzeigen</span>
+              <span class="toggle-help">Aktualisiert die Uhr jede Sekunde statt nur minutengenau.</span>
+            </span>
+          </label>
+          <label class="toggle-line" for="clock12h">
+            <input id="clock12h" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">12-Stunden-Format</span>
+              <span class="toggle-help">Nutze AM/PM statt 24-Stunden-Darstellung.</span>
+            </span>
+          </label>
         </div>
       </section>
 
       <section class="panel">
-        <h2>Module</h2>
-        <div class="row">
-          <div>
-            <div class="row-title">Bookmarks</div>
-            <div class="row-help">Zeigt die aktuellen Obsidian-Bookmarks als klickbare Karten.</div>
+        <div class="panel-body">
+          <div class="actions">
+            <button id="saveBtn" class="btn btn-primary" type="button">Speichern</button>
+            <button id="reloadBtn" class="btn btn-ghost" type="button">Neu laden</button>
           </div>
-          <input id="bookmarksEnabled" class="switch" type="checkbox" />
-        </div>
-
-        <div class="field">
-          <label for="bookmarksShowPath">Bookmarks: voller Zielpfad anzeigen</label>
-          <input id="bookmarksShowPath" class="switch" type="checkbox" />
-        </div>
-
-        <div class="field">
-          <label for="bookmarksShowType">Bookmarks: Typ-Badge anzeigen (Datei, Graph, ...)</label>
-          <input id="bookmarksShowType" class="switch" type="checkbox" />
-        </div>
-
-        <div class="row">
-          <div>
-            <div class="row-title">Uhrzeit</div>
-            <div class="row-help">Live-Uhr mit Datum auf der Homepage.</div>
+          <div id="status" class="status"></div>
+          <div class="footnote">
+            Gespeichert wird in <code>Tools/config/settings.local.json</code>. Defaults liegen in
+            <code>Tools/config/settings.default.json</code>.
           </div>
-          <input id="clockEnabled" class="switch" type="checkbox" />
-        </div>
-
-        <div class="field">
-          <label for="clockSeconds">Uhr zeigt Sekunden</label>
-          <input id="clockSeconds" class="switch" type="checkbox" />
-        </div>
-
-        <div class="field">
-          <label for="clock12h">12-Stunden-Format (AM/PM)</label>
-          <input id="clock12h" class="switch" type="checkbox" />
-        </div>
-
-        <div class="actions">
-          <button id="saveBtn" class="btn btn-primary" type="button">Speichern</button>
-          <button id="reloadBtn" class="btn btn-ghost" type="button">Neu laden</button>
-        </div>
-        <div id="status" class="status"></div>
-        <div class="footnote">
-          Gespeichert wird in <code>Tools/config/settings.local.json</code>. Defaults liegen in
-          <code>Tools/config/settings.default.json</code>.
         </div>
       </section>
     </div>
 
     <script>
       const titleInput = document.getElementById("titleInput");
-      const subtitleInput = document.getElementById("subtitleInput");
+      const titleSizeInput = document.getElementById("titleSizeInput");
+      const searchProvider = document.getElementById("searchProvider");
+      const searchOpenInNewTab = document.getElementById("searchOpenInNewTab");
       const themeMode = document.getElementById("themeMode");
       const themePreset = document.getElementById("themePreset");
       const themeShape = document.getElementById("themeShape");
       const bookmarksEnabled = document.getElementById("bookmarksEnabled");
       const bookmarksShowPath = document.getElementById("bookmarksShowPath");
       const bookmarksShowType = document.getElementById("bookmarksShowType");
+      const bookmarksOpenInNewTab = document.getElementById("bookmarksOpenInNewTab");
+      const bookmarksCardMaxWidth = document.getElementById("bookmarksCardMaxWidth");
       const clockEnabled = document.getElementById("clockEnabled");
       const clockSeconds = document.getElementById("clockSeconds");
       const clock12h = document.getElementById("clock12h");
@@ -391,6 +538,44 @@
       const THEME_CACHE_KEY = "homepage-theme-bootstrap-v1";
 
       let currentSettings = null;
+
+      function makePanelCollapsible(panel, startCollapsed = false) {
+        if (!panel) return;
+        const head = panel.querySelector(".panel-head");
+        const body = panel.querySelector(".panel-body");
+        if (!head || !body) return;
+
+        const applyState = (collapsed) => {
+          panel.classList.toggle("panel-collapsed", collapsed);
+          head.setAttribute("aria-expanded", String(!collapsed));
+        };
+
+        head.setAttribute("role", "button");
+        head.tabIndex = 0;
+        const toggle = () => {
+          const collapsed = !panel.classList.contains("panel-collapsed");
+          applyState(collapsed);
+        };
+
+        head.addEventListener("click", (event) => {
+          const target = event.target;
+          if (
+            target instanceof HTMLElement &&
+            target.closest("input, select, textarea, button, a, label")
+          ) {
+            return;
+          }
+          toggle();
+        });
+        head.addEventListener("keydown", (event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            toggle();
+          }
+        });
+
+        applyState(Boolean(startCollapsed));
+      }
 
       function setStatus(text, state) {
         statusEl.textContent = text || "";
@@ -551,11 +736,23 @@
       }
 
       function readFormToSettings() {
+        const parsedTitleSize = Number.parseInt(String(titleSizeInput.value || ""), 10);
+        const titleSize = Number.isFinite(parsedTitleSize)
+          ? Math.max(18, Math.min(72, parsedTitleSize))
+          : 38;
+        const parsedBookmarkCardMaxWidth = Number.parseInt(String(bookmarksCardMaxWidth.value || ""), 10);
+        const cardMaxWidth = Number.isFinite(parsedBookmarkCardMaxWidth)
+          ? Math.max(205, Math.min(420, parsedBookmarkCardMaxWidth))
+          : 240;
         return {
           schemaVersion: 1,
           ui: {
             title: String(titleInput.value || "").trim() || "Workspace Homepage",
-            subtitle: String(subtitleInput.value || "").trim() || "Visual entry point for the vault",
+            titleSize,
+            search: {
+              provider: String(searchProvider.value || "omnisearch"),
+              openInNewTab: Boolean(searchOpenInNewTab.checked)
+            },
             theme: {
               mode: String(themeMode.value || "preset"),
               preset: String(themePreset.value || "soft"),
@@ -567,7 +764,9 @@
               enabled: Boolean(bookmarksEnabled.checked),
               title: "Bookmarks",
               showPath: Boolean(bookmarksShowPath.checked),
-              showType: Boolean(bookmarksShowType.checked)
+              showType: Boolean(bookmarksShowType.checked),
+              openInNewTab: Boolean(bookmarksOpenInNewTab.checked),
+              cardMaxWidth
             },
             clock: {
               enabled: Boolean(clockEnabled.checked),
@@ -581,7 +780,9 @@
 
       function fillForm(settings) {
         titleInput.value = settings?.ui?.title || "";
-        subtitleInput.value = settings?.ui?.subtitle || "";
+        titleSizeInput.value = String(settings?.ui?.titleSize ?? 38);
+        searchProvider.value = settings?.ui?.search?.provider || "omnisearch";
+        searchOpenInNewTab.checked = Boolean(settings?.ui?.search?.openInNewTab);
         themeMode.value = settings?.ui?.theme?.mode || "preset";
         themePreset.value = settings?.ui?.theme?.preset || "soft";
         themeShape.value = settings?.ui?.theme?.shape || "rounded";
@@ -590,6 +791,8 @@
         bookmarksEnabled.checked = Boolean(settings?.modules?.bookmarks?.enabled);
         bookmarksShowPath.checked = Boolean(settings?.modules?.bookmarks?.showPath);
         bookmarksShowType.checked = Boolean(settings?.modules?.bookmarks?.showType);
+        bookmarksOpenInNewTab.checked = Boolean(settings?.modules?.bookmarks?.openInNewTab);
+        bookmarksCardMaxWidth.value = String(settings?.modules?.bookmarks?.cardMaxWidth ?? 240);
         clockEnabled.checked = Boolean(settings?.modules?.clock?.enabled);
         clockSeconds.checked = Boolean(settings?.modules?.clock?.showSeconds);
         clock12h.checked = Boolean(settings?.modules?.clock?.hour12);
@@ -642,6 +845,9 @@
       });
       themePreset.addEventListener("change", applyThemePreviewFromForm);
       themeShape.addEventListener("change", applyThemePreviewFromForm);
+      document
+        .querySelectorAll(".panel-collapsible")
+        .forEach((panel) => makePanelCollapsible(panel, false));
 
       loadSettings();
     </script>
