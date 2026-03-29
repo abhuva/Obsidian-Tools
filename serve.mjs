@@ -16,6 +16,10 @@ const BOOKMARKS_FILE = path.join(VAULT_ROOT, ".obsidian", "bookmarks.json");
 const SETTINGS_DIR = path.join(ROOT, "config");
 const DEFAULT_SETTINGS_FILE = path.join(SETTINGS_DIR, "settings.default.json");
 const LOCAL_SETTINGS_FILE = path.join(SETTINGS_DIR, "settings.local.json");
+const PROJECTS_ROOT_REL = "2. Projektverwaltung";
+const PROJECTS_ROOT = path.join(VAULT_ROOT, PROJECTS_ROOT_REL);
+const TEMPLATE_PROJECT_FILE_REL = "6. Obsidian/_template/Projekt.md";
+const TEMPLATE_PROJECT_FILE = path.join(VAULT_ROOT, TEMPLATE_PROJECT_FILE_REL);
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -58,6 +62,11 @@ const DEFAULT_SETTINGS_FALLBACK = {
       title: "Uhrzeit",
       showSeconds: true,
       hour12: false
+    },
+    newProject: {
+      enabled: true,
+      title: "Projektverwaltung",
+      openInNewTab: true
     }
   }
 };
@@ -150,6 +159,128 @@ function oneOf(value, allowed, fallback) {
   return allowed.includes(normalized) ? normalized : fallback;
 }
 
+function normalizeProjectTitle(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeFundingCode(value) {
+  return String(value || "").trim().replace(/\s+/g, " ");
+}
+
+function normalizeSociety(value) {
+  return oneOf(value, ["nica", "tohu"], "nica").toUpperCase();
+}
+
+function normalizeProjectType(value) {
+  return oneOf(value, ["funding", "hired", "self financed"], "funding");
+}
+
+function sanitizePathSeparators(input) {
+  return String(input || "").replace(/\\/g, "/");
+}
+
+function hasInvalidWindowsPathChars(value) {
+  return /[<>:"/\\|?*\u0000-\u001F]/.test(String(value || ""));
+}
+
+function toYamlScalar(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  const asString = String(value ?? "");
+  const escaped = asString.replace(/'/g, "''");
+  return `'${escaped}'`;
+}
+
+function upsertFrontmatterScalar(content, key, value) {
+  const normalizedContent = String(content || "");
+  const yamlValue = toYamlScalar(value);
+  const keyPattern = new RegExp(`^${key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}:\\s*.*$`, "m");
+
+  if (!normalizedContent.startsWith("---\n")) {
+    return `---\n${key}: ${yamlValue}\n---\n${normalizedContent}`;
+  }
+
+  const endMarkerIndex = normalizedContent.indexOf("\n---\n", 4);
+  if (endMarkerIndex < 0) {
+    return `---\n${key}: ${yamlValue}\n---\n${normalizedContent.slice(4)}`;
+  }
+
+  const frontmatterBlock = normalizedContent.slice(4, endMarkerIndex);
+  const body = normalizedContent.slice(endMarkerIndex + 5);
+  let nextFrontmatter = frontmatterBlock;
+
+  if (keyPattern.test(frontmatterBlock)) {
+    nextFrontmatter = frontmatterBlock.replace(keyPattern, `${key}: ${yamlValue}`);
+  } else {
+    const needsBreak = nextFrontmatter.length > 0 && !nextFrontmatter.endsWith("\n");
+    nextFrontmatter = `${nextFrontmatter}${needsBreak ? "\n" : ""}${key}: ${yamlValue}`;
+  }
+
+  return `---\n${nextFrontmatter}\n---\n${body}`;
+}
+
+function applyProjectFrontmatter(content, fields) {
+  const orderedKeys = ["year", "antragsteller", "förderer", "title", "type", "category"];
+  let nextContent = String(content || "");
+  for (const key of orderedKeys) {
+    if (!(key in fields)) continue;
+    nextContent = upsertFrontmatterScalar(nextContent, key, fields[key]);
+  }
+  return nextContent;
+}
+
+function renderTemplateFallback(templateRaw, projectTitle) {
+  const now = new Date();
+  const pad = (n) => String(n).padStart(2, "0");
+  const timestamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}, ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+  return String(templateRaw || "")
+    .replace(/<%\s*tp\.date\.now\("YYYY-MM-DD,\s*HH:mm:ss"\)\s*%>/g, timestamp)
+    .replace(/<%\s*tp\.file\.title\s*%>/g, String(projectTitle || ""));
+}
+
+function buildProjectNaming({ year, society, fundingCode, projectTitle, projectType }) {
+  const cleanTitle = normalizeProjectTitle(projectTitle);
+  if (!cleanTitle) throw new Error("Projekt-Titel darf nicht leer sein");
+  if (hasInvalidWindowsPathChars(cleanTitle)) {
+    throw new Error("Projekt-Titel enthaelt unzulaessige Zeichen");
+  }
+  if (cleanTitle.endsWith(".") || cleanTitle.endsWith(" ")) {
+    throw new Error("Projekt-Titel darf nicht mit Punkt oder Leerzeichen enden");
+  }
+
+  const parsedYear = toIntInRange(year, new Date().getFullYear(), 2000, 2100);
+  const cleanSociety = normalizeSociety(society);
+  const cleanType = normalizeProjectType(projectType);
+  const cleanFundingCode = normalizeFundingCode(fundingCode);
+
+  if (cleanType === "funding") {
+    if (!cleanFundingCode || cleanFundingCode === "-") {
+      throw new Error("Foerderkuerzel ist fuer gefoerderte Projekte erforderlich");
+    }
+    if (hasInvalidWindowsPathChars(cleanFundingCode)) {
+      throw new Error("Foerderkuerzel enthaelt unzulaessige Zeichen");
+    }
+    const folderName = `${parsedYear} ${cleanSociety} ${cleanFundingCode} - ${cleanTitle}`;
+    return {
+      year: parsedYear,
+      society: cleanSociety,
+      projectType: cleanType,
+      fundingCode: cleanFundingCode,
+      title: cleanTitle,
+      folderName
+    };
+  }
+
+  const folderName = `${parsedYear} ${cleanSociety} - ${cleanTitle}`;
+  return {
+    year: parsedYear,
+    society: cleanSociety,
+    projectType: cleanType,
+    fundingCode: "-",
+    title: cleanTitle,
+    folderName
+  };
+}
+
 function normalizeSettings(input) {
   const merged = deepMerge(DEFAULT_SETTINGS_FALLBACK, input);
 
@@ -220,6 +351,20 @@ function normalizeSettings(input) {
           DEFAULT_SETTINGS_FALLBACK.modules.clock.showSeconds
         ),
         hour12: toBool(merged?.modules?.clock?.hour12, DEFAULT_SETTINGS_FALLBACK.modules.clock.hour12)
+      },
+      newProject: {
+        enabled: toBool(
+          merged?.modules?.newProject?.enabled,
+          DEFAULT_SETTINGS_FALLBACK.modules.newProject.enabled
+        ),
+        title: toCleanString(
+          merged?.modules?.newProject?.title,
+          DEFAULT_SETTINGS_FALLBACK.modules.newProject.title
+        ),
+        openInNewTab: toBool(
+          merged?.modules?.newProject?.openInNewTab,
+          DEFAULT_SETTINGS_FALLBACK.modules.newProject.openInNewTab
+        )
       }
     }
   };
@@ -454,6 +599,265 @@ if (provider === "obsidian-search" && openInNewTab) {
   };
 }
 
+function getProjectSuggestionData() {
+  const js = `
+const out = {
+  societies: {},
+  types: {},
+  fundingCodes: {},
+  years: {}
+};
+for (const file of app.vault.getMarkdownFiles()) {
+  if (!String(file.path || "").startsWith("2. Projektverwaltung/")) continue;
+  const fm = app.metadataCache.getFileCache(file)?.frontmatter;
+  if (!fm) continue;
+  if (String(fm.category || "") !== "project-moc") continue;
+  const society = String(fm.antragsteller || "").trim();
+  const type = String(fm.type || "").trim();
+  const funding = String(fm["förderer"] || "").trim();
+  const year = String(fm.year || "").trim();
+  if (society) out.societies[society] = (out.societies[society] || 0) + 1;
+  if (type) out.types[type] = (out.types[type] || 0) + 1;
+  if (funding) out.fundingCodes[funding] = (out.fundingCodes[funding] || 0) + 1;
+  if (year) out.years[year] = (out.years[year] || 0) + 1;
+}
+JSON.stringify(out);
+`.trim();
+
+  const raw = execFileSync("obsidian", ["eval", `code=${js}`], {
+    cwd: VAULT_ROOT,
+    encoding: "utf8",
+    stdio: "pipe"
+  });
+  const clean = String(raw || "").replace(/^=>\s*/, "").trim();
+  return JSON.parse(clean);
+}
+
+function toSortedOptionList(counterObject, options = {}) {
+  const entries = Object.entries(counterObject && typeof counterObject === "object" ? counterObject : {});
+  if (options.filter) {
+    return entries
+      .filter(([value]) => options.filter(value))
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "de"))
+      .map(([value, count]) => ({ value, count }));
+  }
+  return entries
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "de"))
+    .map(([value, count]) => ({ value, count }));
+}
+
+function buildProjectMetaPayload() {
+  const currentYear = new Date().getFullYear();
+  let rawSuggestions = null;
+  try {
+    rawSuggestions = getProjectSuggestionData();
+  } catch {
+    rawSuggestions = null;
+  }
+
+  const societyOptions = toSortedOptionList(rawSuggestions?.societies, {
+    filter: (value) => value === "NICA" || value === "TOHU"
+  });
+  const typeOptions = toSortedOptionList(rawSuggestions?.types, {
+    filter: (value) => ["funding", "hired", "self financed"].includes(value)
+  });
+  const fundingOptions = toSortedOptionList(rawSuggestions?.fundingCodes, {
+    filter: (value) => value && value !== "-"
+  });
+  const yearOptions = toSortedOptionList(rawSuggestions?.years)
+    .map((entry) => Number.parseInt(String(entry.value), 10))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => b - a);
+
+  const distinctYears = Array.from(new Set([currentYear + 1, currentYear, ...yearOptions]));
+
+  return {
+    projectRoot: PROJECTS_ROOT_REL.replace(/\\/g, "/"),
+    templateFile: TEMPLATE_PROJECT_FILE_REL.replace(/\\/g, "/"),
+    options: {
+      societies: societyOptions.length ? societyOptions : [{ value: "NICA", count: 0 }, { value: "TOHU", count: 0 }],
+      types: typeOptions.length
+        ? typeOptions
+        : [
+            { value: "funding", count: 0 },
+            { value: "hired", count: 0 },
+            { value: "self financed", count: 0 }
+          ],
+      fundingCodes: fundingOptions,
+      years: distinctYears.map((value) => ({ value, count: 0 }))
+    }
+  };
+}
+
+function ensureVaultFolderExists(relativeFolderPath) {
+  const js = `
+(async () => {
+const folderPath = ${JSON.stringify(relativeFolderPath)};
+const parts = folderPath.split("/").filter(Boolean);
+let current = "";
+for (const part of parts) {
+  current = current ? current + "/" + part : part;
+  if (!app.vault.getAbstractFileByPath(current)) {
+    await app.vault.createFolder(current);
+  }
+}
+})();
+"ok";
+`.trim();
+  execFileSync("obsidian", ["eval", `code=${js}`], {
+    cwd: VAULT_ROOT,
+    encoding: "utf8",
+    stdio: "pipe"
+  });
+}
+
+function createProjectNoteFromTemplate({ projectFolderRel, projectFileRel, projectName }) {
+  const js = `
+(async () => {
+const folderPath = ${JSON.stringify(projectFolderRel)};
+const filePath = ${JSON.stringify(projectFileRel)};
+const fileTitle = ${JSON.stringify(projectName)};
+const templatePath = "6. Obsidian/_template/Projekt.md";
+const templateBasename = "Projekt";
+
+const folder = app.vault.getAbstractFileByPath(folderPath);
+if (!folder) throw new Error("Projektordner nicht gefunden");
+if (app.vault.getAbstractFileByPath(filePath)) throw new Error("Projektdatei existiert bereits");
+
+const templater = app.plugins.plugins["templater-obsidian"]?.templater;
+let templateFile = app.vault.getAbstractFileByPath(templatePath);
+if (!templateFile) {
+  templateFile = app.vault.getMarkdownFiles().find((file) => file.basename === templateBasename) || null;
+}
+if (!templateFile) throw new Error("Projekt-Template nicht gefunden");
+
+let createdFile = null;
+if (templater?.create_new_note_from_template) {
+  createdFile = await templater.create_new_note_from_template(templateFile, folder, fileTitle, false);
+} else {
+  const raw = await app.vault.cachedRead(templateFile);
+  createdFile = await app.vault.create(filePath, raw);
+}
+const createdPath = createdFile?.path || filePath;
+JSON.stringify({ ok: true, createdPath });
+})();
+`.trim();
+
+  const raw = execFileSync("obsidian", ["eval", `code=${js}`], {
+    cwd: VAULT_ROOT,
+    encoding: "utf8",
+    stdio: "pipe"
+  });
+  const normalized = String(raw || "").trim();
+  if (/^Error:/i.test(normalized)) {
+    throw new Error(normalized);
+  }
+  const clean = normalized.replace(/^=>\s*/, "").trim();
+  if (!clean) {
+    return { createdPath: projectFileRel };
+  }
+  let parsed = {};
+  try {
+    parsed = JSON.parse(clean || "{}");
+  } catch {
+    return { createdPath: projectFileRel };
+  }
+  return {
+    createdPath: sanitizePathSeparators(parsed?.createdPath || projectFileRel)
+  };
+}
+
+function openProjectFile(projectFileRel, openInNewTab = false) {
+  execFileSync("obsidian", ["open", `path=${projectFileRel}`, openInNewTab ? "newtab" : ""].filter(Boolean), {
+    cwd: VAULT_ROOT,
+    encoding: "utf8",
+    stdio: "pipe"
+  });
+}
+
+function createProject(payload) {
+  if (!fs.existsSync(PROJECTS_ROOT) || !fs.statSync(PROJECTS_ROOT).isDirectory()) {
+    throw new Error("Projektverwaltung-Ordner wurde nicht gefunden");
+  }
+  if (!fs.existsSync(TEMPLATE_PROJECT_FILE) || !fs.statSync(TEMPLATE_PROJECT_FILE).isFile()) {
+    throw new Error("Projekt-Template fehlt unter 6. Obsidian/_template/Projekt.md");
+  }
+
+  const naming = buildProjectNaming({
+    year: payload?.year,
+    society: payload?.society,
+    fundingCode: payload?.fundingCode,
+    projectTitle: payload?.title,
+    projectType: payload?.projectType
+  });
+
+  const projectFolderAbs = path.join(PROJECTS_ROOT, naming.folderName);
+  const projectFolderRel = sanitizePathSeparators(path.relative(VAULT_ROOT, projectFolderAbs));
+  const projectFileName = `${naming.folderName}.md`;
+  const projectFileAbs = path.join(projectFolderAbs, projectFileName);
+  const projectFileRel = sanitizePathSeparators(path.relative(VAULT_ROOT, projectFileAbs));
+
+  if (fs.existsSync(projectFolderAbs)) throw new Error("Projektordner existiert bereits");
+  if (fs.existsSync(projectFileAbs)) throw new Error("Projektdatei existiert bereits");
+
+  fs.mkdirSync(projectFolderAbs, { recursive: false });
+  ensureVaultFolderExists(projectFolderRel);
+  const created = createProjectNoteFromTemplate({
+    projectFolderRel,
+    projectFileRel,
+    projectName: naming.folderName
+  });
+
+  let targetFileAbs = projectFileAbs;
+  let targetFileRel = projectFileRel;
+  const createdRel = sanitizePathSeparators(created?.createdPath || "");
+  if (createdRel) {
+    const createdAbs = path.resolve(VAULT_ROOT, createdRel);
+    if (fs.existsSync(createdAbs) && createdAbs !== projectFileAbs) {
+      if (!fs.existsSync(projectFileAbs)) {
+        fs.renameSync(createdAbs, projectFileAbs);
+      }
+      targetFileAbs = projectFileAbs;
+      targetFileRel = projectFileRel;
+    }
+  }
+
+  if (!fs.existsSync(targetFileAbs)) {
+    const templateRaw = fs.readFileSync(TEMPLATE_PROJECT_FILE, "utf8");
+    const rendered = renderTemplateFallback(templateRaw, naming.folderName);
+    fs.writeFileSync(targetFileAbs, rendered, "utf8");
+  }
+
+  const raw = fs.readFileSync(targetFileAbs, "utf8");
+  const next = applyProjectFrontmatter(raw, {
+    year: naming.year,
+    antragsteller: naming.society,
+    förderer: naming.fundingCode,
+    title: naming.title,
+    type: naming.projectType,
+    category: "project-moc"
+  });
+  fs.writeFileSync(targetFileAbs, next, "utf8");
+
+  openProjectFile(targetFileRel, toBool(payload?.openInNewTab, true));
+  return {
+    ok: true,
+    folderName: naming.folderName,
+    fileName: projectFileName,
+    paths: {
+      folder: projectFolderRel,
+      file: targetFileRel
+    },
+    frontmatter: {
+      year: naming.year,
+      antragsteller: naming.society,
+      förderer: naming.fundingCode,
+      title: naming.title,
+      type: naming.projectType
+    }
+  };
+}
+
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
@@ -494,7 +898,9 @@ const server = http.createServer((req, res) => {
           return;
         }
 
-        const nextRaw = payload?.settings ?? payload;
+        const patchSettings = payload?.settings ?? payload;
+        const effectiveBefore = getEffectiveSettings();
+        const nextRaw = deepMerge(effectiveBefore, patchSettings);
         const nextSettings = writeLocalSettings(nextRaw);
         sendJson(res, 200, { ok: true, settings: nextSettings });
       })
@@ -580,6 +986,40 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "GET" && req.url === "/api/projects/meta") {
+    try {
+      const payload = buildProjectMetaPayload();
+      sendJson(res, 200, { ok: true, ...payload });
+    } catch (error) {
+      sendText(res, 500, error.message || "Could not load project metadata");
+    }
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/projects/create") {
+    readRequestBody(req)
+      .then((rawBody) => {
+        let payload;
+        try {
+          payload = JSON.parse(rawBody || "{}");
+        } catch {
+          sendText(res, 400, "Invalid JSON payload");
+          return;
+        }
+
+        try {
+          const result = createProject(payload);
+          sendJson(res, 200, result);
+        } catch (error) {
+          sendText(res, 422, error.message || "Could not create project");
+        }
+      })
+      .catch((error) => {
+        sendText(res, 500, error.message || "Unknown error while creating project");
+      });
+    return;
+  }
+
   const target = safeResolve(req.url || "/");
   if (!target) {
     sendText(res, 403, "Forbidden");
@@ -605,6 +1045,6 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`Homepage preview server: http://${HOST}:${PORT}/home.html`);
   console.log(
-    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open"
+    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/projects/meta, POST /api/projects/create"
   );
 });

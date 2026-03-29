@@ -500,6 +500,31 @@
         </div>
       </section>
 
+      <section class="panel panel-collapsible">
+        <header class="panel-head">
+          <div>
+            <h2 class="panel-title">Neues Projekt erstellen</h2>
+            <div class="panel-help">Button + Dialog fuer neue Projektordner und MOC-Datei.</div>
+          </div>
+        </header>
+        <div class="panel-body">
+          <label class="toggle-line" for="newProjectEnabled">
+            <input id="newProjectEnabled" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Modul aktiv</span>
+              <span class="toggle-help">Zeigt den Projekt-Anlegen-Dialog auf der Homepage.</span>
+            </span>
+          </label>
+          <label class="toggle-line" for="newProjectOpenInNewTab">
+            <input id="newProjectOpenInNewTab" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Erstellte Datei in neuem Tab oeffnen</span>
+              <span class="toggle-help">Wenn aktiv, wird die neue Projektdatei in einem neuen Tab geoeffnet.</span>
+            </span>
+          </label>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel-body">
           <div class="actions">
@@ -531,6 +556,8 @@
       const clockEnabled = document.getElementById("clockEnabled");
       const clockSeconds = document.getElementById("clockSeconds");
       const clock12h = document.getElementById("clock12h");
+      const newProjectEnabled = document.getElementById("newProjectEnabled");
+      const newProjectOpenInNewTab = document.getElementById("newProjectOpenInNewTab");
       const saveBtn = document.getElementById("saveBtn");
       const reloadBtn = document.getElementById("reloadBtn");
       const statusEl = document.getElementById("status");
@@ -773,6 +800,11 @@
               title: "Uhrzeit",
               showSeconds: Boolean(clockSeconds.checked),
               hour12: Boolean(clock12h.checked)
+            },
+            newProject: {
+              enabled: Boolean(newProjectEnabled.checked),
+              title: "Projektverwaltung",
+              openInNewTab: Boolean(newProjectOpenInNewTab.checked)
             }
           }
         };
@@ -796,6 +828,8 @@
         clockEnabled.checked = Boolean(settings?.modules?.clock?.enabled);
         clockSeconds.checked = Boolean(settings?.modules?.clock?.showSeconds);
         clock12h.checked = Boolean(settings?.modules?.clock?.hour12);
+        newProjectEnabled.checked = Boolean(settings?.modules?.newProject?.enabled);
+        newProjectOpenInNewTab.checked = Boolean(settings?.modules?.newProject?.openInNewTab);
       }
 
       async function loadSettings() {

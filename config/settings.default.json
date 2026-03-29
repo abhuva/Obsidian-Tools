@@ -27,6 +27,11 @@
       "title": "Uhrzeit",
       "showSeconds": true,
       "hour12": false
+    },
+    "newProject": {
+      "enabled": true,
+      "title": "Projektverwaltung",
+      "openInNewTab": true
     }
   }
 }

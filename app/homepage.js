@@ -1,5 +1,6 @@
 import { renderBookmarksModule } from "../modules/bookmarks.js";
 import { renderClockInElement } from "../modules/clock.js";
+import { renderNewProjectModule } from "../modules/new-project.js";
 
 const pageTitleEl = document.getElementById("pageTitle");
 const moduleGridEl = document.getElementById("moduleGrid");
@@ -86,6 +87,9 @@ function makeShellCollapsible(shell, startCollapsed = false) {
 const moduleRegistry = {
   bookmarks: {
     render: renderBookmarksModule
+  },
+  newProject: {
+    render: renderNewProjectModule
   }
 };
 

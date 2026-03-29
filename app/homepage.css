@@ -166,7 +166,7 @@ html[data-theme-mode="mirror-obsidian"] body {
 .module-grid {
   margin-top: 16px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+  grid-template-columns: 1fr;
   gap: 16px;
 }
 
@@ -314,6 +314,100 @@ html[data-theme-mode="mirror-obsidian"] body {
   background: var(--button-ghost-bg);
   border-color: var(--border);
   color: var(--text);
+}
+
+.module-copy {
+  margin: 0 0 10px;
+  color: var(--text-soft);
+  line-height: 1.4;
+}
+
+.new-project-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 15, 30, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 40;
+  padding: 12px;
+}
+
+.new-project-modal-overlay[hidden] {
+  display: none !important;
+}
+
+.new-project-modal {
+  width: min(760px, 100%);
+  max-height: 90vh;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-module);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+
+.new-project-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--module-head-bg);
+}
+
+.new-project-head h3 {
+  margin: 0;
+  font-size: 0.98rem;
+}
+
+.new-project-body {
+  padding: 12px;
+}
+
+.new-project-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.new-project-field {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.new-project-field-full {
+  grid-column: 1 / -1;
+}
+
+.new-project-label {
+  font-size: 0.78rem;
+  color: var(--text-soft);
+}
+
+.new-project-preview {
+  margin-top: 10px;
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-control);
+  padding: 8px 9px;
+  color: var(--text-soft);
+  background: var(--empty-bg);
+  font-size: 0.9rem;
+}
+
+.new-project-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.new-project-grid .input {
+  flex: 0 0 auto;
+  width: 100%;
+  padding: 7px 9px;
 }
 
 .bookmark-layout {
