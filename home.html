@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Workspace Homepage</title>
+    <script>
+      (function () {
+        const CACHE_KEY = "homepage-theme-bootstrap-v1";
+        const root = document.documentElement;
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return;
+
+        let cached = null;
+        try {
+          cached = JSON.parse(raw);
+        } catch {
+          return;
+        }
+        if (!cached || typeof cached !== "object") return;
+
+        const mode = String(cached.mode || "preset");
+        const preset = String(cached.preset || "soft");
+        const shape = String(cached.shape || "rounded");
+
+        root.dataset.themePreset = preset;
+        root.dataset.themeShape = shape;
+
+        const vars = cached.vars && typeof cached.vars === "object" ? cached.vars : null;
+        if (mode === "mirror-obsidian" && vars) {
+          for (const [key, value] of Object.entries(vars)) {
+            if (String(key).startsWith("--") && typeof value === "string" && value.trim()) {
+              root.style.setProperty(key, value);
+            }
+          }
+          root.dataset.themeMode = "mirror-obsidian";
+        } else {
+          root.dataset.themeMode = "preset";
+        }
+      })();
+    </script>
+    <link rel="stylesheet" href="/app/homepage.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <div class="hero-top">
+          <div class="hero-main">
+            <h1 id="pageTitle">Workspace Homepage</h1>
+            <p id="pageSubtitle">Visual entry point for the vault.</p>
+          </div>
+          <div class="hero-right">
+            <div id="headerClock" class="header-clock" aria-live="polite"></div>
+            <a class="icon-link" href="/settings.html" title="Settings" aria-label="Settings">&#9881;</a>
+          </div>
+        </div>
+      </section>
+
+      <main id="moduleGrid" class="module-grid"></main>
+    </div>
+
+    <script type="module" src="/app/homepage.js"></script>
+  </body>
+</html>

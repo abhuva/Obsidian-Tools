@@ -1,0 +1,10 @@
+{
+  "name": "obsidian-homepage-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "preview": "node ./serve.mjs",
+    "stop:preview": "node ./stop-preview.mjs",
+    "restart:preview": "npm run stop:preview && npm run preview"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": 1,
+  "ui": {
+    "title": "Workspace Homepage",
+    "subtitle": "Visual entry point for the vault",
+    "theme": {
+      "mode": "preset",
+      "preset": "soft",
+      "shape": "rounded"
+    }
+  },
+  "modules": {
+    "bookmarks": {
+      "enabled": true,
+      "title": "Bookmarks",
+      "showPath": false,
+      "showType": false
+    },
+    "clock": {
+      "enabled": true,
+      "title": "Uhrzeit",
+      "showSeconds": true,
+      "hour12": false
+    }
+  }
+}

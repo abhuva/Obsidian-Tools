@@ -1,0 +1,649 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Homepage Settings</title>
+    <script>
+      (function () {
+        const CACHE_KEY = "homepage-theme-bootstrap-v1";
+        const root = document.documentElement;
+        const raw = localStorage.getItem(CACHE_KEY);
+        if (!raw) return;
+
+        let cached = null;
+        try {
+          cached = JSON.parse(raw);
+        } catch {
+          return;
+        }
+        if (!cached || typeof cached !== "object") return;
+
+        const mode = String(cached.mode || "preset");
+        const preset = String(cached.preset || "soft");
+        const shape = String(cached.shape || "rounded");
+
+        root.dataset.themePreset = preset;
+        root.dataset.themeShape = shape;
+
+        const vars = cached.vars && typeof cached.vars === "object" ? cached.vars : null;
+        if (mode === "mirror-obsidian" && vars) {
+          for (const [key, value] of Object.entries(vars)) {
+            if (String(key).startsWith("--") && typeof value === "string" && value.trim()) {
+              root.style.setProperty(key, value);
+            }
+          }
+          root.dataset.themeMode = "mirror-obsidian";
+        } else {
+          root.dataset.themeMode = "preset";
+        }
+      })();
+    </script>
+    <style>
+      :root {
+        --bg-a: #f4f8ff;
+        --bg-b: #f8faf4;
+        --surface: rgba(255, 255, 255, 0.9);
+        --surface-strong: rgba(255, 255, 255, 0.96);
+        --row-bg: rgba(255, 255, 255, 0.7);
+        --input-bg: #fff;
+        --border: rgba(22, 34, 63, 0.12);
+        --text: #13213b;
+        --text-soft: #4a5b7c;
+        --accent: #0f72d8;
+        --accent-soft: #64b5ff;
+        --ok: #1b8e4a;
+        --danger: #a42130;
+        --radius-hero: 20px;
+        --radius-panel: 16px;
+        --radius-card: 12px;
+        --radius-control: 10px;
+      }
+
+      html[data-theme-preset="flat"] {
+        --bg-a: #f5f7fa;
+        --bg-b: #edf1f7;
+        --surface: #ffffff;
+        --surface-strong: #ffffff;
+        --row-bg: #f5f8fc;
+        --input-bg: #ffffff;
+        --border: rgba(25, 40, 68, 0.16);
+        --text: #17243f;
+        --text-soft: #4e5e7b;
+        --accent: #1d63c1;
+        --accent-soft: #3c85e6;
+      }
+
+      html[data-theme-preset="high-contrast"] {
+        --bg-a: #0f131b;
+        --bg-b: #151d29;
+        --surface: #1b2533;
+        --surface-strong: #223042;
+        --row-bg: #24354b;
+        --input-bg: #1f2b3b;
+        --border: rgba(197, 219, 250, 0.3);
+        --text: #edf4ff;
+        --text-soft: #b5c8e5;
+        --accent: #4ba3ff;
+        --accent-soft: #8cc8ff;
+        --ok: #4fd08a;
+        --danger: #ff6f7e;
+      }
+
+      html[data-theme-shape="comfortable"] {
+        --radius-hero: 14px;
+        --radius-panel: 11px;
+        --radius-card: 9px;
+        --radius-control: 8px;
+      }
+
+      html[data-theme-shape="sharp"] {
+        --radius-hero: 4px;
+        --radius-panel: 3px;
+        --radius-card: 3px;
+        --radius-control: 3px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        font-family: "Segoe UI", "Aptos", "Helvetica Neue", sans-serif;
+        color: var(--text);
+        background: linear-gradient(155deg, var(--bg-a), var(--bg-b));
+      }
+
+      .wrap {
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 24px 16px 36px;
+      }
+
+      .hero {
+        background: var(--surface-strong);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-hero);
+        padding: 16px 18px;
+      }
+
+      .hero-top {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .hero h1 {
+        margin: 0;
+        font-size: clamp(1.25rem, 1.1rem + 1vw, 2rem);
+      }
+
+      .hero p {
+        margin: 7px 0 0;
+        color: var(--text-soft);
+      }
+
+      .icon-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: var(--radius-card);
+        border: 1px solid var(--border);
+        text-decoration: none;
+        background: var(--input-bg);
+        color: var(--text);
+        font-size: 1.15rem;
+      }
+
+      .panel {
+        margin-top: 15px;
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-panel);
+        padding: 14px;
+      }
+
+      .panel h2 {
+        margin: 0 0 12px;
+        font-size: 0.85rem;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+        color: var(--text-soft);
+      }
+
+      .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        padding: 10px;
+        border: 1px solid var(--border);
+        border-radius: var(--radius-card);
+        background: var(--row-bg);
+      }
+
+      .row + .row {
+        margin-top: 9px;
+      }
+
+      .row-title {
+        font-weight: 600;
+      }
+
+      .row-help {
+        color: var(--text-soft);
+        font-size: 0.9rem;
+      }
+
+      .switch {
+        width: 20px;
+        height: 20px;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        margin-top: 9px;
+      }
+
+      .field label {
+        font-size: 0.86rem;
+        color: var(--text-soft);
+      }
+
+      .field input[type="text"],
+      .field select {
+        border: 1px solid var(--border);
+        border-radius: var(--radius-control);
+        padding: 8px 10px;
+        font-size: 0.95rem;
+        background: var(--input-bg);
+        color: var(--text);
+      }
+
+      .actions {
+        margin-top: 14px;
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+      }
+
+      .btn {
+        border: 1px solid transparent;
+        border-radius: var(--radius-control);
+        padding: 9px 13px;
+        font-weight: 600;
+        cursor: pointer;
+      }
+
+      .btn-primary {
+        color: #fff;
+        background: linear-gradient(125deg, var(--accent), var(--accent-soft));
+      }
+
+      .btn-ghost {
+        background: var(--input-bg);
+        border-color: var(--border);
+        color: var(--text);
+      }
+
+      .status {
+        margin-top: 10px;
+        min-height: 20px;
+        color: var(--text-soft);
+        font-size: 0.9rem;
+      }
+
+      .status.ok {
+        color: var(--ok);
+      }
+
+      .status.err {
+        color: var(--danger);
+      }
+
+      .footnote {
+        margin-top: 10px;
+        color: var(--text-soft);
+        font-size: 0.85rem;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <section class="hero">
+        <div class="hero-top">
+          <div>
+            <h1>Homepage Settings</h1>
+            <p>Module aktivieren/deaktivieren und Basiseinstellungen anpassen.</p>
+          </div>
+          <a class="icon-link" href="/home.html" title="Zur Homepage" aria-label="Zur Homepage">🏠</a>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Allgemein</h2>
+        <div class="field">
+          <label for="titleInput">Titel</label>
+          <input id="titleInput" type="text" />
+        </div>
+        <div class="field">
+          <label for="subtitleInput">Untertitel</label>
+          <input id="subtitleInput" type="text" />
+        </div>
+        <div class="field">
+          <label for="themeMode">Theme-Modus</label>
+          <select id="themeMode">
+            <option value="preset">Preset</option>
+            <option value="mirror-obsidian">Obsidian-Theme spiegeln</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="themePreset">Preset</label>
+          <select id="themePreset">
+            <option value="soft">Soft (aktuell)</option>
+            <option value="flat">Flat</option>
+            <option value="high-contrast">High Contrast</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="themeShape">Formen</label>
+          <select id="themeShape">
+            <option value="rounded">Rounded</option>
+            <option value="comfortable">Comfortable</option>
+            <option value="sharp">Sharp</option>
+          </select>
+        </div>
+      </section>
+
+      <section class="panel">
+        <h2>Module</h2>
+        <div class="row">
+          <div>
+            <div class="row-title">Bookmarks</div>
+            <div class="row-help">Zeigt die aktuellen Obsidian-Bookmarks als klickbare Karten.</div>
+          </div>
+          <input id="bookmarksEnabled" class="switch" type="checkbox" />
+        </div>
+
+        <div class="field">
+          <label for="bookmarksShowPath">Bookmarks: voller Zielpfad anzeigen</label>
+          <input id="bookmarksShowPath" class="switch" type="checkbox" />
+        </div>
+
+        <div class="field">
+          <label for="bookmarksShowType">Bookmarks: Typ-Badge anzeigen (Datei, Graph, ...)</label>
+          <input id="bookmarksShowType" class="switch" type="checkbox" />
+        </div>
+
+        <div class="row">
+          <div>
+            <div class="row-title">Uhrzeit</div>
+            <div class="row-help">Live-Uhr mit Datum auf der Homepage.</div>
+          </div>
+          <input id="clockEnabled" class="switch" type="checkbox" />
+        </div>
+
+        <div class="field">
+          <label for="clockSeconds">Uhr zeigt Sekunden</label>
+          <input id="clockSeconds" class="switch" type="checkbox" />
+        </div>
+
+        <div class="field">
+          <label for="clock12h">12-Stunden-Format (AM/PM)</label>
+          <input id="clock12h" class="switch" type="checkbox" />
+        </div>
+
+        <div class="actions">
+          <button id="saveBtn" class="btn btn-primary" type="button">Speichern</button>
+          <button id="reloadBtn" class="btn btn-ghost" type="button">Neu laden</button>
+        </div>
+        <div id="status" class="status"></div>
+        <div class="footnote">
+          Gespeichert wird in <code>Tools/config/settings.local.json</code>. Defaults liegen in
+          <code>Tools/config/settings.default.json</code>.
+        </div>
+      </section>
+    </div>
+
+    <script>
+      const titleInput = document.getElementById("titleInput");
+      const subtitleInput = document.getElementById("subtitleInput");
+      const themeMode = document.getElementById("themeMode");
+      const themePreset = document.getElementById("themePreset");
+      const themeShape = document.getElementById("themeShape");
+      const bookmarksEnabled = document.getElementById("bookmarksEnabled");
+      const bookmarksShowPath = document.getElementById("bookmarksShowPath");
+      const bookmarksShowType = document.getElementById("bookmarksShowType");
+      const clockEnabled = document.getElementById("clockEnabled");
+      const clockSeconds = document.getElementById("clockSeconds");
+      const clock12h = document.getElementById("clock12h");
+      const saveBtn = document.getElementById("saveBtn");
+      const reloadBtn = document.getElementById("reloadBtn");
+      const statusEl = document.getElementById("status");
+      const rootEl = document.documentElement;
+      const THEME_CACHE_KEY = "homepage-theme-bootstrap-v1";
+
+      let currentSettings = null;
+
+      function setStatus(text, state) {
+        statusEl.textContent = text || "";
+        statusEl.classList.remove("ok", "err");
+        if (state === "ok") statusEl.classList.add("ok");
+        if (state === "err") statusEl.classList.add("err");
+      }
+
+      function syncThemeFieldState() {
+        const mirrorMode = themeMode.value === "mirror-obsidian";
+        themePreset.disabled = mirrorMode;
+      }
+
+      function cleanThemeValue(value, allowed, fallback) {
+        const normalized = String(value || "").trim().toLowerCase();
+        return allowed.includes(normalized) ? normalized : fallback;
+      }
+
+      function clearMirroredThemeVars() {
+        const vars = [
+          "--bg-a",
+          "--bg-b",
+          "--surface",
+          "--surface-strong",
+          "--row-bg",
+          "--input-bg",
+          "--border",
+          "--text",
+          "--text-soft",
+          "--accent",
+          "--accent-soft",
+          "--ok",
+          "--danger"
+        ];
+        for (const varName of vars) {
+          rootEl.style.removeProperty(varName);
+        }
+      }
+
+      function applyMirroredThemeVars(themeVars) {
+        const accent = String(themeVars?.accent || "").trim();
+        const bgPrimary = String(themeVars?.bgPrimary || "").trim();
+        const bgSecondary = String(themeVars?.bgSecondary || "").trim();
+        const bgMod = String(themeVars?.bgMod || "").trim();
+        const border = String(themeVars?.border || "").trim();
+        const text = String(themeVars?.text || "").trim();
+        const textSoft = String(themeVars?.textMuted || "").trim();
+        const ok = String(themeVars?.textSuccess || "").trim();
+        const danger = String(themeVars?.textError || "").trim();
+        const accentHover = String(themeVars?.accentHover || "").trim();
+
+        if (!bgPrimary || !text || !accent) {
+          return false;
+        }
+
+        rootEl.style.setProperty("--bg-a", bgSecondary || bgPrimary);
+        rootEl.style.setProperty("--bg-b", bgPrimary);
+        rootEl.style.setProperty("--surface", bgSecondary || bgPrimary);
+        rootEl.style.setProperty("--surface-strong", bgPrimary);
+        rootEl.style.setProperty("--row-bg", bgMod || bgSecondary || bgPrimary);
+        rootEl.style.setProperty("--input-bg", bgPrimary);
+        rootEl.style.setProperty("--border", border || "rgba(128, 128, 128, 0.3)");
+        rootEl.style.setProperty("--text", text);
+        rootEl.style.setProperty("--text-soft", textSoft || text);
+        rootEl.style.setProperty("--accent", accent);
+        rootEl.style.setProperty("--accent-soft", accentHover || accent);
+        rootEl.style.setProperty("--ok", ok || "#1b8e4a");
+        rootEl.style.setProperty("--danger", danger || "#a42130");
+        return true;
+      }
+
+      function currentThemeCssVarSnapshot() {
+        const names = [
+          "--bg-a",
+          "--bg-b",
+          "--surface",
+          "--surface-strong",
+          "--row-bg",
+          "--input-bg",
+          "--border",
+          "--text",
+          "--text-soft",
+          "--accent",
+          "--accent-soft",
+          "--ok",
+          "--danger"
+        ];
+        const out = {};
+        for (const name of names) {
+          const value = rootEl.style.getPropertyValue(name);
+          if (value && String(value).trim()) out[name] = String(value).trim();
+        }
+        return out;
+      }
+
+      function persistThemeBootstrapCache({ mode, preset, shape, vars }) {
+        try {
+          localStorage.setItem(
+            THEME_CACHE_KEY,
+            JSON.stringify({
+              mode,
+              preset,
+              shape,
+              vars: vars && typeof vars === "object" ? vars : null
+            })
+          );
+        } catch {
+          // noop
+        }
+      }
+
+      async function fetchObsidianThemeSnapshot() {
+        const response = await fetch("/api/obsidian/theme");
+        if (!response.ok) {
+          const text = await response.text();
+          throw new Error(text || "Could not load Obsidian theme");
+        }
+        const payload = await response.json();
+        return payload?.theme || null;
+      }
+
+      async function applyUiTheme(themeConfig) {
+        const mode = cleanThemeValue(themeConfig?.mode, ["preset", "mirror-obsidian"], "preset");
+        const preset = cleanThemeValue(themeConfig?.preset, ["soft", "flat", "high-contrast"], "soft");
+        const shape = cleanThemeValue(themeConfig?.shape, ["rounded", "comfortable", "sharp"], "rounded");
+
+        rootEl.dataset.themePreset = preset;
+        rootEl.dataset.themeShape = shape;
+
+        clearMirroredThemeVars();
+        if (mode === "mirror-obsidian") {
+          let mirrored = false;
+          try {
+            const theme = await fetchObsidianThemeSnapshot();
+            mirrored = applyMirroredThemeVars(theme?.vars);
+          } catch {
+            mirrored = false;
+          }
+          rootEl.dataset.themeMode = mirrored ? "mirror-obsidian" : "preset";
+          persistThemeBootstrapCache({
+            mode: mirrored ? "mirror-obsidian" : "preset",
+            preset,
+            shape,
+            vars: mirrored ? currentThemeCssVarSnapshot() : null
+          });
+          return;
+        }
+        rootEl.dataset.themeMode = "preset";
+        persistThemeBootstrapCache({ mode: "preset", preset, shape, vars: null });
+      }
+
+      function applyThemePreviewFromForm() {
+        void applyUiTheme({
+          mode: String(themeMode.value || "preset"),
+          preset: String(themePreset.value || "soft"),
+          shape: String(themeShape.value || "rounded")
+        });
+      }
+
+      function readFormToSettings() {
+        return {
+          schemaVersion: 1,
+          ui: {
+            title: String(titleInput.value || "").trim() || "Workspace Homepage",
+            subtitle: String(subtitleInput.value || "").trim() || "Visual entry point for the vault",
+            theme: {
+              mode: String(themeMode.value || "preset"),
+              preset: String(themePreset.value || "soft"),
+              shape: String(themeShape.value || "rounded")
+            }
+          },
+          modules: {
+            bookmarks: {
+              enabled: Boolean(bookmarksEnabled.checked),
+              title: "Bookmarks",
+              showPath: Boolean(bookmarksShowPath.checked),
+              showType: Boolean(bookmarksShowType.checked)
+            },
+            clock: {
+              enabled: Boolean(clockEnabled.checked),
+              title: "Uhrzeit",
+              showSeconds: Boolean(clockSeconds.checked),
+              hour12: Boolean(clock12h.checked)
+            }
+          }
+        };
+      }
+
+      function fillForm(settings) {
+        titleInput.value = settings?.ui?.title || "";
+        subtitleInput.value = settings?.ui?.subtitle || "";
+        themeMode.value = settings?.ui?.theme?.mode || "preset";
+        themePreset.value = settings?.ui?.theme?.preset || "soft";
+        themeShape.value = settings?.ui?.theme?.shape || "rounded";
+        syncThemeFieldState();
+        applyThemePreviewFromForm();
+        bookmarksEnabled.checked = Boolean(settings?.modules?.bookmarks?.enabled);
+        bookmarksShowPath.checked = Boolean(settings?.modules?.bookmarks?.showPath);
+        bookmarksShowType.checked = Boolean(settings?.modules?.bookmarks?.showType);
+        clockEnabled.checked = Boolean(settings?.modules?.clock?.enabled);
+        clockSeconds.checked = Boolean(settings?.modules?.clock?.showSeconds);
+        clock12h.checked = Boolean(settings?.modules?.clock?.hour12);
+      }
+
+      async function loadSettings() {
+        setStatus("Lade Einstellungen...");
+        try {
+          const response = await fetch("/api/settings");
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || "Fehler beim Laden");
+          }
+          const payload = await response.json();
+          currentSettings = payload.settings || null;
+          fillForm(currentSettings || {});
+          setStatus("Einstellungen geladen.", "ok");
+        } catch (error) {
+          setStatus(`Konnte Einstellungen nicht laden: ${error.message || error}`, "err");
+        }
+      }
+
+      async function saveSettings() {
+        const settings = readFormToSettings();
+        setStatus("Speichere Einstellungen...");
+        try {
+          const response = await fetch("/api/settings", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ settings })
+          });
+          if (!response.ok) {
+            const text = await response.text();
+            throw new Error(text || "Fehler beim Speichern");
+          }
+          const payload = await response.json();
+          currentSettings = payload.settings || settings;
+          fillForm(currentSettings);
+          setStatus("Gespeichert. Oeffne die Homepage neu, falls noetig.", "ok");
+        } catch (error) {
+          setStatus(`Speichern fehlgeschlagen: ${error.message || error}`, "err");
+        }
+      }
+
+      saveBtn.addEventListener("click", saveSettings);
+      reloadBtn.addEventListener("click", loadSettings);
+      themeMode.addEventListener("change", () => {
+        syncThemeFieldState();
+        applyThemePreviewFromForm();
+      });
+      themePreset.addEventListener("change", applyThemePreviewFromForm);
+      themeShape.addEventListener("change", applyThemePreviewFromForm);
+
+      loadSettings();
+    </script>
+  </body>
+</html>
