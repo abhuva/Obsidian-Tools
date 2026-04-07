@@ -12,7 +12,8 @@ This demo generates a JS file that FullCalendar can render.
 If Base query is not available, it falls back to scanning markdown files for:
 
 - event tag (`tags: [event]`, tags list, or inline `#event`)
-- frontmatter dates `startDate` and optional `endDate`
+- all-day frontmatter dates `startDate` and optional `endDate`
+- timed frontmatter values `event_start` and optional `event_end` (example: `2026-04-06T16:00:00+02:00`)
 - optional color from frontmatter: `event_color` (fallback also accepts `eventColor` or `color`)
 - optional background rendering flag: `event_background` (`true`/`false`, fallback also accepts `eventBackground`)
 - optional weekly recurrence (RRule-based):
@@ -24,6 +25,35 @@ If Base query is not available, it falls back to scanning markdown files for:
   - optional `event_recurrence_exdates: [YYYY-MM-DD, ...]` for skipped occurrences
   - optional `event_recurrence_rdates: [YYYY-MM-DD, ...]` for added/moved occurrences
 - optional `event_recurrence_exrule` (JSON string, advanced)
+
+## Optional Google Calendar read integration
+
+The preview server can additionally fetch and render events from Google Calendar (read-only).
+
+Edit `Tools/Calendar/.env` and set:
+
+```powershell
+# Tools/Calendar/.env
+OBSIDIAN_VAULT_NAME=Nica (Geteilte Dokumente)
+GOOGLE_CALENDAR_API_KEY=your-google-api-key
+GOOGLE_CALENDAR_IDS=calendar1@group.calendar.google.com,calendar2@group.calendar.google.com
+```
+
+Then start preview:
+
+```powershell
+npm.cmd --prefix .\Tools\Calendar run preview
+```
+
+Notes:
+- Google events are loaded live by visible date range and merged with local Obsidian events.
+- Google events are read-only in this calendar UI (no drag/save to markdown).
+- Google events are off by default. Enable them in calendar settings (`Show Google events`).
+- Clicking a Google event opens its Google Calendar link in a new tab when available.
+- If variables are not set, only local Obsidian events are shown.
+- `serve.mjs` auto-loads `Tools/Calendar/.env` and optional `Tools/Calendar/.env.local`.
+- Set `OBSIDIAN_VAULT_NAME` to force all Obsidian CLI calls to the intended vault on this machine.
+- API key access works for public calendars. Private calendars typically require OAuth/service-account flow.
 
 ## Base filter bookmarks
 
@@ -51,6 +81,19 @@ event_recurrence_days: [1, 3]
 event_recurrence_until: 2026-12-31
 event_recurrence_interval: 1
 event_recurrence_exdates: [2026-05-04, 2026-05-06]
+tags:
+  - event
+---
+```
+
+Timed event example:
+
+```yaml
+---
+title: "Workshop Slot"
+event_start: 2026-04-06T16:00:00+02:00
+event_end: 2026-04-06T18:00:00+02:00
+event_background: false
 tags:
   - event
 ---
@@ -176,6 +219,7 @@ It opens a popover with:
 - `Show NICA/TOHU badges`
 - `Show REC badge`
 - `Year view month width` (slider, maps to FullCalendar `multiMonthMinWidth`)
+- `Global roundness` (slider for border radius)
 
 Behavior:
 
@@ -226,8 +270,8 @@ When a date changes, `cal.html` calls:
 
 The local preview server updates the source markdown frontmatter:
 
-- `startDate: YYYY-MM-DD`
-- `endDate: YYYY-MM-DD`
+- all-day events: `startDate` / `endDate` (`YYYY-MM-DD`)
+- timed events: `event_start` / `event_end` (`YYYY-MM-DDTHH:mm[:ss][timezone]`)
 
 Important:
 
@@ -246,9 +290,21 @@ The server then runs Obsidian CLI:
 
 Result: the mapped markdown note opens in a new Obsidian tab.
 
-## Create event on date click
+## Day interaction model
 
-When you click an empty date cell in `cal.html`, the app prompts for an event title and then calls:
+`cal.html` uses a focused-day workflow for all-day cells:
+
+- single-day click: opens a compact context menu near the cursor with:
+  - `Set focus day`
+  - `Create event`
+- multi-day drag selection: directly opens the create-event title dialog (no action menu)
+- outside click / `Esc`: closes the action menu
+- view switch (`day` / `week` / `month` / `year`) keeps anchoring to the current focused day
+- `Today` button sets focus to the current local date and reloads the current view around that date
+
+## Create event flow
+
+When creating an event from the day interaction flow, the app prompts for an event title and then calls:
 
 - `POST /api/events/create`
 
@@ -261,4 +317,4 @@ Created file details:
 - filename is derived from the entered title (with automatic ` (2)`, ` (3)`... on duplicates)
 - frontmatter includes `title`, `startDate`, `endDate`, `event_background: false`, and `tags: [event]`
 - the new event is added directly to the calendar view
-
+- for multi-day selections, `startDate`/`endDate` follow the selected inclusive day range

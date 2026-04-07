@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang='en'>
   <head>
     <meta charset='utf-8' />
@@ -41,8 +41,14 @@
       var CALENDAR_API_BASE = window.CALENDAR_API_BASE || window.location.origin;
       var THEME_CACHE_KEY = 'calendar-theme-bootstrap-v1';
       var CALENDAR_UI_SETTINGS_KEY = 'calendar-ui-settings-v1';
+      var CALENDAR_FOCUS_DATE_KEY = 'calendar-focus-date-v1';
+      var ROUNDNESS_MIN = 0;
+      var ROUNDNESS_MAX = 24;
       var isCreateFlowActive = false;
+      var isDayActionFlowActive = false;
+      var focusedDate = loadFocusedDate();
       var calendarUiSettings = loadCalendarUiSettings();
+      applyGlobalRoundness(calendarUiSettings.roundness);
 
       function isHttpContext() {
         return window.location.protocol === 'http:' || window.location.protocol === 'https:';
@@ -52,7 +58,9 @@
         var defaults = {
           showSocietyBadges: true,
           showRecurringBadge: true,
-          multiMonthMinWidth: 300
+          showGoogleEvents: false,
+          multiMonthMinWidth: 300,
+          roundness: 8
         };
         var raw = null;
         try {
@@ -68,14 +76,50 @@
           var safeWidth = Number.isFinite(parsedWidth) ? Math.round(parsedWidth) : defaults.multiMonthMinWidth;
           if (safeWidth < 220) safeWidth = 220;
           if (safeWidth > 520) safeWidth = 520;
+          var parsedRoundness = Number(parsed.roundness);
+          var safeRoundness = Number.isFinite(parsedRoundness) ? Math.round(parsedRoundness) : defaults.roundness;
+          if (safeRoundness < ROUNDNESS_MIN) safeRoundness = ROUNDNESS_MIN;
+          if (safeRoundness > ROUNDNESS_MAX) safeRoundness = ROUNDNESS_MAX;
           return {
             showSocietyBadges: parsed.showSocietyBadges !== false,
             showRecurringBadge: parsed.showRecurringBadge !== false,
-            multiMonthMinWidth: safeWidth
+            showGoogleEvents: parsed.showGoogleEvents === true,
+            multiMonthMinWidth: safeWidth,
+            roundness: safeRoundness
           };
         } catch (error) {
           return defaults;
         }
+      }
+
+      function loadFocusedDate() {
+        var raw = '';
+        try {
+          raw = String(localStorage.getItem(CALENDAR_FOCUS_DATE_KEY) || '').trim();
+        } catch (error) {
+          return '';
+        }
+        return normalizeIsoDate(raw);
+      }
+
+      function persistFocusedDate(value) {
+        try {
+          if (!value) {
+            localStorage.removeItem(CALENDAR_FOCUS_DATE_KEY);
+          } else {
+            localStorage.setItem(CALENDAR_FOCUS_DATE_KEY, String(value));
+          }
+        } catch (error) {
+          // noop
+        }
+      }
+
+      function applyGlobalRoundness(roundness) {
+        var parsed = Number(roundness);
+        var safe = Number.isFinite(parsed) ? Math.round(parsed) : 8;
+        if (safe < ROUNDNESS_MIN) safe = ROUNDNESS_MIN;
+        if (safe > ROUNDNESS_MAX) safe = ROUNDNESS_MAX;
+        document.documentElement.style.setProperty('--cal-radius', String(safe) + 'px');
       }
 
       function persistCalendarUiSettings() {
@@ -307,6 +351,25 @@
         };
       }
 
+      function eventDidMountHook(arg) {
+        var event = arg && arg.event;
+        var el = arg && arg.el;
+        if (!event || !el || event.display === 'background') return;
+
+        var bg = String(event.backgroundColor || event.borderColor || '').trim();
+        var border = String(event.borderColor || event.backgroundColor || '').trim();
+        if (!bg && !border) return;
+
+        if (bg) el.style.backgroundColor = bg;
+        if (border) el.style.borderColor = border;
+        el.style.color = '#ffffff';
+
+        if (el.classList.contains('fc-daygrid-dot-event')) {
+          var dot = el.querySelector('.fc-daygrid-event-dot');
+          if (dot) dot.style.display = 'none';
+        }
+      }
+
       function dayCellClassNamesHook(vacationDays, arg) {
         var classes = [];
         var date = arg && arg.date;
@@ -315,22 +378,99 @@
         if (day === 0 || day === 6) classes.push('day-weekend');
         var iso = toLocalIsoDate(date);
         if (vacationDays && vacationDays.has(iso)) classes.push('day-vacation');
+        if (focusedDate && iso === focusedDate) classes.push('day-focused');
         return classes;
+      }
+
+      function dayHeaderClassNamesHook(arg) {
+        var classes = [];
+        var date = arg && arg.date;
+        if (!(date instanceof Date)) return classes;
+        var iso = toLocalIsoDate(date);
+        if (focusedDate && iso === focusedDate) classes.push('day-focused');
+        return classes;
+      }
+
+      function updateFocusedDateDecorations(calendarEl) {
+        if (!calendarEl) return;
+        var nodes = calendarEl.querySelectorAll('.fc-daygrid-day[data-date], .fc-col-header-cell[data-date]');
+        nodes.forEach(function(node) {
+          var iso = normalizeIsoDate(node.getAttribute('data-date'));
+          if (focusedDate && iso === focusedDate) {
+            node.classList.add('day-focused');
+          } else {
+            node.classList.remove('day-focused');
+          }
+        });
+      }
+
+      function setFocusedDate(calendar, calendarEl, nextDate, options) {
+        var normalized = normalizeIsoDate(nextDate);
+        if (!normalized) return;
+        if (focusedDate === normalized) return;
+        focusedDate = normalized;
+        persistFocusedDate(focusedDate);
+        updateFocusedDateDecorations(calendarEl);
+        if (calendar && options && options.jumpToFocus === true) {
+          calendar.gotoDate(focusedDate);
+        }
+      }
+
+      function focusCalendarOnToday(calendar, calendarEl) {
+        if (!calendar) return;
+        var todayIso = toLocalIsoDate(new Date());
+        if (!todayIso) return;
+        setFocusedDate(calendar, calendarEl, todayIso, { jumpToFocus: false });
+        var currentViewType = calendar.view && calendar.view.type ? String(calendar.view.type) : '';
+        if (currentViewType) {
+          calendar.changeView(currentViewType, todayIso);
+        } else {
+          calendar.gotoDate(todayIso);
+        }
+        updateFocusedDateDecorations(calendarEl);
       }
 
       function mountCalendarSettingsPopover(calendarEl, calendar) {
         var panel = document.getElementById('calendar-label-settings');
         var societyToggle = document.getElementById('toggle-society-badges');
         var recurringToggle = document.getElementById('toggle-recurring-badge');
+        var googleToggle = document.getElementById('toggle-google-events');
+        var googleStatus = document.getElementById('setting-google-status');
         var monthWidthSlider = document.getElementById('setting-month-width');
         var monthWidthValue = document.getElementById('setting-month-width-value');
-        if (!panel || !societyToggle || !recurringToggle || !monthWidthSlider || !monthWidthValue) return;
+        var roundnessSlider = document.getElementById('setting-roundness');
+        var roundnessValue = document.getElementById('setting-roundness-value');
+        if (!panel || !societyToggle || !recurringToggle || !googleToggle || !googleStatus || !monthWidthSlider || !monthWidthValue || !roundnessSlider || !roundnessValue) return;
+
+        function updateGoogleStatusText() {
+          if (window.googleCalendarState && window.googleCalendarState.lastError) {
+            googleStatus.textContent = 'Google load error: ' + window.googleCalendarState.lastError;
+            googleStatus.classList.add('is-error');
+            return;
+          }
+          if (!window.googleCalendarState || !window.googleCalendarState.configured) {
+            googleStatus.textContent = 'Google source not configured (.env key/ids missing).';
+            googleStatus.classList.remove('is-error');
+            return;
+          }
+          if (window.googleCalendarState.enabled) {
+            googleStatus.textContent = 'Google source active.';
+          } else {
+            googleStatus.textContent = 'Google source available (currently disabled).';
+          }
+          googleStatus.classList.remove('is-error');
+        }
 
         function syncInputs() {
           societyToggle.checked = calendarUiSettings.showSocietyBadges !== false;
           recurringToggle.checked = calendarUiSettings.showRecurringBadge !== false;
+          googleToggle.checked = calendarUiSettings.showGoogleEvents === true;
+          googleToggle.disabled = !window.googleCalendarState || !window.googleCalendarState.configured;
+          updateGoogleStatusText();
           monthWidthSlider.value = String(calendarUiSettings.multiMonthMinWidth || 300);
           monthWidthValue.textContent = String(calendarUiSettings.multiMonthMinWidth || 300) + ' px';
+          roundnessSlider.value = String(calendarUiSettings.roundness || 0);
+          roundnessValue.textContent = String(calendarUiSettings.roundness || 0) + ' px';
         }
 
         function closePanel() {
@@ -373,6 +513,14 @@
           persistCalendarUiSettings();
           calendar.rerenderEvents();
         });
+        googleToggle.addEventListener('change', function() {
+          calendarUiSettings.showGoogleEvents = Boolean(googleToggle.checked);
+          persistCalendarUiSettings();
+          if (typeof window.setGoogleEventsEnabled === 'function') {
+            window.setGoogleEventsEnabled(calendar, calendarUiSettings.showGoogleEvents);
+          }
+          updateGoogleStatusText();
+        });
         monthWidthSlider.addEventListener('input', function() {
           var parsed = Number(monthWidthSlider.value);
           if (!Number.isFinite(parsed)) return;
@@ -383,6 +531,17 @@
           monthWidthValue.textContent = String(parsed) + ' px';
           persistCalendarUiSettings();
           calendar.setOption('multiMonthMinWidth', parsed);
+        });
+        roundnessSlider.addEventListener('input', function() {
+          var parsed = Number(roundnessSlider.value);
+          if (!Number.isFinite(parsed)) return;
+          if (parsed < ROUNDNESS_MIN) parsed = ROUNDNESS_MIN;
+          if (parsed > ROUNDNESS_MAX) parsed = ROUNDNESS_MAX;
+          parsed = Math.round(parsed);
+          calendarUiSettings.roundness = parsed;
+          roundnessValue.textContent = String(parsed) + ' px';
+          applyGlobalRoundness(parsed);
+          persistCalendarUiSettings();
         });
 
         document.addEventListener('click', function(event) {
@@ -452,6 +611,101 @@
         });
       }
 
+      function getAnchorPointFromNativeEvent(nativeEvent) {
+        if (!nativeEvent) return null;
+        var clientX = Number(nativeEvent.clientX);
+        var clientY = Number(nativeEvent.clientY);
+        if (Number.isFinite(clientX) && Number.isFinite(clientY)) {
+          return { x: clientX, y: clientY };
+        }
+        var target = nativeEvent.target;
+        if (target && typeof target.getBoundingClientRect === 'function') {
+          var rect = target.getBoundingClientRect();
+          return {
+            x: rect.left + (rect.width / 2),
+            y: rect.top + (rect.height / 2)
+          };
+        }
+        return null;
+      }
+
+      function placeDayActionMenu(menu, anchorPoint) {
+        if (!menu) return;
+        var margin = 10;
+        var viewportWidth = window.innerWidth || document.documentElement.clientWidth || 0;
+        var viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0;
+        var fallbackX = Math.max(margin, Math.round(viewportWidth / 2));
+        var fallbackY = Math.max(margin, Math.round(viewportHeight / 2));
+        var rawX = anchorPoint && Number.isFinite(Number(anchorPoint.x)) ? Number(anchorPoint.x) : fallbackX;
+        var rawY = anchorPoint && Number.isFinite(Number(anchorPoint.y)) ? Number(anchorPoint.y) : fallbackY;
+        var menuWidth = menu.offsetWidth || 220;
+        var menuHeight = menu.offsetHeight || 100;
+
+        var left = Math.round(rawX + 6);
+        var top = Math.round(rawY + 6);
+        if (left + menuWidth > viewportWidth - margin) left = viewportWidth - menuWidth - margin;
+        if (top + menuHeight > viewportHeight - margin) top = viewportHeight - menuHeight - margin;
+        if (left < margin) left = margin;
+        if (top < margin) top = margin;
+
+        menu.style.left = String(left) + 'px';
+        menu.style.top = String(top) + 'px';
+      }
+
+      function showDayActionDialog(anchorPoint) {
+        return new Promise(function(resolve) {
+          var modal = document.getElementById('day-action-modal');
+          var focusBtn = document.getElementById('day-action-focus');
+          var createBtn = document.getElementById('day-action-create');
+          if (!modal || !focusBtn || !createBtn) {
+            resolve(null);
+            return;
+          }
+
+          var done = false;
+
+          function cleanup() {
+            modal.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+            modal.style.left = '';
+            modal.style.top = '';
+            focusBtn.removeEventListener('click', onFocus);
+            createBtn.removeEventListener('click', onCreate);
+            document.removeEventListener('mousedown', onOutsidePointer);
+            document.removeEventListener('keydown', onKeyDown);
+          }
+
+          function finish(value) {
+            if (done) return;
+            done = true;
+            cleanup();
+            resolve(value);
+          }
+
+          function onFocus() { finish('focus'); }
+          function onCreate() { finish('create'); }
+          function onOutsidePointer(event) {
+            if (modal.contains(event.target)) return;
+            finish(null);
+          }
+          function onKeyDown(event) {
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              finish(null);
+            }
+          }
+
+          modal.classList.add('is-open');
+          modal.setAttribute('aria-hidden', 'false');
+          placeDayActionMenu(modal, anchorPoint || null);
+          focusBtn.addEventListener('click', onFocus);
+          createBtn.addEventListener('click', onCreate);
+          document.addEventListener('mousedown', onOutsidePointer);
+          document.addEventListener('keydown', onKeyDown);
+          setTimeout(function() { focusBtn.focus(); }, 0);
+        });
+      }
+
       function shiftIsoDate(isoDate, deltaDays) {
         if (!isoDate) return null;
         var parts = isoDate.split('-').map(Number);
@@ -464,10 +718,61 @@
         return shiftIsoDate(exclusiveEndDate, -1);
       }
 
-      function toFrontmatterDates(event) {
-        var startDate = event.startStr;
-        var endDate = event.endStr ? shiftIsoDate(event.endStr, -1) : event.startStr;
-        return { startDate: startDate, endDate: endDate };
+      function isIsoDateOnly(value) {
+        return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim());
+      }
+
+      function normalizeCalendarDateLike(value) {
+        var raw = String(value || '').trim();
+        if (!raw) return '';
+        return raw.replace(' ', 'T');
+      }
+
+      function localIsoDateKey(date) {
+        if (!(date instanceof Date)) return '';
+        var y = date.getFullYear();
+        var m = String(date.getMonth() + 1).padStart(2, '0');
+        var d = String(date.getDate()).padStart(2, '0');
+        return y + '-' + m + '-' + d;
+      }
+
+      function allowRecurringTimedEdit(dropInfo, draggedEvent) {
+        if (!draggedEvent || draggedEvent.allDay) return true;
+        var props = draggedEvent.extendedProps || {};
+        if (!props.isRecurring || props.isRecurringOverride) return true;
+
+        var originalStartDay = localIsoDateKey(draggedEvent.start);
+        var originalEndDay = localIsoDateKey(draggedEvent.end || draggedEvent.start);
+        var nextStartDay = localIsoDateKey(dropInfo && dropInfo.start ? dropInfo.start : null);
+        var nextEndDay = localIsoDateKey(dropInfo && dropInfo.end ? dropInfo.end : (dropInfo && dropInfo.start ? dropInfo.start : null));
+
+        if (!originalStartDay || !nextStartDay) return false;
+        if (originalStartDay !== nextStartDay) return false;
+        if (originalEndDay && nextEndDay && originalEndDay !== nextEndDay) return false;
+        return true;
+      }
+
+      function toEventPersistPayload(event) {
+        if (event && event.allDay) {
+          var startDate = normalizeCalendarDateLike(event.startStr);
+          var endDate = event.endStr ? shiftIsoDate(normalizeCalendarDateLike(event.endStr), -1) : startDate;
+          return { start: startDate, end: endDate, allDay: true };
+        }
+
+        var start = normalizeCalendarDateLike(event && event.startStr ? event.startStr : '');
+        var end = normalizeCalendarDateLike(event && event.endStr ? event.endStr : '') || start;
+        return { start: start, end: end, allDay: false };
+      }
+
+      function toCreatePayload(start, end, allDay) {
+        var normalizedStart = normalizeCalendarDateLike(start);
+        var normalizedEnd = normalizeCalendarDateLike(end) || normalizedStart;
+        if (allDay) {
+          var allDayStart = isIsoDateOnly(normalizedStart) ? normalizedStart : normalizeIsoDate(normalizedStart);
+          var allDayEnd = isIsoDateOnly(normalizedEnd) ? normalizedEnd : normalizeIsoDate(normalizedEnd);
+          return { start: allDayStart || normalizedStart, end: allDayEnd || normalizedEnd, allDay: true };
+        }
+        return { start: normalizedStart, end: normalizedEnd, allDay: false };
       }
 
       async function saveEventDates(event) {
@@ -477,15 +782,19 @@
           throw new Error('Calendar is not running on http(s). Open the preview server URL.');
         }
 
-        var dates = toFrontmatterDates(event);
+        var schedule = toEventPersistPayload(event);
+        var eventProps = event.extendedProps || {};
+        var recurringSeriesEdit = Boolean(eventProps.isRecurring && !eventProps.isRecurringOverride && !event.allDay);
         var updateUrl = new URL('/api/events/update-dates', CALENDAR_API_BASE).toString();
         var response = await fetch(updateUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             sourcePath: sourcePath,
-            startDate: dates.startDate,
-            endDate: dates.endDate
+            start: schedule.start,
+            end: schedule.end,
+            allDay: schedule.allDay,
+            recurringSeriesEdit: recurringSeriesEdit
           })
         });
 
@@ -515,19 +824,21 @@
         }
       }
 
-      async function createEvent(title, startDate, endDate) {
+      async function createEvent(title, start, end, allDay) {
         if (!isHttpContext()) {
           throw new Error('Calendar is not running on http(s). Open the preview server URL.');
         }
 
+        var schedule = toCreatePayload(start, end, allDay);
         var createUrl = new URL('/api/events/create', CALENDAR_API_BASE).toString();
         var response = await fetch(createUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             title: title,
-            startDate: startDate,
-            endDate: endDate
+            start: schedule.start,
+            end: schedule.end,
+            allDay: schedule.allDay
           })
         });
 
@@ -565,6 +876,29 @@
           throw new Error(text || 'Could not load calendar filters');
         }
         return response.json();
+      }
+
+      async function fetchGoogleCalendarConfig() {
+        var configUrl = new URL('/api/google-calendar/config', CALENDAR_API_BASE).toString();
+        var response = await fetch(configUrl, { method: 'GET' });
+        if (!response.ok) {
+          var text = await response.text();
+          throw new Error(text || 'Could not load Google Calendar config');
+        }
+        return response.json();
+      }
+
+      async function fetchGoogleCalendarEvents(start, end) {
+        var eventsUrl = new URL('/api/google-calendar/events', CALENDAR_API_BASE);
+        eventsUrl.searchParams.set('start', String(start || ''));
+        eventsUrl.searchParams.set('end', String(end || ''));
+        var response = await fetch(eventsUrl.toString(), { method: 'GET' });
+        if (!response.ok) {
+          var text = await response.text();
+          throw new Error(text || 'Could not load Google Calendar events');
+        }
+        var payload = await response.json();
+        return payload && Array.isArray(payload.events) ? payload.events : [];
       }
 
       function createFilterSelect(meta) {
@@ -630,6 +964,10 @@
       }
 
       async function onEventDateChange(info) {
+        if (isExternalReadOnlyEvent(info.event)) {
+          info.revert();
+          return;
+        }
         try {
           await saveEventDates(info.event);
         } catch (error) {
@@ -639,6 +977,13 @@
       }
 
       async function onEventClick(info) {
+        if (isExternalReadOnlyEvent(info.event)) {
+          var googleLink = String(info.event && info.event.extendedProps && info.event.extendedProps.googleHtmlLink || '').trim();
+          if (googleLink) {
+            window.open(googleLink, '_blank', 'noopener,noreferrer');
+          }
+          return;
+        }
         try {
           await openEventNote(info.event);
         } catch (error) {
@@ -646,7 +991,7 @@
         }
       }
 
-      async function createEventForDates(calendar, startDate, endDate) {
+      async function createEventForDates(calendar, start, end, allDay) {
         if (isCreateFlowActive) return;
         isCreateFlowActive = true;
         var title = await showCreateEventDialog();
@@ -657,7 +1002,7 @@
             return;
           }
 
-          var result = await createEvent(trimmedTitle, startDate, endDate);
+          var result = await createEvent(trimmedTitle, start, end, allDay);
           if (result && result.event) {
             calendar.addEvent(result.event);
           }
@@ -670,21 +1015,128 @@
 
       async function onDateSelect(info) {
         info.view.calendar.unselect();
-        var startDate = info.startStr;
-        var endDate = info.endStr ? toInclusiveEndDate(info.endStr) : info.startStr;
-        await createEventForDates(info.view.calendar, startDate, endDate);
+        if (isDayActionFlowActive) return;
+        if (!info || !info.allDay) return;
+
+        var startDate = normalizeIsoDate(info.startStr);
+        if (!startDate) return;
+        var endDate = startDate;
+        if (info.endStr) {
+          var inclusive = toInclusiveEndDate(info.endStr);
+          endDate = normalizeIsoDate(inclusive) || startDate;
+        }
+
+        isDayActionFlowActive = true;
+        try {
+          if (startDate !== endDate) {
+            await createEventForDates(info.view.calendar, startDate, endDate, true);
+            return;
+          }
+          var selectAnchor = getAnchorPointFromNativeEvent(info.jsEvent);
+          var action = await showDayActionDialog(selectAnchor);
+          if (action === 'focus') {
+            setFocusedDate(info.view.calendar, document.getElementById('calendar'), startDate, { jumpToFocus: false });
+          } else if (action === 'create') {
+            await createEventForDates(info.view.calendar, startDate, endDate, true);
+          }
+        } finally {
+          isDayActionFlowActive = false;
+        }
       }
 
       async function onDateClick(info) {
-        await createEventForDates(info.view.calendar, info.dateStr, info.dateStr);
+        if (!info.allDay) return;
+        if (isDayActionFlowActive) return;
+        var dateStr = normalizeIsoDate(info.dateStr);
+        if (!dateStr) return;
+
+        isDayActionFlowActive = true;
+        try {
+          var clickAnchor = getAnchorPointFromNativeEvent(info.jsEvent);
+          var action = await showDayActionDialog(clickAnchor);
+          if (action === 'focus') {
+            setFocusedDate(info.view.calendar, document.getElementById('calendar'), dateStr, { jumpToFocus: false });
+          } else if (action === 'create') {
+            await createEventForDates(info.view.calendar, dateStr, dateStr, true);
+          }
+        } finally {
+          isDayActionFlowActive = false;
+        }
       }
+
+      function isExternalReadOnlyEvent(event) {
+        var source = String(event && event.extendedProps && event.extendedProps.externalSource || '').toLowerCase();
+        return source === 'google';
+      }
+
+      function createGoogleEventSource() {
+        return {
+          id: 'google',
+          editable: false,
+          events: function(fetchInfo, successCallback, failureCallback) {
+            fetchGoogleCalendarEvents(fetchInfo && fetchInfo.startStr, fetchInfo && fetchInfo.endStr)
+              .then(function(events) {
+                if (window.googleCalendarState) {
+                  window.googleCalendarState.lastError = '';
+                }
+                successCallback(events);
+              })
+              .catch(function(error) {
+                if (window.googleCalendarState) {
+                  window.googleCalendarState.lastError = String(error && error.message || error || 'Unknown error');
+                }
+                console.warn('Google Calendar fetch failed:', error && error.message ? error.message : error);
+                failureCallback(error);
+              });
+          }
+        };
+      }
+
+      function setGoogleEventsEnabled(calendar, enabled) {
+        if (!calendar || !window.googleCalendarState || !window.googleCalendarState.configured) return;
+        var source = calendar.getEventSourceById('google');
+        if (enabled) {
+          if (!source) {
+            calendar.addEventSource(createGoogleEventSource());
+          } else {
+            source.refetch();
+          }
+          window.googleCalendarState.enabled = true;
+        } else {
+          if (source) {
+            source.remove();
+          }
+          window.googleCalendarState.enabled = false;
+          window.googleCalendarState.lastError = '';
+        }
+      }
+      window.setGoogleEventsEnabled = setGoogleEventsEnabled;
 
       document.addEventListener('DOMContentLoaded', async function() {
         await applyCalendarTheme();
         var calendarEl = document.getElementById('calendar');
         var calendarEvents = window.CALENDAR_EVENTS || [];
         var vacationDays = buildVacationDaySet(calendarEvents);
+        window.googleCalendarState = {
+          configured: false,
+          enabled: false,
+          lastError: ''
+        };
+
+        if (isHttpContext()) {
+          try {
+            var googleConfig = await fetchGoogleCalendarConfig();
+            window.googleCalendarState.configured = Boolean(googleConfig && googleConfig.enabled);
+          } catch (error) {
+            console.warn('Could not load Google Calendar config:', error.message);
+            window.googleCalendarState.configured = false;
+            window.googleCalendarState.lastError = String(error && error.message || error || 'Unknown error');
+          }
+        }
+        var eventSources = [{ id: 'local', events: calendarEvents }];
         var multiMonthMinWidth = Number(calendarUiSettings.multiMonthMinWidth || 300);
+        var lastViewType = '';
+        var isApplyingFocusOnViewChange = false;
         var calendar = new FullCalendar.Calendar(calendarEl, {
           initialView: 'multiMonthYear',
           height: '100%',
@@ -710,8 +1162,24 @@
                 }
               }
             },
+            focusToday: {
+              text: 'Today',
+              click: function() {
+                focusCalendarOnToday(calendar, calendarEl);
+              }
+            },
+            printCalendar: {
+              text: '',
+              hint: 'Print or save current view as PDF',
+              click: function() {
+                calendar.updateSize();
+                setTimeout(function() {
+                  window.print();
+                }, 0);
+              }
+            },
             calendarSettings: {
-              text: '⚙',
+              text: '',
               hint: 'Calendar settings',
               click: function() {
                 if (typeof window.toggleCalendarSettings === 'function') {
@@ -721,51 +1189,93 @@
             }
           },
           headerToolbar: {
-            left: 'prev,next today refreshCalendar calendarSettings',
+            left: 'prev,next focusToday refreshCalendar printCalendar calendarSettings',
             center: 'title',
-            right: 'dayGridMonth,multiMonthYear'
+            right: 'timeGridDay,timeGridWeek,dayGridMonth,multiMonthYear'
           },
           views: {
-            multiMonthYear: {
+            timeGridDay: {
               dayMaxEvents: false,
               dayMaxEventRows: false
+            },
+            timeGridWeek: {
+              dayMaxEvents: false,
+              dayMaxEventRows: false
+            },
+            dayGridMonth: {
+              dayMaxEvents: false,
+              dayMaxEventRows: false,
+              eventDisplay: 'block'
+            },
+            dayGridWeek: {
+              dayMaxEvents: false,
+              dayMaxEventRows: false
+            },
+            multiMonthYear: {
+              dayMaxEvents: false,
+              dayMaxEventRows: false,
+              eventDisplay: 'block'
             }
           },
           editable: true,
           selectable: true,
           selectMinDistance: 0,
-          events: calendarEvents,
+          eventSources: eventSources,
           eventClassNames: eventClassNamesHook,
           eventContent: eventContentHook,
+          eventDidMount: eventDidMountHook,
           dayCellClassNames: function(arg) {
             return dayCellClassNamesHook(vacationDays, arg);
           },
+          dayHeaderClassNames: dayHeaderClassNamesHook,
           eventClick: onEventClick,
           dateClick: onDateClick,
           select: onDateSelect,
+          eventAllow: allowRecurringTimedEdit,
           eventDrop: onEventDateChange,
-          eventResize: onEventDateChange
+          eventResize: onEventDateChange,
+          datesSet: function(arg) {
+            var currentViewType = arg && arg.view && arg.view.type ? String(arg.view.type) : '';
+            var viewChanged = Boolean(lastViewType) && currentViewType !== lastViewType;
+            if (viewChanged && focusedDate && !isApplyingFocusOnViewChange) {
+              var currentAnchor = toLocalIsoDate(arg && arg.view ? arg.view.currentStart : null);
+              if (currentAnchor !== focusedDate) {
+                isApplyingFocusOnViewChange = true;
+                lastViewType = currentViewType;
+                calendar.gotoDate(focusedDate);
+                isApplyingFocusOnViewChange = false;
+                updateFocusedDateDecorations(calendarEl);
+                return;
+              }
+            }
+            lastViewType = currentViewType;
+            updateFocusedDateDecorations(calendarEl);
+          }
         });
         calendar.render();
+        updateFocusedDateDecorations(calendarEl);
+        if (window.googleCalendarState.configured && calendarUiSettings.showGoogleEvents === true) {
+          setGoogleEventsEnabled(calendar, true);
+        }
+        window.addEventListener('beforeprint', function() {
+          document.body.setAttribute('data-print-view', calendar.view && calendar.view.type ? calendar.view.type : '');
+          calendar.setOption('height', 'auto');
+          calendar.updateSize();
+        });
+        window.addEventListener('afterprint', function() {
+          document.body.removeAttribute('data-print-view');
+          calendar.setOption('height', '100%');
+          calendar.updateSize();
+        });
         mountFilterDropdown(calendarEl);
         mountCalendarSettingsPopover(calendarEl, calendar);
-
-        // Fallback for environments where FullCalendar select/date callbacks are unreliable.
-        calendarEl.addEventListener('click', function(event) {
-          var eventEl = event.target.closest('.fc-event');
-          if (eventEl) return;
-          var dayCell = event.target.closest('.fc-daygrid-day[data-date]');
-          if (!dayCell) return;
-          var dateStr = dayCell.getAttribute('data-date');
-          if (!dateStr) return;
-          createEventForDates(calendar, dateStr, dateStr);
-        }, true);
 
       });
 
     </script>
     <style>
       :root {
+        --cal-radius: 8px;
         --cal-bg-a: #eef4fb;
         --cal-bg-b: #f7faf5;
         --cal-surface: #ffffff;
@@ -821,7 +1331,7 @@
         height: 100%;
         background: var(--cal-surface);
         border: 1px solid var(--cal-border);
-        border-radius: 12px;
+        border-radius: var(--cal-radius);
         padding: 10px;
         box-shadow: var(--cal-shadow);
       }
@@ -851,11 +1361,27 @@
         background: var(--fc-today-bg-color);
       }
       .fc .fc-event {
-        border-radius: 6px;
+        border-radius: var(--cal-radius);
+      }
+      .fc .fc-button,
+      .fc .fc-button-group > .fc-button {
+        border-radius: var(--cal-radius);
       }
       .fc .fc-daygrid-event,
       .fc .fc-h-event {
         overflow: hidden;
+      }
+      .fc .fc-daygrid-dot-event {
+        border: 1px solid transparent;
+        border-radius: var(--cal-radius);
+        padding: 1px 4px;
+      }
+      .fc .fc-daygrid-dot-event .fc-event-time,
+      .fc .fc-daygrid-dot-event .fc-event-title {
+        color: #ffffff;
+      }
+      .fc .fc-daygrid-event-dot {
+        display: none;
       }
       .fc .fc-event .fc-event-main {
         overflow: hidden;
@@ -882,6 +1408,14 @@
             color-mix(in srgb, var(--cal-surface-strong) 86%, var(--cal-accent) 14%) 12px
           );
       }
+      .fc .fc-daygrid-day.day-focused {
+        box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--cal-accent) 70%, transparent 30%);
+      }
+      .fc .fc-col-header-cell.day-focused .fc-col-header-cell-cushion {
+        background: color-mix(in srgb, var(--cal-accent) 15%, transparent 85%);
+        border-radius: calc(var(--cal-radius) * 0.7);
+        padding: 2px 6px;
+      }
       .fc .fc-event .ev-content {
         display: flex;
         align-items: center;
@@ -898,7 +1432,7 @@
         flex: 0 0 auto;
       }
       .fc .fc-event .ev-badge {
-        border-radius: 999px;
+        border-radius: var(--cal-radius);
         font-size: 9px;
         line-height: 1;
         padding: 2px 5px;
@@ -935,7 +1469,7 @@
       .calendar-filter-select {
         height: 2.3em;
         min-width: 220px;
-        border-radius: 6px;
+        border-radius: var(--cal-radius);
         border: 1px solid var(--cal-border);
         background: var(--cal-surface-strong);
         color: var(--cal-text);
@@ -958,7 +1492,7 @@
         color: var(--cal-text);
         background: var(--cal-surface);
         border: 1px solid var(--cal-border);
-        border-radius: 10px;
+        border-radius: var(--cal-radius);
         padding: 14px;
         box-shadow: var(--cal-shadow);
       }
@@ -973,7 +1507,7 @@
         padding: 8px 10px;
         color: var(--cal-text);
         border: 1px solid var(--cal-border);
-        border-radius: 6px;
+        border-radius: var(--cal-radius);
         background: var(--cal-surface-strong);
       }
       .event-modal__actions {
@@ -986,7 +1520,7 @@
         border: 1px solid var(--cal-border);
         background: var(--cal-surface-strong);
         color: var(--cal-text);
-        border-radius: 6px;
+        border-radius: var(--cal-radius);
         padding: 6px 12px;
         cursor: pointer;
       }
@@ -995,6 +1529,40 @@
         background: var(--cal-accent);
         color: #ffffff;
       }
+      .day-action-menu {
+        position: fixed;
+        z-index: 1300;
+        display: none;
+        min-width: 200px;
+        background: var(--cal-surface);
+        border: 1px solid var(--cal-border);
+        border-radius: var(--cal-radius);
+        box-shadow: var(--cal-shadow);
+        padding: 6px;
+      }
+      .day-action-menu.is-open {
+        display: block;
+      }
+      .day-action-menu__item {
+        display: block;
+        width: 100%;
+        border: 0;
+        background: transparent;
+        color: var(--cal-text);
+        text-align: left;
+        border-radius: calc(var(--cal-radius) * 0.8);
+        padding: 7px 10px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      .day-action-menu__item:hover,
+      .day-action-menu__item:focus {
+        outline: none;
+        background: color-mix(in srgb, var(--cal-accent) 14%, transparent 86%);
+      }
+      .day-action-menu__item--primary {
+        font-weight: 600;
+      }
       .calendar-settings-popover {
         position: absolute;
         z-index: 1200;
@@ -1002,7 +1570,7 @@
         display: none;
         background: var(--cal-surface);
         border: 1px solid var(--cal-border);
-        border-radius: 10px;
+        border-radius: var(--cal-radius);
         box-shadow: var(--cal-shadow);
         padding: 10px;
       }
@@ -1019,6 +1587,14 @@
         font-size: 11px;
         margin: 0 0 10px;
         color: var(--cal-text-soft);
+      }
+      .calendar-settings-popover__status {
+        font-size: 11px;
+        margin: -2px 0 8px 24px;
+        color: var(--cal-text-soft);
+      }
+      .calendar-settings-popover__status.is-error {
+        color: var(--cal-danger);
       }
       .calendar-settings-popover__check {
         display: flex;
@@ -1052,9 +1628,111 @@
         color: var(--cal-text);
       }
       .fc .fc-calendarSettings-button {
-        min-width: 2.2em;
-        padding-left: 0.55em;
-        padding-right: 0.55em;
+        position: relative;
+        min-width: 2.3em;
+        width: 2.3em;
+        height: 2.3em;
+        line-height: 2.3em;
+        padding-left: 0;
+        padding-right: 0;
+      }
+      .fc .fc-calendarSettings-button::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 1em;
+        height: 1em;
+        transform: translate(-50%, -50%);
+        background: currentColor;
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M19.14 12.94a7.96 7.96 0 0 0 .05-.94 7.96 7.96 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.3 7.3 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.22-1.12.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.03.31-.05.63-.05.94s.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54c.58-.22 1.12-.53 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z'/%3E%3C/svg%3E") center / contain no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M19.14 12.94a7.96 7.96 0 0 0 .05-.94 7.96 7.96 0 0 0-.05-.94l2.03-1.58a.5.5 0 0 0 .12-.64l-1.92-3.32a.5.5 0 0 0-.6-.22l-2.39.96a7.3 7.3 0 0 0-1.63-.94l-.36-2.54A.5.5 0 0 0 13.9 2h-3.8a.5.5 0 0 0-.49.42l-.36 2.54c-.58.22-1.12.53-1.63.94l-2.39-.96a.5.5 0 0 0-.6.22L2.71 8.48a.5.5 0 0 0 .12.64l2.03 1.58c-.03.31-.05.63-.05.94s.02.63.05.94l-2.03 1.58a.5.5 0 0 0-.12.64l1.92 3.32a.5.5 0 0 0 .6.22l2.39-.96c.5.41 1.05.72 1.63.94l.36 2.54a.5.5 0 0 0 .49.42h3.8a.5.5 0 0 0 .49-.42l.36-2.54c.58-.22 1.12-.53 1.63-.94l2.39.96a.5.5 0 0 0 .6-.22l1.92-3.32a.5.5 0 0 0-.12-.64l-2.03-1.58ZM12 15.5A3.5 3.5 0 1 1 12 8.5a3.5 3.5 0 0 1 0 7Z'/%3E%3C/svg%3E") center / contain no-repeat;
+      }
+    
+      .fc .fc-printCalendar-button {
+        position: relative;
+        min-width: 2.3em;
+        width: 2.3em;
+        height: 2.3em;
+        line-height: 2.3em;
+        padding-left: 0;
+        padding-right: 0;
+      }
+      .fc .fc-printCalendar-button::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 50%;
+        width: 0.95em;
+        height: 0.95em;
+        transform: translate(-50%, -50%);
+        background: currentColor;
+        -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M6 9V3h12v6h2a3 3 0 0 1 3 3v6h-4v3H5v-3H1v-6a3 3 0 0 1 3-3h2zm2-4v4h8V5H8zm9 14v-5H7v5h10zm2-3h2v-4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v4h2v-4h14v4z'/%3E%3C/svg%3E") center / contain no-repeat;
+        mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='black' d='M6 9V3h12v6h2a3 3 0 0 1 3 3v6h-4v3H5v-3H1v-6a3 3 0 0 1 3-3h2zm2-4v4h8V5H8zm9 14v-5H7v5h10zm2-3h2v-4a1 1 0 0 0-1-1H4a1 1 0 0 0-1 1v4h2v-4h14v4z'/%3E%3C/svg%3E") center / contain no-repeat;
+      }
+      @media print {
+        @page {
+          size: A4 landscape;
+          margin: 10mm;
+        }
+        * {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+          forced-color-adjust: none !important;
+        }
+        html, body {
+          height: auto;
+          overflow: visible;
+          display: block !important;
+          background: #ffffff;
+        }
+        #calendar {
+          width: 100% !important;
+          overflow: visible !important;
+          height: auto !important;
+        }
+        .fc {
+          height: auto !important;
+          border: 0 !important;
+          box-shadow: none !important;
+          padding: 0 !important;
+        }
+        .fc .fc-view-harness,
+        .fc .fc-scroller {
+          height: auto !important;
+          max-height: none !important;
+          overflow: visible !important;
+        }
+        body[data-print-view='multiMonthYear'] .fc .fc-multimonth {
+          display: flex !important;
+          flex-wrap: wrap !important;
+          column-gap: 6mm;
+          row-gap: 6mm;
+        }
+        body[data-print-view='multiMonthYear'] .fc .fc-multimonth-month {
+          flex: 0 0 calc((100% - 12mm) / 3);
+          max-width: calc((100% - 12mm) / 3);
+          break-inside: avoid;
+          page-break-inside: avoid;
+        }
+        body[data-print-view='multiMonthYear'] .fc .fc-multimonth-month:nth-child(3n) {
+          break-after: page;
+          page-break-after: always;
+        }
+        .fc .fc-event,
+        .fc .fc-bg-event,
+        .fc .fc-highlight,
+        .fc .fc-daygrid-day.day-weekend,
+        .fc .fc-daygrid-day.day-vacation {
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        .fc .fc-header-toolbar,
+        .calendar-settings-popover,
+        .event-modal,
+        .calendar-filter-wrap {
+          display: none !important;
+        }
       }
     </style>
   </head>
@@ -1062,7 +1740,7 @@
     <div id='calendar'></div>
     <div id='calendar-label-settings' class='calendar-settings-popover' aria-hidden='true'>
       <p class='calendar-settings-popover__title'>Calendar settings</p>
-      <p class='calendar-settings-popover__hint'>Control labels and month width for yearly view.</p>
+      <p class='calendar-settings-popover__hint'>Control labels, Google source, month width, and global roundness.</p>
       <label class='calendar-settings-popover__check'>
         <input id='toggle-society-badges' type='checkbox' checked />
         <span>Show NICA/TOHU badges</span>
@@ -1071,10 +1749,20 @@
         <input id='toggle-recurring-badge' type='checkbox' checked />
         <span>Show REC badge</span>
       </label>
+      <label class='calendar-settings-popover__check'>
+        <input id='toggle-google-events' type='checkbox' />
+        <span>Show Google events</span>
+      </label>
+      <p id='setting-google-status' class='calendar-settings-popover__status'>Google source not configured.</p>
       <label class='calendar-settings-popover__field' for='setting-month-width'>Year view month width</label>
       <div class='calendar-settings-popover__range-wrap'>
         <input id='setting-month-width' class='calendar-settings-popover__range' type='range' min='220' max='520' step='10' />
         <span id='setting-month-width-value' class='calendar-settings-popover__value'>300 px</span>
+      </div>
+      <label class='calendar-settings-popover__field' for='setting-roundness'>Global roundness</label>
+      <div class='calendar-settings-popover__range-wrap'>
+        <input id='setting-roundness' class='calendar-settings-popover__range' type='range' min='0' max='24' step='1' />
+        <span id='setting-roundness-value' class='calendar-settings-popover__value'>8 px</span>
       </div>
     </div>
     <div id='create-event-modal' class='event-modal' aria-hidden='true'>
@@ -1087,5 +1775,10 @@
         </div>
       </div>
     </div>
+    <div id='day-action-modal' class='day-action-menu' role='dialog' aria-modal='false' aria-label='Day actions' aria-hidden='true'>
+      <button id='day-action-focus' class='day-action-menu__item' type='button'>Set focus day</button>
+      <button id='day-action-create' class='day-action-menu__item day-action-menu__item--primary' type='button'>Create event</button>
+    </div>
   </body>
 </html>
+
