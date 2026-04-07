@@ -96,26 +96,6 @@ window.CALENDAR_EVENTS = [
     "borderColor": "cyan"
   },
   {
-    "id": "6. Obsidian/Inbox/xgfsgfs.md",
-    "title": "xgfsgfs",
-    "allDay": true,
-    "extendedProps": {
-      "sourcePath": "6. Obsidian/Inbox/xgfsgfs.md"
-    },
-    "start": "2026-03-02",
-    "end": "2026-03-05"
-  },
-  {
-    "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/hgvhtz.md",
-    "title": "hgvhtz",
-    "allDay": true,
-    "extendedProps": {
-      "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/hgvhtz.md"
-    },
-    "start": "2026-03-09",
-    "end": "2026-03-12"
-  },
-  {
     "id": "6. Obsidian/Inbox/Osterferien 2026.md",
     "title": "Osterferien 2026",
     "allDay": true,

@@ -157,18 +157,94 @@
         return response.json();
       }
 
-      async function rebuildEventsAndReload() {
+      async function rebuildEventsAndReload(payload) {
         if (!isHttpContext()) {
           throw new Error('Calendar is not running on http(s). Open the preview server URL.');
         }
 
         var rebuildUrl = new URL('/api/events/rebuild', CALENDAR_API_BASE).toString();
-        var response = await fetch(rebuildUrl, { method: 'POST' });
+        var response = await fetch(rebuildUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload || {})
+        });
         if (!response.ok) {
           var text = await response.text();
           throw new Error(text || 'Could not rebuild events');
         }
         window.location.reload();
+      }
+
+      async function fetchCalendarFilters() {
+        var filtersUrl = new URL('/api/calendar/filters', CALENDAR_API_BASE).toString();
+        var response = await fetch(filtersUrl, { method: 'GET' });
+        if (!response.ok) {
+          var text = await response.text();
+          throw new Error(text || 'Could not load calendar filters');
+        }
+        return response.json();
+      }
+
+      function createFilterSelect(meta) {
+        var wrap = document.createElement('span');
+        wrap.className = 'calendar-filter-wrap';
+
+        var select = document.createElement('select');
+        select.className = 'calendar-filter-select';
+        select.setAttribute('aria-label', 'Calendar filter');
+
+        var filters = (meta && meta.filters) || [];
+        var currentPath = meta && meta.current && meta.current.path ? meta.current.path : '';
+        var currentView = meta && meta.current && meta.current.view ? meta.current.view : 'Tabelle';
+
+        filters.forEach(function(filter) {
+          var option = document.createElement('option');
+          option.value = String(filter.path || '');
+          option.textContent = String(filter.title || filter.path || 'Unnamed Base');
+          option.dataset.baseView = String(filter.view || 'Tabelle');
+          if (option.value === currentPath && option.dataset.baseView === currentView) {
+            option.selected = true;
+          }
+          select.appendChild(option);
+        });
+
+        wrap.appendChild(select);
+        return { wrap: wrap, select: select };
+      }
+
+      async function mountFilterDropdown(calendarEl) {
+        try {
+          var meta = await fetchCalendarFilters();
+          if (!meta || !meta.filters || !meta.filters.length) return;
+
+          var leftToolbarChunk = calendarEl.closest('body').querySelector('.fc-header-toolbar .fc-toolbar-chunk');
+          if (!leftToolbarChunk) return;
+
+          var controls = createFilterSelect(meta);
+          var refreshButton = calendarEl.closest('body').querySelector('.fc-refreshCalendar-button');
+          if (refreshButton && refreshButton.parentElement) {
+            refreshButton.insertAdjacentElement('afterend', controls.wrap);
+          } else {
+            leftToolbarChunk.appendChild(controls.wrap);
+          }
+
+          controls.select.addEventListener('change', async function(event) {
+            var selectedOption = event.target.options[event.target.selectedIndex];
+            var basePath = selectedOption ? selectedOption.value : '';
+            var baseView = selectedOption ? selectedOption.dataset.baseView : 'Tabelle';
+            if (!basePath) return;
+
+            controls.select.disabled = true;
+            try {
+              await rebuildEventsAndReload({ basePath: basePath, baseView: baseView });
+            } catch (error) {
+              alert('Filter change failed: ' + error.message);
+              controls.select.disabled = false;
+            }
+          });
+        } catch (error) {
+          console.warn('Could not mount filter dropdown:', error.message);
+        }
       }
 
       async function onEventDateChange(info) {
@@ -269,6 +345,7 @@
           eventResize: onEventDateChange
         });
         calendar.render();
+        mountFilterDropdown(calendarEl);
 
         // Fallback for environments where FullCalendar select/date callbacks are unreliable.
         calendarEl.addEventListener('click', function(event) {
@@ -296,6 +373,19 @@
       }
       .fc .fc-multimonth-daygrid .fc-daygrid-day-frame {
         min-height: 5.5em;
+      }
+      .calendar-filter-wrap {
+        display: inline-flex;
+        margin-left: 8px;
+      }
+      .calendar-filter-select {
+        height: 2.3em;
+        min-width: 220px;
+        border-radius: 6px;
+        border: 1px solid #cbd5e1;
+        background: #ffffff;
+        color: #0f172a;
+        padding: 0 8px;
       }
       .event-modal {
         position: fixed;

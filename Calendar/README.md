@@ -23,7 +23,19 @@ If Base query is not available, it falls back to scanning markdown files for:
   - optional `event_recurrence_interval` (every N weeks)
   - optional `event_recurrence_exdates: [YYYY-MM-DD, ...]` for skipped occurrences
   - optional `event_recurrence_rdates: [YYYY-MM-DD, ...]` for added/moved occurrences
-  - optional `event_recurrence_exrule` (JSON string, advanced)
+- optional `event_recurrence_exrule` (JSON string, advanced)
+
+## Base filter bookmarks
+
+Calendar Base filters are discovered from Obsidian bookmarks:
+
+- file: `.obsidian/bookmarks.json`
+- folder/group title: `Kalendar Bases`
+- supported bookmark type: `file` entries ending in `.base`
+
+In `cal.html`, a filter dropdown appears next to the `Refresh` button.
+When you change the filter, the app calls `POST /api/events/rebuild` with that base path/view,
+rebuilds `events.generated.js`, and reloads the calendar.
 
 Example frontmatter:
 

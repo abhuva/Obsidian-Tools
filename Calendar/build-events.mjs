@@ -210,6 +210,29 @@ function isIsoDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function parseDateLikeToIsoDate(value) {
+  if (value == null) return "";
+  const raw = String(value).trim();
+  if (!raw) return "";
+  if (isIsoDate(raw)) return raw;
+  const dateOnlyMatch = raw.match(/^(\d{4}-\d{2}-\d{2})[T\s].*$/);
+  if (dateOnlyMatch?.[1] && isIsoDate(dateOnlyMatch[1])) return dateOnlyMatch[1];
+  const timestamp = Date.parse(raw);
+  if (Number.isNaN(timestamp)) return "";
+  return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function getStartDateFromFileMeta(filePath) {
+  try {
+    const stats = fs.statSync(filePath);
+    const birthtimeIso = parseDateLikeToIsoDate(stats.birthtime);
+    if (birthtimeIso) return birthtimeIso;
+    return parseDateLikeToIsoDate(stats.ctime);
+  } catch {
+    return "";
+  }
+}
+
 function addOneDay(isoDate) {
   const [year, month, day] = isoDate.split("-").map(Number);
   const utcDate = new Date(Date.UTC(year, month - 1, day));
@@ -242,7 +265,26 @@ function toCalendarEvent(filePath) {
   const taggedAsEvent = tags.includes("event") || hasInlineEventTag(content);
   if (!taggedAsEvent) return null;
 
-  const startDate = extractField(frontmatter, "startDate", "startdate");
+  const startDateFromFrontmatter = extractField(
+    frontmatter,
+    "event_start",
+    "eventStart",
+    "startDate",
+    "startdate"
+  );
+  const createdDateFromFrontmatter = extractField(
+    frontmatter,
+    "created",
+    "creationDate",
+    "created_at",
+    "date_created",
+    "file_created",
+    "ctime"
+  );
+  const startDate =
+    parseDateLikeToIsoDate(startDateFromFrontmatter) ||
+    parseDateLikeToIsoDate(createdDateFromFrontmatter) ||
+    getStartDateFromFileMeta(filePath);
   const endDate = extractField(frontmatter, "endDate", "enddate");
   if (!isIsoDate(startDate)) return null;
 
@@ -364,11 +406,29 @@ function queryBaseRows() {
 }
 
 function baseRowToCalendarEvent(row) {
-  const startDate = String(row.startDate ?? "").trim();
+  const sourcePath = String(row.path ?? "").trim();
+  const sourceFilePath = sourcePath ? path.resolve(VAULT_ROOT, sourcePath) : "";
+  const startDate =
+    parseDateLikeToIsoDate(
+      row.event_start ??
+        row.eventStart ??
+        row.startDate ??
+        row.startdate
+    ) ||
+    parseDateLikeToIsoDate(
+      row.created ??
+        row.creationDate ??
+        row.created_at ??
+        row.date_created ??
+        row.file_created ??
+        row.fileCtime ??
+        row.file_ctime ??
+        row.ctime
+    ) ||
+    (sourceFilePath ? getStartDateFromFileMeta(sourceFilePath) : "");
   const endDate = String(row.endDate ?? "").trim();
   if (!isIsoDate(startDate)) return null;
 
-  const sourcePath = String(row.path ?? "").trim();
   let eventColor =
     String(row.event_color ?? "").trim() ||
     String(row.eventColor ?? "").trim() ||

@@ -12,6 +12,11 @@ const PORT = Number(process.env.CALENDAR_PORT || 4173);
 const ROOT = __dirname;
 const VAULT_ROOT = path.resolve(__dirname, "..", "..");
 const INBOX_PATH = process.env.CALENDAR_INBOX_PATH || "6. Obsidian/Inbox";
+const DEFAULT_BASE_PATH = process.env.OBSIDIAN_BASE_PATH || "6. Obsidian/Live/Kalender.base";
+const DEFAULT_BASE_VIEW = process.env.OBSIDIAN_BASE_VIEW || "Tabelle";
+const BOOKMARKS_FILE = path.resolve(VAULT_ROOT, ".obsidian", "bookmarks.json");
+const FILTER_STATE_FILE = path.resolve(ROOT, "calendar.filter-state.json");
+const KALENDAR_BASES_GROUP = "Kalendar Bases";
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -24,6 +29,106 @@ const MIME_TYPES = {
   ".jpeg": "image/jpeg",
   ".ico": "image/x-icon"
 };
+
+function normalizeVaultRelativePath(value) {
+  return String(value || "").replace(/\\/g, "/").replace(/^\/+/, "").trim();
+}
+
+function sanitizeBaseFilter(basePath, baseView, title = "") {
+  const pathValue = normalizeVaultRelativePath(basePath);
+  return {
+    path: pathValue,
+    view: String(baseView || DEFAULT_BASE_VIEW).trim() || DEFAULT_BASE_VIEW,
+    title: String(title || "").trim() || path.basename(pathValue, ".base")
+  };
+}
+
+function isValidBasePath(basePath) {
+  const normalized = normalizeVaultRelativePath(basePath).toLowerCase();
+  return normalized.endsWith(".base");
+}
+
+function basePathExists(basePath) {
+  const normalized = normalizeVaultRelativePath(basePath);
+  if (!normalized || !isValidBasePath(normalized)) return false;
+  const resolved = path.resolve(VAULT_ROOT, normalized);
+  if (!resolved.startsWith(VAULT_ROOT)) return false;
+  return fs.existsSync(resolved) && fs.statSync(resolved).isFile();
+}
+
+function loadSavedFilterState() {
+  try {
+    if (!fs.existsSync(FILTER_STATE_FILE)) return null;
+    const parsed = JSON.parse(fs.readFileSync(FILTER_STATE_FILE, "utf8"));
+    if (!parsed || typeof parsed !== "object") return null;
+    if (!isValidBasePath(parsed.path) || !basePathExists(parsed.path)) return null;
+    return sanitizeBaseFilter(parsed.path, parsed.view, parsed.title);
+  } catch {
+    return null;
+  }
+}
+
+function saveFilterState(filter) {
+  const safeFilter = sanitizeBaseFilter(filter.path, filter.view, filter.title);
+  fs.writeFileSync(FILTER_STATE_FILE, JSON.stringify(safeFilter, null, 2), "utf8");
+}
+
+function collectBaseBookmarks(items, inKalendarBasesGroup = false) {
+  const results = [];
+  for (const item of items || []) {
+    if (!item || typeof item !== "object") continue;
+    if (item.type === "group") {
+      const nextInGroup =
+        inKalendarBasesGroup || String(item.title || "").trim() === KALENDAR_BASES_GROUP;
+      results.push(...collectBaseBookmarks(item.items || [], nextInGroup));
+      continue;
+    }
+    if (!inKalendarBasesGroup || item.type !== "file") continue;
+
+    const itemPath = normalizeVaultRelativePath(item.path || "");
+    if (!isValidBasePath(itemPath) || !basePathExists(itemPath)) continue;
+    const itemView = String(item.view || DEFAULT_BASE_VIEW).trim() || DEFAULT_BASE_VIEW;
+    const itemTitle = String(item.title || "").trim() || path.basename(itemPath, ".base");
+    results.push(sanitizeBaseFilter(itemPath, itemView, itemTitle));
+  }
+  return results;
+}
+
+function readAvailableBaseFilters() {
+  const defaultFilter = sanitizeBaseFilter(DEFAULT_BASE_PATH, DEFAULT_BASE_VIEW, "Kalender");
+  const byPath = new Map();
+  if (basePathExists(defaultFilter.path)) {
+    byPath.set(defaultFilter.path, defaultFilter);
+  }
+
+  try {
+    if (fs.existsSync(BOOKMARKS_FILE)) {
+      const raw = fs.readFileSync(BOOKMARKS_FILE, "utf8");
+      const bookmarks = JSON.parse(raw);
+      for (const filter of collectBaseBookmarks(bookmarks.items || [])) {
+        byPath.set(filter.path, filter);
+      }
+    }
+  } catch {
+    // Keep running with default filter only.
+  }
+
+  return [...byPath.values()];
+}
+
+function selectCurrentBaseFilter(availableFilters) {
+  const saved = loadSavedFilterState();
+  if (saved) {
+    const matched = availableFilters.find((f) => f.path === saved.path) || saved;
+    return sanitizeBaseFilter(matched.path, saved.view || matched.view, matched.title || saved.title);
+  }
+
+  const envDefault = sanitizeBaseFilter(DEFAULT_BASE_PATH, DEFAULT_BASE_VIEW, "Kalender");
+  const envMatch = availableFilters.find((f) => f.path === envDefault.path);
+  if (envMatch) return envMatch;
+  if (basePathExists(envDefault.path)) return envDefault;
+  return availableFilters[0] || envDefault;
+}
 
 function safeResolve(urlPath) {
   const decoded = decodeURIComponent(urlPath.split("?")[0]);
@@ -222,18 +327,45 @@ function openMarkdownInObsidianNewTab(sourcePath) {
   return vaultRelativePath;
 }
 
-function rebuildEventsFile() {
+function rebuildEventsFile(baseFilter) {
+  const filter = sanitizeBaseFilter(baseFilter.path, baseFilter.view, baseFilter.title);
+  if (!isValidBasePath(filter.path) || !basePathExists(filter.path)) {
+    throw new Error(`Base file not found: ${filter.path}`);
+  }
   execFileSync(process.execPath, [path.join(ROOT, "build-events.mjs")], {
     cwd: ROOT,
+    env: {
+      ...process.env,
+      OBSIDIAN_BASE_PATH: filter.path,
+      OBSIDIAN_BASE_VIEW: filter.view
+    },
     encoding: "utf8",
     stdio: "pipe"
   });
+}
+
+const availableBaseFilters = readAvailableBaseFilters();
+let currentBaseFilter = selectCurrentBaseFilter(availableBaseFilters);
+if (currentBaseFilter?.path && basePathExists(currentBaseFilter.path)) {
+  saveFilterState(currentBaseFilter);
 }
 
 const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/api/ping") {
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/api/calendar/filters") {
+    const filters = readAvailableBaseFilters();
+    const selected =
+      filters.find((item) => item.path === currentBaseFilter.path) ||
+      selectCurrentBaseFilter(filters);
+    currentBaseFilter = selected;
+    saveFilterState(selected);
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: true, current: selected, filters }));
     return;
   }
 
@@ -364,14 +496,60 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === "POST" && req.url === "/api/events/rebuild") {
-    try {
-      rebuildEventsFile();
-      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
-      res.end(JSON.stringify({ ok: true }));
-    } catch (error) {
-      res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
-      res.end(error.message || "Could not rebuild events");
-    }
+    readRequestBody(req)
+      .then((rawBody) => {
+        let payload = {};
+        if (rawBody && rawBody.trim()) {
+          try {
+            payload = JSON.parse(rawBody);
+          } catch {
+            res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+            res.end("Invalid JSON payload");
+            return;
+          }
+        }
+
+        const filters = readAvailableBaseFilters();
+        const requestedBasePath = normalizeVaultRelativePath(payload.basePath || "");
+        let nextFilter = currentBaseFilter;
+
+        if (requestedBasePath) {
+          const fromBookmarks = filters.find((f) => f.path === requestedBasePath);
+          if (fromBookmarks) {
+            nextFilter = sanitizeBaseFilter(
+              fromBookmarks.path,
+              payload.baseView || fromBookmarks.view,
+              fromBookmarks.title
+            );
+          } else if (isValidBasePath(requestedBasePath) && basePathExists(requestedBasePath)) {
+            nextFilter = sanitizeBaseFilter(
+              requestedBasePath,
+              payload.baseView || DEFAULT_BASE_VIEW,
+              payload.baseTitle || path.basename(requestedBasePath, ".base")
+            );
+          } else {
+            res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+            res.end(`Invalid basePath: ${requestedBasePath}`);
+            return;
+          }
+        } else if (payload.baseView) {
+          nextFilter = sanitizeBaseFilter(
+            currentBaseFilter.path,
+            payload.baseView,
+            currentBaseFilter.title
+          );
+        }
+
+        rebuildEventsFile(nextFilter);
+        currentBaseFilter = nextFilter;
+        saveFilterState(currentBaseFilter);
+        res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+        res.end(JSON.stringify({ ok: true, current: currentBaseFilter }));
+      })
+      .catch((error) => {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end(error.message || "Could not rebuild events");
+      });
     return;
   }
 
@@ -402,6 +580,6 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`Calendar preview server: http://${HOST}:${PORT}/cal.html`);
   console.log(
-    "Calendar API endpoints ready: POST /api/events/update-dates, POST /api/events/open-note, POST /api/events/create, POST /api/events/rebuild"
+    "Calendar API endpoints ready: GET /api/calendar/filters, POST /api/events/update-dates, POST /api/events/open-note, POST /api/events/create, POST /api/events/rebuild"
   );
 });
