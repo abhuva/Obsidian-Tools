@@ -152,6 +152,70 @@ Planned later (Option 3):
 
 - we want to extract/shared theme utilities between Homepage and Calendar, so theme snapshot/mapping logic is not duplicated across both tools.
 
+## Render/Class hooks (current behavior)
+
+`cal.html` currently uses FullCalendar hooks for semantic styling:
+
+- `eventClassNames`: adds classes based on event semantics
+  - recurring events -> `ev-recurring`
+  - recurring override instances -> `ev-recurring-override`
+  - background events -> `ev-background`
+  - society classes -> `ev-society-nica` / `ev-society-tohu`
+- `eventContent`: renders compact badges before title text
+  - `NICA` or `TOHU`
+  - `REC` for recurring events
+- `dayCellClassNames`: adds day-level classes
+  - weekends -> `day-weekend`
+  - days covered by background events -> `day-vacation`
+
+### User controls (settings popover)
+
+Calendar toolbar now includes a compact settings icon button (gear).
+It opens a popover with:
+
+- `Show NICA/TOHU badges`
+- `Show REC badge`
+- `Year view month width` (slider, maps to FullCalendar `multiMonthMinWidth`)
+
+Behavior:
+
+- changes apply immediately (events rerender in place)
+- settings are stored in `localStorage` under key `calendar-ui-settings-v1`
+- defaults:
+  - both label toggles enabled
+  - year-view month width: `300`
+
+### Society label inference (important)
+
+Society labels are not read from frontmatter metadata right now.
+They are inferred from `extendedProps.sourcePath` with string matching:
+
+- if path contains ` TOHU ` or `/TOHU ` (case-insensitive via uppercase conversion), label is `TOHU`
+- if path contains ` NICA ` or `/NICA `, label is `NICA`
+- otherwise no society label is shown
+
+This is a heuristic. It works well for project folders following naming convention (`[Year] [Society] ...`) but can miss files in generic paths (for example Inbox/Meetings/custom folders).
+
+### Vacation day inference
+
+`day-vacation` is derived from events with `display: "background"`.
+For each background event, all covered dates are added to an in-memory day set and then marked on day cells.
+Date matching uses local calendar dates (not UTC conversion) to avoid timezone off-by-one mismatches in textured day rendering.
+
+### Recurring event colors
+
+Recurring events now respect `event_color` metadata as well.
+The builder applies event color before recurrence expansion so recurring instances/overrides inherit the same color.
+
+### Next technical improvement (recommended)
+
+To remove heuristic path matching, enrich generated events in `build-events.mjs` with explicit metadata:
+
+- `extendedProps.society` (`nica` / `tohu`)
+- optional future keys like `extendedProps.projectKey`, `extendedProps.eventType`
+
+Then UI hooks in `cal.html` should consume those explicit fields first and only fallback to path matching for legacy events.
+
 ## Drag and drop persistence
 
 Drag and resize are enabled in the calendar.
@@ -197,3 +261,4 @@ Created file details:
 - filename is derived from the entered title (with automatic ` (2)`, ` (3)`... on duplicates)
 - frontmatter includes `title`, `startDate`, `endDate`, `event_background: false`, and `tags: [event]`
 - the new event is added directly to the calendar view
+

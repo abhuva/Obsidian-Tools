@@ -325,6 +325,11 @@ function toCalendarEvent(filePath) {
     }
   };
 
+  if (eventColor) {
+    event.backgroundColor = eventColor;
+    event.borderColor = eventColor;
+  }
+
   if (recurrenceType === "weekly") {
     const daysOfWeek = recurrenceDays.length ? recurrenceDays : [dayOfWeekFromIsoDate(startDate)];
     event.rrule = {
@@ -379,11 +384,6 @@ function toCalendarEvent(filePath) {
     if (isIsoDate(endDate)) {
       event.end = addOneDay(endDate);
     }
-  }
-
-  if (eventColor) {
-    event.backgroundColor = eventColor;
-    event.borderColor = eventColor;
   }
 
   if (eventBackground) {
@@ -532,6 +532,11 @@ function baseRowToCalendarEvent(row) {
     }
   };
 
+  if (eventColor) {
+    event.backgroundColor = eventColor;
+    event.borderColor = eventColor;
+  }
+
   if (recurrenceType === "weekly") {
     const parsedDays = parseDaysOfWeek(recurrenceDays);
     event.rrule = {
@@ -590,11 +595,6 @@ function baseRowToCalendarEvent(row) {
     if (isIsoDate(endDate)) {
       event.end = addOneDay(endDate);
     }
-  }
-
-  if (eventColor) {
-    event.backgroundColor = eventColor;
-    event.borderColor = eventColor;
   }
 
   if (parseBoolean(eventBackground)) {
