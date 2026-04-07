@@ -130,6 +130,28 @@ npm.cmd --prefix .\Tools\Calendar run preview
 1. FullCalendar from CDN
 2. `events.generated.js` from local folder
 
+## UI theming (mirror Obsidian)
+
+Calendar now mirrors the active Obsidian theme colors when running via preview server.
+
+- frontend fetches `GET /api/obsidian/theme`
+- server reads Obsidian CSS vars via `obsidian eval`
+- `cal.html` maps those values to Calendar and FullCalendar CSS tokens
+- if mirroring fails, built-in calendar defaults remain active
+
+For first paint, the last successful theme mapping is cached in `localStorage`:
+
+- key: `calendar-theme-bootstrap-v1`
+
+Important:
+
+- mirror theming requires HTTP preview (`npm.cmd --prefix .\Tools\Calendar run preview`)
+- `file://` mode cannot call the API endpoint
+
+Planned later (Option 3):
+
+- we want to extract/shared theme utilities between Homepage and Calendar, so theme snapshot/mapping logic is not duplicated across both tools.
+
 ## Drag and drop persistence
 
 Drag and resize are enabled in the calendar.

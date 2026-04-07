@@ -8,11 +8,161 @@
     <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/rrule@6.1.20/index.global.min.js'></script>
     <script src='./events.generated.js'></script>
     <script>
+      (function() {
+        var CACHE_KEY = 'calendar-theme-bootstrap-v1';
+        var raw = null;
+        try {
+          raw = window.localStorage ? window.localStorage.getItem(CACHE_KEY) : null;
+        } catch (error) {
+          return;
+        }
+        if (!raw) return;
+
+        var cached = null;
+        try {
+          cached = JSON.parse(raw);
+        } catch (error) {
+          return;
+        }
+        if (!cached || typeof cached !== 'object') return;
+        var vars = cached.vars && typeof cached.vars === 'object' ? cached.vars : null;
+        if (!vars) return;
+
+        var root = document.documentElement;
+        Object.keys(vars).forEach(function(key) {
+          var value = vars[key];
+          if (String(key).indexOf('--') !== 0) return;
+          if (typeof value !== 'string' || !value.trim()) return;
+          root.style.setProperty(key, value);
+        });
+      })();
+    </script>
+    <script>
       var CALENDAR_API_BASE = window.CALENDAR_API_BASE || window.location.origin;
+      var THEME_CACHE_KEY = 'calendar-theme-bootstrap-v1';
       var isCreateFlowActive = false;
 
       function isHttpContext() {
         return window.location.protocol === 'http:' || window.location.protocol === 'https:';
+      }
+
+      function currentThemeCssVarSnapshot() {
+        var names = [
+          '--cal-bg-a',
+          '--cal-bg-b',
+          '--cal-surface',
+          '--cal-surface-strong',
+          '--cal-border',
+          '--cal-text',
+          '--cal-text-soft',
+          '--cal-accent',
+          '--cal-accent-soft',
+          '--cal-success',
+          '--cal-danger',
+          '--cal-shadow',
+          '--fc-page-bg-color',
+          '--fc-neutral-bg-color',
+          '--fc-neutral-text-color',
+          '--fc-border-color',
+          '--fc-button-bg-color',
+          '--fc-button-border-color',
+          '--fc-button-text-color',
+          '--fc-button-hover-bg-color',
+          '--fc-button-hover-border-color',
+          '--fc-button-active-bg-color',
+          '--fc-button-active-border-color',
+          '--fc-today-bg-color',
+          '--fc-event-bg-color',
+          '--fc-event-border-color',
+          '--fc-event-text-color',
+          '--fc-list-event-hover-bg-color'
+        ];
+        var out = {};
+        var root = document.documentElement;
+        names.forEach(function(name) {
+          var value = root.style.getPropertyValue(name);
+          if (value && String(value).trim()) out[name] = String(value).trim();
+        });
+        return out;
+      }
+
+      function persistThemeBootstrapCache(vars) {
+        try {
+          localStorage.setItem(THEME_CACHE_KEY, JSON.stringify({ vars: vars || {} }));
+        } catch (error) {
+          // noop
+        }
+      }
+
+      function applyMirroredThemeVars(themeVars) {
+        var accent = String(themeVars && themeVars.accent || '').trim();
+        var accentHover = String(themeVars && themeVars.accentHover || '').trim();
+        var bgPrimary = String(themeVars && themeVars.bgPrimary || '').trim();
+        var bgSecondary = String(themeVars && themeVars.bgSecondary || '').trim();
+        var bgMod = String(themeVars && themeVars.bgMod || '').trim();
+        var border = String(themeVars && themeVars.border || '').trim();
+        var text = String(themeVars && themeVars.text || '').trim();
+        var textMuted = String(themeVars && themeVars.textMuted || '').trim();
+        var textSuccess = String(themeVars && themeVars.textSuccess || '').trim();
+        var textError = String(themeVars && themeVars.textError || '').trim();
+
+        if (!accent || !bgPrimary || !text) return false;
+
+        var root = document.documentElement;
+        root.style.setProperty('--cal-bg-a', bgSecondary || bgPrimary);
+        root.style.setProperty('--cal-bg-b', bgPrimary);
+        root.style.setProperty('--cal-surface', bgPrimary);
+        root.style.setProperty('--cal-surface-strong', bgMod || bgSecondary || bgPrimary);
+        root.style.setProperty('--cal-border', border || 'rgba(128, 128, 128, 0.3)');
+        root.style.setProperty('--cal-text', text);
+        root.style.setProperty('--cal-text-soft', textMuted || text);
+        root.style.setProperty('--cal-accent', accent);
+        root.style.setProperty('--cal-accent-soft', accentHover || accent);
+        root.style.setProperty('--cal-success', textSuccess || '#1b8e4a');
+        root.style.setProperty('--cal-danger', textError || '#a42130');
+        root.style.setProperty('--cal-shadow', '0 12px 30px rgba(0, 0, 0, 0.20)');
+
+        root.style.setProperty('--fc-page-bg-color', bgPrimary);
+        root.style.setProperty('--fc-neutral-bg-color', bgMod || bgSecondary || bgPrimary);
+        root.style.setProperty('--fc-neutral-text-color', text);
+        root.style.setProperty('--fc-border-color', border || 'rgba(128, 128, 128, 0.3)');
+        root.style.setProperty('--fc-button-bg-color', accent);
+        root.style.setProperty('--fc-button-border-color', accent);
+        root.style.setProperty('--fc-button-text-color', '#ffffff');
+        root.style.setProperty('--fc-button-hover-bg-color', accentHover || accent);
+        root.style.setProperty('--fc-button-hover-border-color', accentHover || accent);
+        root.style.setProperty('--fc-button-active-bg-color', accentHover || accent);
+        root.style.setProperty('--fc-button-active-border-color', accentHover || accent);
+        root.style.setProperty('--fc-today-bg-color', bgMod || bgSecondary || bgPrimary);
+        root.style.setProperty('--fc-event-bg-color', accent);
+        root.style.setProperty('--fc-event-border-color', accent);
+        root.style.setProperty('--fc-event-text-color', '#ffffff');
+        root.style.setProperty('--fc-list-event-hover-bg-color', bgMod || bgSecondary || bgPrimary);
+        return true;
+      }
+
+      async function fetchObsidianThemeSnapshot() {
+        var themeUrl = new URL('/api/obsidian/theme', CALENDAR_API_BASE).toString();
+        var response = await fetch(themeUrl, { method: 'GET' });
+        if (!response.ok) {
+          var text = await response.text();
+          throw new Error(text || 'Could not load Obsidian theme');
+        }
+        var payload = await response.json();
+        return payload && payload.theme ? payload.theme : null;
+      }
+
+      async function applyCalendarTheme() {
+        if (!isHttpContext()) return;
+        try {
+          var theme = await fetchObsidianThemeSnapshot();
+          var mirrored = applyMirroredThemeVars(theme && theme.vars ? theme.vars : null);
+          if (mirrored) {
+            persistThemeBootstrapCache(currentThemeCssVarSnapshot());
+          }
+        } catch (error) {
+          console.warn('Could not mirror Obsidian theme for calendar:', error.message);
+        }
       }
 
       function showCreateEventDialog() {
@@ -297,7 +447,8 @@
         await createEventForDates(info.view.calendar, info.dateStr, info.dateStr);
       }
 
-      document.addEventListener('DOMContentLoaded', function() {
+      document.addEventListener('DOMContentLoaded', async function() {
+        await applyCalendarTheme();
         var calendarEl = document.getElementById('calendar');
         var calendar = new FullCalendar.Calendar(calendarEl, {
           initialView: 'multiMonthYear',
@@ -362,14 +513,78 @@
 
     </script>
     <style>
+      :root {
+        --cal-bg-a: #eef4fb;
+        --cal-bg-b: #f7faf5;
+        --cal-surface: #ffffff;
+        --cal-surface-strong: #ffffff;
+        --cal-border: rgba(23, 40, 73, 0.14);
+        --cal-text: #13213b;
+        --cal-text-soft: #4a5b7c;
+        --cal-accent: #0f72d8;
+        --cal-accent-soft: #2f85df;
+        --cal-success: #1b8e4a;
+        --cal-danger: #a42130;
+        --cal-shadow: 0 12px 30px rgba(21, 45, 94, 0.14);
+        --fc-page-bg-color: var(--cal-surface);
+        --fc-neutral-bg-color: var(--cal-surface-strong);
+        --fc-neutral-text-color: var(--cal-text);
+        --fc-border-color: var(--cal-border);
+        --fc-button-bg-color: var(--cal-accent);
+        --fc-button-border-color: var(--cal-accent);
+        --fc-button-text-color: #ffffff;
+        --fc-button-hover-bg-color: var(--cal-accent-soft);
+        --fc-button-hover-border-color: var(--cal-accent-soft);
+        --fc-button-active-bg-color: var(--cal-accent-soft);
+        --fc-button-active-border-color: var(--cal-accent-soft);
+        --fc-today-bg-color: color-mix(in srgb, var(--cal-accent) 10%, var(--cal-surface) 90%);
+        --fc-event-bg-color: var(--cal-accent);
+        --fc-event-border-color: var(--cal-accent);
+        --fc-event-text-color: #ffffff;
+        --fc-list-event-hover-bg-color: var(--cal-surface-strong);
+      }
       body {
         margin: 0;
-        font-family: sans-serif;
+        color: var(--cal-text);
+        font-family: "Segoe UI", "Aptos", "Helvetica Neue", sans-serif;
+        background: linear-gradient(155deg, var(--cal-bg-a), var(--cal-bg-b));
       }
       #calendar {
         max-width: 1100px;
         margin: 20px auto;
         padding: 0 12px;
+      }
+      .fc {
+        background: var(--cal-surface);
+        border: 1px solid var(--cal-border);
+        border-radius: 12px;
+        padding: 10px;
+        box-shadow: var(--cal-shadow);
+      }
+      .fc .fc-toolbar-title,
+      .fc .fc-col-header-cell-cushion,
+      .fc .fc-daygrid-day-number,
+      .fc .fc-multimonth-title {
+        color: var(--cal-text);
+      }
+      .fc .fc-day-other .fc-daygrid-day-number {
+        color: var(--cal-text-soft);
+      }
+      .fc-theme-standard td,
+      .fc-theme-standard th {
+        border-color: var(--cal-border);
+      }
+      .fc .fc-button-primary:focus {
+        box-shadow: 0 0 0 0.2rem color-mix(in srgb, var(--cal-accent) 30%, transparent 70%);
+      }
+      .fc .fc-button-primary:disabled {
+        opacity: 0.55;
+      }
+      .fc .fc-daygrid-day.fc-day-today {
+        background: var(--fc-today-bg-color);
+      }
+      .fc .fc-event {
+        border-radius: 6px;
       }
       .fc .fc-multimonth-daygrid .fc-daygrid-day-frame {
         min-height: 5.5em;
@@ -382,9 +597,9 @@
         height: 2.3em;
         min-width: 220px;
         border-radius: 6px;
-        border: 1px solid #cbd5e1;
-        background: #ffffff;
-        color: #0f172a;
+        border: 1px solid var(--cal-border);
+        background: var(--cal-surface-strong);
+        color: var(--cal-text);
         padding: 0 8px;
       }
       .event-modal {
@@ -401,10 +616,12 @@
       }
       .event-modal__card {
         width: min(420px, calc(100vw - 24px));
-        background: #ffffff;
+        color: var(--cal-text);
+        background: var(--cal-surface);
+        border: 1px solid var(--cal-border);
         border-radius: 10px;
         padding: 14px;
-        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+        box-shadow: var(--cal-shadow);
       }
       .event-modal__title {
         margin: 0 0 10px;
@@ -415,8 +632,10 @@
         box-sizing: border-box;
         font-size: 14px;
         padding: 8px 10px;
-        border: 1px solid #d1d5db;
+        color: var(--cal-text);
+        border: 1px solid var(--cal-border);
         border-radius: 6px;
+        background: var(--cal-surface-strong);
       }
       .event-modal__actions {
         margin-top: 12px;
@@ -425,16 +644,16 @@
         gap: 8px;
       }
       .event-modal__btn {
-        border: 1px solid #d1d5db;
-        background: #ffffff;
-        color: #111827;
+        border: 1px solid var(--cal-border);
+        background: var(--cal-surface-strong);
+        color: var(--cal-text);
         border-radius: 6px;
         padding: 6px 12px;
         cursor: pointer;
       }
       .event-modal__btn--primary {
-        border-color: #0f766e;
-        background: #0f766e;
+        border-color: var(--cal-accent);
+        background: var(--cal-accent);
         color: #ffffff;
       }
     </style>

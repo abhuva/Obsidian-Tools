@@ -344,6 +344,41 @@ function rebuildEventsFile(baseFilter) {
   });
 }
 
+function readObsidianThemeSnapshot() {
+  const js = `
+const bodyClasses = String(document.body?.className || "");
+const styles = getComputedStyle(document.body || document.documentElement);
+const isDark = bodyClasses.includes("theme-dark");
+const isLight = bodyClasses.includes("theme-light");
+JSON.stringify({
+  mode: isDark ? "dark" : (isLight ? "light" : "unknown"),
+  classes: bodyClasses,
+  cssTheme: app.vault.getConfig("cssTheme") || "",
+  baseTheme: app.vault.getConfig("theme") || "",
+  vars: {
+    accent: styles.getPropertyValue("--interactive-accent").trim(),
+    accentHover: styles.getPropertyValue("--interactive-accent-hover").trim(),
+    bgPrimary: styles.getPropertyValue("--background-primary").trim(),
+    bgSecondary: styles.getPropertyValue("--background-secondary").trim(),
+    bgMod: styles.getPropertyValue("--background-modifier-form-field").trim(),
+    border: styles.getPropertyValue("--background-modifier-border").trim(),
+    text: styles.getPropertyValue("--text-normal").trim(),
+    textMuted: styles.getPropertyValue("--text-muted").trim(),
+    textSuccess: styles.getPropertyValue("--text-success").trim(),
+    textError: styles.getPropertyValue("--text-error").trim()
+  }
+});
+`.trim();
+
+  const raw = execFileSync("obsidian", ["eval", `code=${js}`], {
+    cwd: VAULT_ROOT,
+    encoding: "utf8",
+    stdio: "pipe"
+  });
+  const clean = String(raw || "").replace(/^=>\s*/, "").trim();
+  return JSON.parse(clean);
+}
+
 const availableBaseFilters = readAvailableBaseFilters();
 let currentBaseFilter = selectCurrentBaseFilter(availableBaseFilters);
 if (currentBaseFilter?.path && basePathExists(currentBaseFilter.path)) {
@@ -354,6 +389,18 @@ const server = http.createServer((req, res) => {
   if (req.method === "GET" && req.url === "/api/ping") {
     res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
     res.end(JSON.stringify({ ok: true }));
+    return;
+  }
+
+  if (req.method === "GET" && req.url === "/api/obsidian/theme") {
+    try {
+      const theme = readObsidianThemeSnapshot();
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: true, theme }));
+    } catch (error) {
+      res.writeHead(502, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end(error.message || "Could not read Obsidian theme");
+    }
     return;
   }
 
@@ -580,6 +627,6 @@ const server = http.createServer((req, res) => {
 server.listen(PORT, HOST, () => {
   console.log(`Calendar preview server: http://${HOST}:${PORT}/cal.html`);
   console.log(
-    "Calendar API endpoints ready: GET /api/calendar/filters, POST /api/events/update-dates, POST /api/events/open-note, POST /api/events/create, POST /api/events/rebuild"
+    "Calendar API endpoints ready: GET /api/ping, GET /api/obsidian/theme, GET /api/calendar/filters, POST /api/events/update-dates, POST /api/events/open-note, POST /api/events/create, POST /api/events/rebuild"
   );
 });
