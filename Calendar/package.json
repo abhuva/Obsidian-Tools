@@ -1,0 +1,11 @@
+{
+  "name": "obsidian-fullcalendar-demo",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:events": "node ./build-events.mjs",
+    "preview": "npm run build:events && node ./serve.mjs",
+    "stop:preview": "node ./stop-preview.mjs",
+    "restart:preview": "npm run stop:preview && npm run preview"
+  }
+}

@@ -1,0 +1,365 @@
+<!DOCTYPE html>
+<html lang='en'>
+  <head>
+    <meta charset='utf-8' />
+    <meta name='viewport' content='width=device-width, initial-scale=1' />
+    <script src='https://cdn.jsdelivr.net/npm/rrule@2.8.1/dist/es5/rrule.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/fullcalendar@6.1.20/index.global.min.js'></script>
+    <script src='https://cdn.jsdelivr.net/npm/@fullcalendar/rrule@6.1.20/index.global.min.js'></script>
+    <script src='./events.generated.js'></script>
+    <script>
+      var CALENDAR_API_BASE = window.CALENDAR_API_BASE || window.location.origin;
+      var isCreateFlowActive = false;
+
+      function isHttpContext() {
+        return window.location.protocol === 'http:' || window.location.protocol === 'https:';
+      }
+
+      function showCreateEventDialog() {
+        return new Promise(function(resolve) {
+          var modal = document.getElementById('create-event-modal');
+          var input = document.getElementById('create-event-title');
+          var createBtn = document.getElementById('create-event-confirm');
+          var cancelBtn = document.getElementById('create-event-cancel');
+          if (!modal || !input || !createBtn || !cancelBtn) {
+            resolve(null);
+            return;
+          }
+
+          var done = false;
+          function cleanup() {
+            modal.classList.remove('is-open');
+            createBtn.removeEventListener('click', onCreate);
+            cancelBtn.removeEventListener('click', onCancel);
+            input.removeEventListener('keydown', onKeyDown);
+          }
+          function finish(value) {
+            if (done) return;
+            done = true;
+            cleanup();
+            resolve(value);
+          }
+          function onCreate() {
+            var title = input.value.trim();
+            if (!title) {
+              input.focus();
+              return;
+            }
+            finish(title);
+          }
+          function onCancel() {
+            finish(null);
+          }
+          function onKeyDown(event) {
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              onCreate();
+            }
+            if (event.key === 'Escape') {
+              event.preventDefault();
+              onCancel();
+            }
+          }
+
+          input.value = '';
+          modal.classList.add('is-open');
+          createBtn.addEventListener('click', onCreate);
+          cancelBtn.addEventListener('click', onCancel);
+          input.addEventListener('keydown', onKeyDown);
+          setTimeout(function() { input.focus(); }, 0);
+        });
+      }
+
+      function shiftIsoDate(isoDate, deltaDays) {
+        if (!isoDate) return null;
+        var parts = isoDate.split('-').map(Number);
+        var utcDate = new Date(Date.UTC(parts[0], parts[1] - 1, parts[2]));
+        utcDate.setUTCDate(utcDate.getUTCDate() + deltaDays);
+        return utcDate.toISOString().slice(0, 10);
+      }
+
+      function toInclusiveEndDate(exclusiveEndDate) {
+        return shiftIsoDate(exclusiveEndDate, -1);
+      }
+
+      function toFrontmatterDates(event) {
+        var startDate = event.startStr;
+        var endDate = event.endStr ? shiftIsoDate(event.endStr, -1) : event.startStr;
+        return { startDate: startDate, endDate: endDate };
+      }
+
+      async function saveEventDates(event) {
+        var sourcePath = event.extendedProps && event.extendedProps.sourcePath;
+        if (!sourcePath) throw new Error('Missing sourcePath for event');
+        if (!isHttpContext()) {
+          throw new Error('Calendar is not running on http(s). Open the preview server URL.');
+        }
+
+        var dates = toFrontmatterDates(event);
+        var updateUrl = new URL('/api/events/update-dates', CALENDAR_API_BASE).toString();
+        var response = await fetch(updateUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            sourcePath: sourcePath,
+            startDate: dates.startDate,
+            endDate: dates.endDate
+          })
+        });
+
+        if (!response.ok) {
+          var text = await response.text();
+          throw new Error((text || 'Could not save event') + ' (path: ' + sourcePath + ')');
+        }
+      }
+
+      async function openEventNote(event) {
+        var sourcePath = event.extendedProps && event.extendedProps.sourcePath;
+        if (!sourcePath) throw new Error('Missing sourcePath for event');
+        if (!isHttpContext()) {
+          throw new Error('Calendar is not running on http(s). Open the preview server URL.');
+        }
+
+        var openUrl = new URL('/api/events/open-note', CALENDAR_API_BASE).toString();
+        var response = await fetch(openUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ sourcePath: sourcePath })
+        });
+
+        if (!response.ok) {
+          var text = await response.text();
+          throw new Error((text || 'Could not open note') + ' (path: ' + sourcePath + ')');
+        }
+      }
+
+      async function createEvent(title, startDate, endDate) {
+        if (!isHttpContext()) {
+          throw new Error('Calendar is not running on http(s). Open the preview server URL.');
+        }
+
+        var createUrl = new URL('/api/events/create', CALENDAR_API_BASE).toString();
+        var response = await fetch(createUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: title,
+            startDate: startDate,
+            endDate: endDate
+          })
+        });
+
+        if (!response.ok) {
+          var text = await response.text();
+          throw new Error(text || 'Could not create event');
+        }
+
+        return response.json();
+      }
+
+      async function rebuildEventsAndReload() {
+        if (!isHttpContext()) {
+          throw new Error('Calendar is not running on http(s). Open the preview server URL.');
+        }
+
+        var rebuildUrl = new URL('/api/events/rebuild', CALENDAR_API_BASE).toString();
+        var response = await fetch(rebuildUrl, { method: 'POST' });
+        if (!response.ok) {
+          var text = await response.text();
+          throw new Error(text || 'Could not rebuild events');
+        }
+        window.location.reload();
+      }
+
+      async function onEventDateChange(info) {
+        try {
+          await saveEventDates(info.event);
+        } catch (error) {
+          info.revert();
+          alert('Saving failed: ' + error.message);
+        }
+      }
+
+      async function onEventClick(info) {
+        try {
+          await openEventNote(info.event);
+        } catch (error) {
+          alert('Open note failed: ' + error.message);
+        }
+      }
+
+      async function createEventForDates(calendar, startDate, endDate) {
+        if (isCreateFlowActive) return;
+        isCreateFlowActive = true;
+        var title = await showCreateEventDialog();
+        try {
+          if (title == null) return;
+          var trimmedTitle = title.trim();
+          if (!trimmedTitle) {
+            return;
+          }
+
+          var result = await createEvent(trimmedTitle, startDate, endDate);
+          if (result && result.event) {
+            calendar.addEvent(result.event);
+          }
+        } catch (error) {
+          alert('Create event failed: ' + error.message);
+        } finally {
+          isCreateFlowActive = false;
+        }
+      }
+
+      async function onDateSelect(info) {
+        info.view.calendar.unselect();
+        var startDate = info.startStr;
+        var endDate = info.endStr ? toInclusiveEndDate(info.endStr) : info.startStr;
+        await createEventForDates(info.view.calendar, startDate, endDate);
+      }
+
+      async function onDateClick(info) {
+        await createEventForDates(info.view.calendar, info.dateStr, info.dateStr);
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        var calendarEl = document.getElementById('calendar');
+        var calendar = new FullCalendar.Calendar(calendarEl, {
+          initialView: 'multiMonthYear',
+          firstDay: 1,
+          fixedWeekCount: false,
+          dayMaxEvents: false,
+          dayMaxEventRows: false,
+          customButtons: {
+            refreshCalendar: {
+              text: 'Refresh',
+              click: async function() {
+                var buttonEl = calendarEl.closest('body').querySelector('.fc-refreshCalendar-button');
+                if (!buttonEl || buttonEl.disabled) return;
+                buttonEl.disabled = true;
+                buttonEl.textContent = 'Refreshing...';
+                try {
+                  await rebuildEventsAndReload();
+                } catch (error) {
+                  alert('Refresh failed: ' + error.message);
+                  buttonEl.disabled = false;
+                  buttonEl.textContent = 'Refresh';
+                }
+              }
+            }
+          },
+          headerToolbar: {
+            left: 'prev,next today refreshCalendar',
+            center: 'title',
+            right: 'dayGridMonth,multiMonthYear'
+          },
+          views: {
+            multiMonthYear: {
+              dayMaxEvents: false,
+              dayMaxEventRows: false
+            }
+          },
+          editable: true,
+          selectable: true,
+          selectMinDistance: 0,
+          events: window.CALENDAR_EVENTS || [],
+          eventClick: onEventClick,
+          dateClick: onDateClick,
+          select: onDateSelect,
+          eventDrop: onEventDateChange,
+          eventResize: onEventDateChange
+        });
+        calendar.render();
+
+        // Fallback for environments where FullCalendar select/date callbacks are unreliable.
+        calendarEl.addEventListener('click', function(event) {
+          var eventEl = event.target.closest('.fc-event');
+          if (eventEl) return;
+          var dayCell = event.target.closest('.fc-daygrid-day[data-date]');
+          if (!dayCell) return;
+          var dateStr = dayCell.getAttribute('data-date');
+          if (!dateStr) return;
+          createEventForDates(calendar, dateStr, dateStr);
+        }, true);
+
+      });
+
+    </script>
+    <style>
+      body {
+        margin: 0;
+        font-family: sans-serif;
+      }
+      #calendar {
+        max-width: 1100px;
+        margin: 20px auto;
+        padding: 0 12px;
+      }
+      .fc .fc-multimonth-daygrid .fc-daygrid-day-frame {
+        min-height: 5.5em;
+      }
+      .event-modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        background: rgba(0, 0, 0, 0.35);
+        z-index: 1000;
+      }
+      .event-modal.is-open {
+        display: flex;
+      }
+      .event-modal__card {
+        width: min(420px, calc(100vw - 24px));
+        background: #ffffff;
+        border-radius: 10px;
+        padding: 14px;
+        box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+      }
+      .event-modal__title {
+        margin: 0 0 10px;
+        font-size: 16px;
+      }
+      .event-modal__input {
+        width: 100%;
+        box-sizing: border-box;
+        font-size: 14px;
+        padding: 8px 10px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+      }
+      .event-modal__actions {
+        margin-top: 12px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 8px;
+      }
+      .event-modal__btn {
+        border: 1px solid #d1d5db;
+        background: #ffffff;
+        color: #111827;
+        border-radius: 6px;
+        padding: 6px 12px;
+        cursor: pointer;
+      }
+      .event-modal__btn--primary {
+        border-color: #0f766e;
+        background: #0f766e;
+        color: #ffffff;
+      }
+    </style>
+  </head>
+  <body>
+    <div id='calendar'></div>
+    <div id='create-event-modal' class='event-modal' aria-hidden='true'>
+      <div class='event-modal__card' role='dialog' aria-modal='true' aria-label='Create event'>
+        <h3 class='event-modal__title'>Create event</h3>
+        <input id='create-event-title' class='event-modal__input' type='text' placeholder='Event title' />
+        <div class='event-modal__actions'>
+          <button id='create-event-cancel' class='event-modal__btn' type='button'>Cancel</button>
+          <button id='create-event-confirm' class='event-modal__btn event-modal__btn--primary' type='button'>Create</button>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
