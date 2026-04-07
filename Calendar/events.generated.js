@@ -2,7 +2,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
     "title": "Kurs 1 OAC",
-    "allDay": true,
+    "allDay": false,
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true
@@ -15,8 +15,11 @@ window.CALENDAR_EVENTS = [
       "byweekday": [
         "mo"
       ],
-      "dtstart": "2026-03-09",
+      "dtstart": "2026-04-07T12:00:00",
       "count": 20
+    },
+    "duration": {
+      "milliseconds": 3600000
     },
     "exdate": [
       "2026-03-09",
@@ -31,12 +34,12 @@ window.CALENDAR_EVENTS = [
       "2026-07-13",
       "2026-07-20"
     ],
-    "editable": false
+    "editable": true
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
     "title": "Kurs 2 JEP",
-    "allDay": true,
+    "allDay": false,
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "isRecurring": true
@@ -49,8 +52,11 @@ window.CALENDAR_EVENTS = [
       "byweekday": [
         "th"
       ],
-      "dtstart": "2026-03-26",
+      "dtstart": "2026-04-09T12:00:00+02:00",
       "count": 20
+    },
+    "duration": {
+      "milliseconds": 11580000
     },
     "exdate": [
       "2026-04-02",
@@ -61,12 +67,12 @@ window.CALENDAR_EVENTS = [
       "2026-07-30",
       "2026-08-06"
     ],
-    "editable": false
+    "editable": true
   },
   {
     "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
     "title": "Kurs Dornroesschen",
-    "allDay": true,
+    "allDay": false,
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
       "isRecurring": true
@@ -79,15 +85,18 @@ window.CALENDAR_EVENTS = [
       "byweekday": [
         "fr"
       ],
-      "dtstart": "2026-03-06",
+      "dtstart": "2026-03-06T14:00:00",
       "count": 20
+    },
+    "duration": {
+      "milliseconds": 7200000
     },
     "exdate": [
       "2026-04-03",
       "2026-07-10",
       "2026-07-17"
     ],
-    "editable": false
+    "editable": true
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU VHS - Zirkus Kröllwitz/Ferienwoche 1 Kröllwitz.md",
@@ -166,8 +175,8 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-06-08",
     "title": "Kurs 1 OAC",
-    "start": "2026-06-08",
-    "allDay": true,
+    "start": "2026-06-08T12:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -175,13 +184,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-06-08T11:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-06-15",
     "title": "Kurs 1 OAC",
-    "start": "2026-06-15",
-    "allDay": true,
+    "start": "2026-06-15T12:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -189,13 +199,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-06-15T11:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-06-22",
     "title": "Kurs 1 OAC",
-    "start": "2026-06-22",
-    "allDay": true,
+    "start": "2026-06-22T12:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -203,13 +214,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-06-22T11:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-06-29",
     "title": "Kurs 1 OAC",
-    "start": "2026-06-29",
-    "allDay": true,
+    "start": "2026-06-29T12:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -217,7 +229,8 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-06-29T11:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU ZGV - Wanderzirkus Neustadt/Ferienwoche CVJM Schnitte Ost.md",
@@ -343,8 +356,8 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-08-17",
     "title": "Kurs 1 OAC",
-    "start": "2026-08-17",
-    "allDay": true,
+    "start": "2026-08-17T12:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -352,13 +365,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-08-17T11:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-08-20",
     "title": "Kurs 2 JEP",
-    "start": "2026-08-20",
-    "allDay": true,
+    "start": "2026-08-20T12:00:00+02:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -366,13 +380,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-08-20T13:13:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-08-21",
     "title": "Kurs Dornroesschen",
-    "start": "2026-08-21",
-    "allDay": true,
+    "start": "2026-08-21T14:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "orange",
     "borderColor": "orange",
@@ -380,13 +395,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-08-21T14:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-08-24",
     "title": "Kurs 1 OAC",
-    "start": "2026-08-24",
-    "allDay": true,
+    "start": "2026-08-24T12:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -394,13 +410,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-08-24T11:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-08-27",
     "title": "Kurs 2 JEP",
-    "start": "2026-08-27",
-    "allDay": true,
+    "start": "2026-08-27T12:00:00+02:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -408,13 +425,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-08-27T13:13:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-08-28",
     "title": "Kurs Dornroesschen",
-    "start": "2026-08-28",
-    "allDay": true,
+    "start": "2026-08-28T14:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "orange",
     "borderColor": "orange",
@@ -422,13 +440,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-08-28T14:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-08-31",
     "title": "Kurs 1 OAC",
-    "start": "2026-08-31",
-    "allDay": true,
+    "start": "2026-08-31T12:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -436,13 +455,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-08-31T11:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-03",
     "title": "Kurs 2 JEP",
-    "start": "2026-09-03",
-    "allDay": true,
+    "start": "2026-09-03T12:00:00+02:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -450,13 +470,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-09-03T13:13:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-09-04",
     "title": "Kurs Dornroesschen",
-    "start": "2026-09-04",
-    "allDay": true,
+    "start": "2026-09-04T14:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "orange",
     "borderColor": "orange",
@@ -464,13 +485,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-09-04T14:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-09-07",
     "title": "Kurs 1 OAC",
-    "start": "2026-09-07",
-    "allDay": true,
+    "start": "2026-09-07T12:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -478,13 +500,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-09-07T11:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-10",
     "title": "Kurs 2 JEP",
-    "start": "2026-09-10",
-    "allDay": true,
+    "start": "2026-09-10T12:00:00+02:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -492,13 +515,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-09-10T13:13:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-09-14",
     "title": "Kurs 1 OAC",
-    "start": "2026-09-14",
-    "allDay": true,
+    "start": "2026-09-14T12:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -506,13 +530,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-09-14T11:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-17",
     "title": "Kurs 2 JEP",
-    "start": "2026-09-17",
-    "allDay": true,
+    "start": "2026-09-17T12:00:00+02:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -520,13 +545,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-09-17T13:13:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-09-21",
     "title": "Kurs 1 OAC",
-    "start": "2026-09-21",
-    "allDay": true,
+    "start": "2026-09-21T12:00:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -534,13 +560,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-09-21T11:00:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-24",
     "title": "Kurs 2 JEP",
-    "start": "2026-09-24",
-    "allDay": true,
+    "start": "2026-09-24T12:00:00+02:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -548,13 +575,14 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-09-24T13:13:00.000Z"
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-10-01",
     "title": "Kurs 2 JEP",
-    "start": "2026-10-01",
-    "allDay": true,
+    "start": "2026-10-01T12:00:00+02:00",
+    "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -562,7 +590,8 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "isRecurring": true,
       "isRecurringOverride": true
-    }
+    },
+    "end": "2026-10-01T13:13:00.000Z"
   },
   {
     "id": "6. Obsidian/Inbox/Herbstferien 2026.md",

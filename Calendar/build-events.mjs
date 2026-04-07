@@ -6,10 +6,40 @@ import { execSync } from "node:child_process";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function loadDotEnvFile(filePath) {
+  if (!fs.existsSync(filePath)) return;
+  const raw = fs.readFileSync(filePath, "utf8");
+  const lines = raw.split(/\r?\n/);
+  for (const line of lines) {
+    const trimmed = String(line || "").trim();
+    if (!trimmed || trimmed.startsWith("#")) continue;
+    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
+    if (!match) continue;
+    const key = match[1];
+    let value = match[2] || "";
+    const isDoubleQuoted = value.startsWith('"') && value.endsWith('"');
+    const isSingleQuoted = value.startsWith("'") && value.endsWith("'");
+    if (!isDoubleQuoted && !isSingleQuoted) {
+      const hashIndex = value.indexOf("#");
+      if (hashIndex >= 0) value = value.slice(0, hashIndex);
+      value = value.trim();
+    } else {
+      value = value.slice(1, -1);
+    }
+    if (process.env[key] == null) {
+      process.env[key] = value;
+    }
+  }
+}
+
+loadDotEnvFile(path.resolve(__dirname, ".env"));
+loadDotEnvFile(path.resolve(__dirname, ".env.local"));
+
 const VAULT_ROOT = path.resolve(__dirname, "..", "..");
 const OUTPUT_FILE = path.resolve(__dirname, "events.generated.js");
 const BASE_PATH = process.env.OBSIDIAN_BASE_PATH || "6. Obsidian/Live/Kalender.base";
 const BASE_VIEW = process.env.OBSIDIAN_BASE_VIEW || "Tabelle";
+const OBSIDIAN_VAULT_NAME = String(process.env.OBSIDIAN_VAULT_NAME || "").trim();
 const EXCLUDE_DIRS = new Set([".obsidian", ".trash", "8. Emails", "Attachments", "Excalidraw"]);
 
 function isMarkdownFile(filePath) {
@@ -210,6 +240,16 @@ function isIsoDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+function isIsoDateTime(value) {
+  return /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/.test(
+    String(value || "").trim()
+  );
+}
+
+function isDateOrDateTime(value) {
+  return isIsoDate(value) || isIsoDateTime(value);
+}
+
 function parseDateLikeToIsoDate(value) {
   if (value == null) return "";
   const raw = String(value).trim();
@@ -220,6 +260,17 @@ function parseDateLikeToIsoDate(value) {
   const timestamp = Date.parse(raw);
   if (Number.isNaN(timestamp)) return "";
   return new Date(timestamp).toISOString().slice(0, 10);
+}
+
+function parseDateLikeToCalendarValue(value) {
+  if (value == null) return "";
+  const raw = String(value).trim().replace(/^["']|["']$/g, "");
+  if (!raw) return "";
+  if (isIsoDate(raw)) return raw;
+  if (isIsoDateTime(raw)) return raw.replace(" ", "T");
+  const timestamp = Date.parse(raw);
+  if (Number.isNaN(timestamp)) return "";
+  return new Date(timestamp).toISOString();
 }
 
 function getStartDateFromFileMeta(filePath) {
@@ -256,6 +307,24 @@ function inclusiveDaySpan(startIso, endIso) {
   return diff > 0 ? diff : 1;
 }
 
+function durationMsFromDateLike(startValue, endValue) {
+  const startTs = Date.parse(String(startValue || ""));
+  const endTs = Date.parse(String(endValue || ""));
+  if (!Number.isFinite(startTs) || !Number.isFinite(endTs) || endTs <= startTs) return 0;
+  return endTs - startTs;
+}
+
+function extractTimePortion(dateTimeValue) {
+  const raw = String(dateTimeValue || "").trim();
+  const match = raw.match(/^\d{4}-\d{2}-\d{2}T(.+)$/);
+  return match && match[1] ? match[1] : "";
+}
+
+function mergeDateWithTimePortion(isoDate, timePortion) {
+  if (!isIsoDate(isoDate) || !timePortion) return isoDate;
+  return `${isoDate}T${timePortion}`;
+}
+
 function toCalendarEvent(filePath) {
   const content = fs.readFileSync(filePath, "utf8");
   const frontmatter = extractFrontmatter(content);
@@ -281,12 +350,16 @@ function toCalendarEvent(filePath) {
     "file_created",
     "ctime"
   );
-  const startDate =
-    parseDateLikeToIsoDate(startDateFromFrontmatter) ||
+  const startValue =
+    parseDateLikeToCalendarValue(startDateFromFrontmatter) ||
     parseDateLikeToIsoDate(createdDateFromFrontmatter) ||
     getStartDateFromFileMeta(filePath);
-  const endDate = extractField(frontmatter, "endDate", "enddate");
-  if (!isIsoDate(startDate)) return null;
+  const startDate = parseDateLikeToIsoDate(startValue);
+  const endValue = parseDateLikeToCalendarValue(
+    extractField(frontmatter, "event_end", "eventEnd", "endDate", "enddate")
+  );
+  const isTimedEvent = isIsoDateTime(startValue);
+  if (!startDate || !isDateOrDateTime(startValue)) return null;
 
   const titleFromFm = extractField(frontmatter, "title");
   const eventColor = extractField(frontmatter, "event_color", "eventColor", "color");
@@ -319,7 +392,7 @@ function toCalendarEvent(filePath) {
   const event = {
     id: path.relative(VAULT_ROOT, filePath).replace(/\\/g, "/"),
     title,
-    allDay: true,
+    allDay: !isTimedEvent,
     extendedProps: {
       sourcePath: path.relative(VAULT_ROOT, filePath).replace(/\\/g, "/")
     }
@@ -332,11 +405,13 @@ function toCalendarEvent(filePath) {
 
   if (recurrenceType === "weekly") {
     const daysOfWeek = recurrenceDays.length ? recurrenceDays : [dayOfWeekFromIsoDate(startDate)];
+    const recurringDurationMs = isTimedEvent ? durationMsFromDateLike(startValue, endValue) : 0;
+    const recurringTimePortion = extractTimePortion(startValue);
     event.rrule = {
       freq: "weekly",
       interval: recurrenceInterval > 0 ? recurrenceInterval : 1,
       byweekday: toRruleByWeekday(daysOfWeek),
-      dtstart: startDate
+      dtstart: startValue
     };
     if (isIsoDate(recurrenceUntil)) {
       event.rrule.until = recurrenceUntil;
@@ -345,10 +420,16 @@ function toCalendarEvent(filePath) {
       event.rrule.count = recurrenceCount;
     }
 
-    const lastDate = isIsoDate(endDate) ? endDate : startDate;
-    const durationDays = inclusiveDaySpan(startDate, lastDate);
-    if (durationDays > 1) {
-      event.duration = { days: durationDays };
+    if (isTimedEvent) {
+      if (recurringDurationMs > 0) {
+        event.duration = { milliseconds: recurringDurationMs };
+      }
+    } else {
+      const lastDate = isIsoDate(endValue) ? endValue : startDate;
+      const durationDays = inclusiveDaySpan(startDate, lastDate);
+      if (durationDays > 1) {
+        event.duration = { days: durationDays };
+      }
     }
 
     if (recurrenceExdates.length) {
@@ -359,14 +440,14 @@ function toCalendarEvent(filePath) {
       event.exrule = recurrenceExrule;
     }
 
-    event.editable = false;
+    event.editable = isTimedEvent;
     event.extendedProps.isRecurring = true;
 
     const overrideEvents = recurrenceRdates.map((dateStr) => ({
       id: `${event.id}#rdate-${dateStr}`,
       title: event.title,
-      start: dateStr,
-      allDay: true,
+      start: isTimedEvent ? mergeDateWithTimePortion(dateStr, recurringTimePortion) : dateStr,
+      allDay: !isTimedEvent,
       editable: false,
       backgroundColor: event.backgroundColor,
       borderColor: event.borderColor,
@@ -378,11 +459,24 @@ function toCalendarEvent(filePath) {
       }
     }));
 
+    if (isTimedEvent && recurringDurationMs > 0) {
+      overrideEvents.forEach((overrideEvent) => {
+        const startTs = Date.parse(String(overrideEvent.start || ""));
+        if (Number.isFinite(startTs)) {
+          overrideEvent.end = new Date(startTs + recurringDurationMs).toISOString();
+        }
+      });
+    }
+
     return [event, ...overrideEvents];
   } else {
-    event.start = startDate;
-    if (isIsoDate(endDate)) {
-      event.end = addOneDay(endDate);
+    event.start = startValue;
+    if (endValue) {
+      if (isTimedEvent && isIsoDateTime(endValue)) {
+        event.end = endValue;
+      } else if (!isTimedEvent && isIsoDate(endValue)) {
+        event.end = addOneDay(endValue);
+      }
     }
   }
 
@@ -394,10 +488,12 @@ function toCalendarEvent(filePath) {
 }
 
 function queryBaseRows() {
+  const escapedVaultName = OBSIDIAN_VAULT_NAME.replace(/"/g, '\\"');
   const escapedBasePath = BASE_PATH.replace(/"/g, '\\"');
   const escapedView = BASE_VIEW.replace(/"/g, '\\"');
+  const vaultArg = escapedVaultName ? ` vault="${escapedVaultName}"` : "";
 
-  const raw = execSync(`obsidian base:query path="${escapedBasePath}" view="${escapedView}" format=json`, {
+  const raw = execSync(`obsidian base:query${vaultArg} path="${escapedBasePath}" view="${escapedView}" format=json`, {
     cwd: VAULT_ROOT,
     encoding: "utf8",
     stdio: "pipe"
@@ -408,8 +504,8 @@ function queryBaseRows() {
 function baseRowToCalendarEvent(row) {
   const sourcePath = String(row.path ?? "").trim();
   const sourceFilePath = sourcePath ? path.resolve(VAULT_ROOT, sourcePath) : "";
-  const startDate =
-    parseDateLikeToIsoDate(
+  let startValue =
+    parseDateLikeToCalendarValue(
       row.event_start ??
         row.eventStart ??
         row.startDate ??
@@ -426,8 +522,38 @@ function baseRowToCalendarEvent(row) {
         row.ctime
     ) ||
     (sourceFilePath ? getStartDateFromFileMeta(sourceFilePath) : "");
-  const endDate = String(row.endDate ?? "").trim();
-  if (!isIsoDate(startDate)) return null;
+  let endValue = parseDateLikeToCalendarValue(row.event_end ?? row.eventEnd ?? row.endDate ?? "");
+  let isTimedEvent = isIsoDateTime(startValue);
+
+  // Base views can omit date-time fields. Recover from note frontmatter to avoid
+  // downgrading timed events into all-day events after rebuild.
+  if (sourceFilePath && fs.existsSync(sourceFilePath)) {
+    const content = fs.readFileSync(sourceFilePath, "utf8");
+    const frontmatter = extractFrontmatter(content);
+    if (frontmatter) {
+      const fmStartValue = parseDateLikeToCalendarValue(
+        extractField(frontmatter, "event_start", "eventStart", "startDate", "startdate")
+      );
+      const fmEndValue = parseDateLikeToCalendarValue(
+        extractField(frontmatter, "event_end", "eventEnd", "endDate", "enddate")
+      );
+
+      if (!isTimedEvent && fmStartValue && isIsoDateTime(fmStartValue)) {
+        startValue = fmStartValue;
+      } else if (!startValue && fmStartValue) {
+        startValue = fmStartValue;
+      }
+
+      if (!endValue && fmEndValue) {
+        endValue = fmEndValue;
+      }
+
+      isTimedEvent = isIsoDateTime(startValue);
+    }
+  }
+
+  const startDate = parseDateLikeToIsoDate(startValue);
+  if (!startDate || !isDateOrDateTime(startValue)) return null;
 
   let eventColor =
     String(row.event_color ?? "").trim() ||
@@ -526,7 +652,7 @@ function baseRowToCalendarEvent(row) {
   const event = {
     id: sourcePath,
     title,
-    allDay: true,
+    allDay: !isTimedEvent,
     extendedProps: {
       sourcePath
     }
@@ -539,11 +665,13 @@ function baseRowToCalendarEvent(row) {
 
   if (recurrenceType === "weekly") {
     const parsedDays = parseDaysOfWeek(recurrenceDays);
+    const recurringDurationMs = isTimedEvent ? durationMsFromDateLike(startValue, endValue) : 0;
+    const recurringTimePortion = extractTimePortion(startValue);
     event.rrule = {
       freq: "weekly",
       interval: Math.max(1, parseInteger(recurrenceInterval, 1)),
       byweekday: toRruleByWeekday(parsedDays.length ? parsedDays : [dayOfWeekFromIsoDate(startDate)]),
-      dtstart: startDate
+      dtstart: startValue
     };
     if (isIsoDate(recurrenceUntil)) {
       event.rrule.until = recurrenceUntil;
@@ -553,10 +681,16 @@ function baseRowToCalendarEvent(row) {
       event.rrule.count = parsedCount;
     }
 
-    const lastDate = isIsoDate(endDate) ? endDate : startDate;
-    const durationDays = inclusiveDaySpan(startDate, lastDate);
-    if (durationDays > 1) {
-      event.duration = { days: durationDays };
+    if (isTimedEvent) {
+      if (recurringDurationMs > 0) {
+        event.duration = { milliseconds: recurringDurationMs };
+      }
+    } else {
+      const lastDate = isIsoDate(endValue) ? endValue : startDate;
+      const durationDays = inclusiveDaySpan(startDate, lastDate);
+      if (durationDays > 1) {
+        event.duration = { days: durationDays };
+      }
     }
 
     const parsedExdates = parseIsoDateList(recurrenceExdates);
@@ -569,15 +703,15 @@ function baseRowToCalendarEvent(row) {
       event.exrule = parsedExrule;
     }
 
-    event.editable = false;
+    event.editable = isTimedEvent;
     event.extendedProps.isRecurring = true;
 
     const parsedRdates = parseIsoDateList(recurrenceRdates);
     const overrideEvents = parsedRdates.map((dateStr) => ({
       id: `${event.id}#rdate-${dateStr}`,
       title: event.title,
-      start: dateStr,
-      allDay: true,
+      start: isTimedEvent ? mergeDateWithTimePortion(dateStr, recurringTimePortion) : dateStr,
+      allDay: !isTimedEvent,
       editable: false,
       backgroundColor: event.backgroundColor,
       borderColor: event.borderColor,
@@ -589,11 +723,24 @@ function baseRowToCalendarEvent(row) {
       }
     }));
 
+    if (isTimedEvent && recurringDurationMs > 0) {
+      overrideEvents.forEach((overrideEvent) => {
+        const startTs = Date.parse(String(overrideEvent.start || ""));
+        if (Number.isFinite(startTs)) {
+          overrideEvent.end = new Date(startTs + recurringDurationMs).toISOString();
+        }
+      });
+    }
+
     return [event, ...overrideEvents];
   } else {
-    event.start = startDate;
-    if (isIsoDate(endDate)) {
-      event.end = addOneDay(endDate);
+    event.start = startValue;
+    if (endValue) {
+      if (isTimedEvent && isIsoDateTime(endValue)) {
+        event.end = endValue;
+      } else if (!isTimedEvent && isIsoDate(endValue)) {
+        event.end = addOneDay(endValue);
+      }
     }
   }
 
