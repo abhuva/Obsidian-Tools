@@ -687,6 +687,7 @@
         var multiMonthMinWidth = Number(calendarUiSettings.multiMonthMinWidth || 300);
         var calendar = new FullCalendar.Calendar(calendarEl, {
           initialView: 'multiMonthYear',
+          height: '100%',
           multiMonthMinWidth: multiMonthMinWidth,
           firstDay: 1,
           fixedWeekCount: false,
@@ -796,23 +797,36 @@
       }
       body {
         margin: 0;
+        height: 100vh;
+        overflow: hidden;
+        display: flex;
         color: var(--cal-text);
         font-family: "Segoe UI", "Aptos", "Helvetica Neue", sans-serif;
         background: linear-gradient(155deg, var(--cal-bg-a), var(--cal-bg-b));
       }
+      html {
+        height: 100%;
+      }
       #calendar {
         width: 100%;
         max-width: none;
-        margin: 12px 0;
+        margin: 0;
+        flex: 1 1 auto;
+        min-height: 0;
         padding: 0 8px;
         box-sizing: border-box;
+        overflow: hidden;
       }
       .fc {
+        height: 100%;
         background: var(--cal-surface);
         border: 1px solid var(--cal-border);
         border-radius: 12px;
         padding: 10px;
         box-shadow: var(--cal-shadow);
+      }
+      .fc .fc-view-harness {
+        min-height: 0;
       }
       .fc .fc-toolbar-title,
       .fc .fc-col-header-cell-cushion,
