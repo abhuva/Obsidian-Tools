@@ -102,7 +102,7 @@
       }
       .fc .fc-daygrid-dot-event .fc-event-time,
       .fc .fc-daygrid-dot-event .fc-event-title {
-        color: #ffffff;
+        color: inherit;
       }
       .fc .fc-daygrid-event-dot {
         display: none;

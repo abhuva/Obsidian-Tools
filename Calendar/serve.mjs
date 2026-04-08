@@ -832,7 +832,71 @@ function normalizeGoogleRangeDateTime(value) {
   return new Date(timestamp).toISOString();
 }
 
-async function fetchGoogleCalendarEventsForCalendar(calendarId, timeMin, timeMax) {
+const GOOGLE_FALLBACK_EVENT_BG = "#a4bdfc";
+const GOOGLE_FALLBACK_EVENT_TEXT = "#1d1d1d";
+const GOOGLE_FALLBACK_COLOR_ID = "1";
+
+async function fetchGoogleCalendarColorPalette() {
+  const endpoint = new URL("https://www.googleapis.com/calendar/v3/colors");
+  endpoint.searchParams.set("key", GOOGLE_CALENDAR_API_KEY);
+  const response = await fetch(endpoint.toString(), { method: "GET" });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Google color palette request failed: ${body || response.statusText}`);
+  }
+  const payload = await response.json();
+  return {
+    event: payload?.event && typeof payload.event === "object" ? payload.event : {},
+    calendar: payload?.calendar && typeof payload.calendar === "object" ? payload.calendar : {}
+  };
+}
+
+async function fetchGoogleCalendarMetadata(calendarId, colorPalette) {
+  const endpoint = new URL(`https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}`);
+  endpoint.searchParams.set("key", GOOGLE_CALENDAR_API_KEY);
+  const response = await fetch(endpoint.toString(), { method: "GET" });
+  if (!response.ok) {
+    const body = await response.text();
+    throw new Error(`Google calendar metadata request failed for ${calendarId}: ${body || response.statusText}`);
+  }
+  const payload = await response.json();
+  const colorId = String(payload?.colorId || "").trim();
+  const paletteColor = colorId ? colorPalette?.calendar?.[colorId] : null;
+  return {
+    id: calendarId,
+    summary: String(payload?.summary || payload?.id || calendarId).trim(),
+    colorId,
+    backgroundColor: String(payload?.backgroundColor || paletteColor?.background || "").trim(),
+    foregroundColor: String(payload?.foregroundColor || paletteColor?.foreground || "").trim()
+  };
+}
+
+function resolveGoogleEventColors(item, calendarMeta, colorPalette) {
+  const eventColorId = String(item?.colorId || "").trim();
+  const calendarColorId = String(calendarMeta?.colorId || "").trim();
+  const effectiveColorId = eventColorId || calendarColorId || GOOGLE_FALLBACK_COLOR_ID;
+  const eventPaletteColor = effectiveColorId ? colorPalette?.event?.[effectiveColorId] : null;
+  const calendarPaletteColor = effectiveColorId ? colorPalette?.calendar?.[effectiveColorId] : null;
+  const explicitBackground = String(item?.backgroundColor || "").trim();
+  const explicitForeground = String(item?.foregroundColor || "").trim();
+  const backgroundColor = String(
+    explicitBackground ||
+      eventPaletteColor?.background ||
+      calendarMeta?.backgroundColor ||
+      calendarPaletteColor?.background ||
+      GOOGLE_FALLBACK_EVENT_BG
+  ).trim();
+  const textColor = String(
+    explicitForeground ||
+      eventPaletteColor?.foreground ||
+      calendarMeta?.foregroundColor ||
+      calendarPaletteColor?.foreground ||
+      GOOGLE_FALLBACK_EVENT_TEXT
+  ).trim();
+  return { eventColorId: effectiveColorId, backgroundColor, textColor };
+}
+
+async function fetchGoogleCalendarEventsForCalendar(calendarId, timeMin, timeMax, colorPalette, calendarMeta) {
   const endpoint = new URL(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`
   );
@@ -857,16 +921,26 @@ async function fetchGoogleCalendarEventsForCalendar(calendarId, timeMin, timeMax
       const end = String(item?.end?.dateTime || item?.end?.date || "").trim();
       if (!start) return null;
       const allDay = Boolean(item?.start?.date && !item?.start?.dateTime);
+      const eventColors = resolveGoogleEventColors(item, calendarMeta, colorPalette);
       const event = {
         id: `gcal:${calendarId}:${String(item?.id || Math.random()).trim()}`,
         title: String(item?.summary || "(No title)").trim(),
         start,
         allDay,
         editable: false,
+        backgroundColor: eventColors.backgroundColor || undefined,
+        borderColor: eventColors.backgroundColor || undefined,
+        textColor: eventColors.textColor || undefined,
         extendedProps: {
           externalSource: "google",
           googleCalendarId: calendarId,
-          googleHtmlLink: String(item?.htmlLink || "").trim()
+          googleColorId: eventColors.eventColorId,
+          googleBackgroundColor: eventColors.backgroundColor,
+          googleTextColor: eventColors.textColor,
+          googleHtmlLink: String(item?.htmlLink || "").trim(),
+          googleDescription: String(item?.description || "").trim(),
+          googleLocation: String(item?.location || "").trim(),
+          googleCalendarSummary: String(calendarMeta?.summary || item?.organizer?.displayName || item?.organizer?.email || calendarId).trim()
         }
       };
       if (end) event.end = end;
@@ -887,8 +961,29 @@ async function fetchGoogleCalendarEventsInRange(start, end) {
     throw new Error("Missing or invalid start/end range");
   }
 
+  let colorPalette = { event: {}, calendar: {} };
+  try {
+    colorPalette = await fetchGoogleCalendarColorPalette();
+  } catch {
+    // Continue without palette; calendar/event colors may still come from metadata.
+  }
+
   const all = await Promise.all(
-    GOOGLE_CALENDAR_IDS.map((calendarId) => fetchGoogleCalendarEventsForCalendar(calendarId, timeMin, timeMax))
+    GOOGLE_CALENDAR_IDS.map(async (calendarId) => {
+      let calendarMeta = {
+        id: calendarId,
+        summary: calendarId,
+        colorId: "",
+        backgroundColor: "",
+        foregroundColor: ""
+      };
+      try {
+        calendarMeta = await fetchGoogleCalendarMetadata(calendarId, colorPalette);
+      } catch {
+        // Continue with defaults if metadata is unavailable for this calendar.
+      }
+      return fetchGoogleCalendarEventsForCalendar(calendarId, timeMin, timeMax, colorPalette, calendarMeta);
+    })
   );
 
   const merged = all.flat();

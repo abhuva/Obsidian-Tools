@@ -46,23 +46,23 @@ window.CALENDAR_EVENTS = [
       "byweekday": [
         "th"
       ],
-      "dtstart": "2026-04-09T12:00:00+02:00",
+      "dtstart": "2026-04-09T14:00:00+02:00",
       "count": 20
     },
     "duration": {
       "milliseconds": 11580000
     },
     "exdate": [
-      "2026-04-02T12:00:00+02:00",
-      "2026-05-28T12:00:00+02:00",
-      "2026-07-09T12:00:00+02:00",
-      "2026-07-16T12:00:00+02:00",
-      "2026-07-23T12:00:00+02:00",
-      "2026-07-30T12:00:00+02:00",
-      "2026-08-06T12:00:00+02:00",
-      "2026-04-30T12:00:00+02:00",
-      "2026-05-07T12:00:00+02:00",
-      "2026-08-13T12:00:00+02:00"
+      "2026-04-02T14:00:00+02:00",
+      "2026-05-28T14:00:00+02:00",
+      "2026-07-09T14:00:00+02:00",
+      "2026-07-16T14:00:00+02:00",
+      "2026-07-23T14:00:00+02:00",
+      "2026-07-30T14:00:00+02:00",
+      "2026-08-06T14:00:00+02:00",
+      "2026-04-30T14:00:00+02:00",
+      "2026-05-07T14:00:00+02:00",
+      "2026-08-13T14:00:00+02:00"
     ],
     "editable": true
   },
@@ -108,7 +108,7 @@ window.CALENDAR_EVENTS = [
     "allDay": true,
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU VHS - Zirkus Kröllwitz/Ferienwoche 1 Kröllwitz.md",
-      "coordinates": "51.46884, 11.99228"
+      "coordinates": "51.50682, 11.9523"
     },
     "backgroundColor": "red",
     "borderColor": "red",
@@ -228,7 +228,7 @@ window.CALENDAR_EVENTS = [
     "allDay": true,
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU ZGV - Wanderzirkus Neustadt/Ferienwoche CVJM Schnitte Ost.md",
-      "coordinates": "51.46899, 11.99168"
+      "coordinates": "51.48245, 11.94347"
     },
     "backgroundColor": "red",
     "borderColor": "red",
@@ -254,7 +254,7 @@ window.CALENDAR_EVENTS = [
     "allDay": true,
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU ZGV - Wanderzirkus Neustadt/Ferienwoche Roxy.md",
-      "coordinates": "51.46884, 11.99229"
+      "coordinates": "51.46866, 11.9288"
     },
     "backgroundColor": "red",
     "borderColor": "red",
@@ -280,7 +280,7 @@ window.CALENDAR_EVENTS = [
     "allDay": true,
     "extendedProps": {
       "sourcePath": "6. Obsidian/Inbox/Ferienwoche Schöpfkelle.md",
-      "coordinates": "51.46884, 11.99226"
+      "coordinates": "51.43642, 11.96079"
     },
     "backgroundColor": "red",
     "borderColor": "red",
@@ -293,7 +293,7 @@ window.CALENDAR_EVENTS = [
     "allDay": true,
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Ferienwoche Blauer Elefant.md",
-      "coordinates": "51.46884, 11.99226"
+      "coordinates": "51.4372, 11.96993"
     },
     "backgroundColor": "red",
     "borderColor": "red",
@@ -352,7 +352,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-08-27",
     "title": "JEP",
-    "start": "2026-08-27T12:00:00+02:00",
+    "start": "2026-08-27T14:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -406,7 +406,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-03",
     "title": "JEP",
-    "start": "2026-09-03T12:00:00+02:00",
+    "start": "2026-09-03T14:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -460,7 +460,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-10",
     "title": "JEP",
-    "start": "2026-09-10T12:00:00+02:00",
+    "start": "2026-09-10T14:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -496,7 +496,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-17",
     "title": "JEP",
-    "start": "2026-09-17T12:00:00+02:00",
+    "start": "2026-09-17T14:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -532,7 +532,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-24",
     "title": "JEP",
-    "start": "2026-09-24T12:00:00+02:00",
+    "start": "2026-09-24T14:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -568,7 +568,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-10-01",
     "title": "JEP",
-    "start": "2026-10-01T12:00:00+02:00",
+    "start": "2026-10-01T14:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -604,7 +604,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-10-08",
     "title": "JEP",
-    "start": "2026-10-08T12:00:00+02:00",
+    "start": "2026-10-08T14:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -640,7 +640,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-10-15",
     "title": "JEP",
-    "start": "2026-10-15T12:00:00+02:00",
+    "start": "2026-10-15T14:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -658,7 +658,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-10-16",
     "title": "JEP",
-    "start": "2026-10-16T12:00:00+02:00",
+    "start": "2026-10-16T14:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",

@@ -355,11 +355,12 @@
 
         var bg = String(event.backgroundColor || event.borderColor || '').trim();
         var border = String(event.borderColor || event.backgroundColor || '').trim();
+        var text = String(event.textColor || '').trim();
         if (!bg && !border) return;
 
         if (bg) el.style.backgroundColor = bg;
         if (border) el.style.borderColor = border;
-        el.style.color = '#ffffff';
+        el.style.color = text || '#ffffff';
 
         if (el.classList.contains('fc-daygrid-dot-event')) {
           var dot = el.querySelector('.fc-daygrid-event-dot');
@@ -791,6 +792,30 @@
         );
       }
 
+      function renderGoogleEventPreviewBlock(event) {
+        var props = event && event.extendedProps ? event.extendedProps : {};
+        var description = String(props.googleDescription || '').trim();
+        var location = String(props.googleLocation || '').trim();
+        var calendarLabel = String(props.googleCalendarSummary || props.googleCalendarId || '').trim();
+        var parts = [];
+
+        if (description) {
+          parts.push('<p>' + renderSimpleMarkdownText(description).replace(/\r?\n/g, '<br />') + '</p>');
+        } else {
+          parts.push('<p class="event-preview-popover__empty">No description provided.</p>');
+        }
+
+        if (location) {
+          parts.push('<p><strong>Location:</strong> ' + escapeHtml(location) + '</p>');
+        }
+
+        if (calendarLabel) {
+          parts.push('<p><strong>Calendar:</strong> ' + escapeHtml(calendarLabel) + '</p>');
+        }
+
+        return parts.join('');
+      }
+
       async function fetchEventPreview(sourcePath) {
         if (!isHttpContext()) {
           throw new Error('Calendar is not running on http(s). Open the preview server URL.');
@@ -813,6 +838,7 @@
         var bodyNode = document.getElementById('event-preview-body');
         var openMapButton = document.getElementById('event-preview-open-map');
         var openNoteButton = document.getElementById('event-preview-open-note');
+        var defaultOpenButtonLabel = 'Open note in new tab';
         if (!popover || !closeButton || !titleNode || !dateNode || !bodyNode || !openNoteButton) {
           await openEventNote(event);
           return;
@@ -832,6 +858,7 @@
             openMapButton.removeEventListener('click', onOpenMap);
           }
           openNoteButton.removeEventListener('click', onOpenNote);
+          openNoteButton.removeEventListener('click', onOpenExternalLink);
           document.removeEventListener('mousedown', onOutsidePointer);
           document.removeEventListener('keydown', onKeyDown);
           if (closeActiveEventPreview === cleanup) {
@@ -850,6 +877,12 @@
             keyEvent.preventDefault();
             cleanup();
           }
+        }
+        async function onOpenExternalLink() {
+          var externalLink = String(event && event.extendedProps && event.extendedProps.googleHtmlLink || '').trim();
+          if (!externalLink) return;
+          window.open(externalLink, '_blank', 'noopener,noreferrer');
+          cleanup();
         }
         async function onOpenNote() {
           try {
@@ -872,6 +905,7 @@
         dateNode.textContent = formatEventDateForPreview(event);
         bodyNode.innerHTML = '<p class="event-preview-popover__loading">Loading preview...</p>';
         openNoteButton.disabled = false;
+        openNoteButton.textContent = defaultOpenButtonLabel;
         var eventCoordinates = getEventCoordinates(event);
         if (openMapButton) {
           openMapButton.hidden = !eventCoordinates;
@@ -885,10 +919,24 @@
         if (openMapButton) {
           openMapButton.addEventListener('click', onOpenMap);
         }
-        openNoteButton.addEventListener('click', onOpenNote);
+        var isGoogleEvent = isExternalReadOnlyEvent(event);
+        var hasGoogleLink = Boolean(String(event && event.extendedProps && event.extendedProps.googleHtmlLink || '').trim());
+        if (isGoogleEvent) {
+          openNoteButton.textContent = 'Open event in new tab';
+          openNoteButton.disabled = !hasGoogleLink;
+          openNoteButton.addEventListener('click', onOpenExternalLink);
+        } else {
+          openNoteButton.addEventListener('click', onOpenNote);
+        }
         document.addEventListener('mousedown', onOutsidePointer);
         document.addEventListener('keydown', onKeyDown);
         closeActiveEventPreview = cleanup;
+
+        if (isGoogleEvent) {
+          bodyNode.innerHTML = renderGoogleEventPreviewBlock(event);
+          placeEventPreviewPopover(popover, anchorPoint || null);
+          return;
+        }
 
         var sourcePath = String(event && event.extendedProps && event.extendedProps.sourcePath || '').trim();
         if (!sourcePath) {
@@ -1308,9 +1356,11 @@
 
       async function onEventClick(info) {
         if (isExternalReadOnlyEvent(info.event)) {
-          var googleLink = String(info.event && info.event.extendedProps && info.event.extendedProps.googleHtmlLink || '').trim();
-          if (googleLink) {
-            window.open(googleLink, '_blank', 'noopener,noreferrer');
+          try {
+            var externalAnchor = getAnchorPointFromNativeEvent(info.jsEvent);
+            await showEventPreviewPopover(info.event, externalAnchor);
+          } catch (error) {
+            alert('Event preview failed: ' + error.message);
           }
           return;
         }
