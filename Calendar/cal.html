@@ -1016,7 +1016,21 @@
       async function onDateSelect(info) {
         info.view.calendar.unselect();
         if (isDayActionFlowActive) return;
-        if (!info || !info.allDay) return;
+        if (!info) return;
+
+        var viewType = info && info.view && info.view.type ? String(info.view.type) : '';
+        if (viewType === 'timeGridDay' || viewType === 'timeGridWeek') {
+          var timedAllDay = Boolean(info.allDay);
+          var timedStart = info.startStr;
+          var timedEnd = info.endStr || info.startStr;
+          if (timedAllDay && info.endStr) {
+            timedEnd = toInclusiveEndDate(info.endStr);
+          }
+          await createEventForDates(info.view.calendar, timedStart, timedEnd, timedAllDay);
+          return;
+        }
+
+        if (!info.allDay) return;
 
         var startDate = normalizeIsoDate(info.startStr);
         if (!startDate) return;
@@ -1045,6 +1059,14 @@
       }
 
       async function onDateClick(info) {
+        var viewType = info && info.view && info.view.type ? String(info.view.type) : '';
+        if (viewType === 'timeGridDay' || viewType === 'timeGridWeek') {
+          var timedDate = info && info.dateStr ? String(info.dateStr) : '';
+          if (!timedDate) return;
+          await createEventForDates(info.view.calendar, timedDate, timedDate, false);
+          return;
+        }
+
         if (!info.allDay) return;
         if (isDayActionFlowActive) return;
         var dateStr = normalizeIsoDate(info.dateStr);
