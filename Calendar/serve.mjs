@@ -1,40 +1,13 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { loadDotEnvFile } from "./lib/env.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-function loadDotEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return;
-  const raw = fs.readFileSync(filePath, "utf8");
-  const lines = raw.split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = String(line || "").trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-    if (!match) continue;
-    const key = match[1];
-    let value = match[2] || "";
-
-    // Preserve inline # inside quoted values, trim unquoted trailing comments.
-    const isDoubleQuoted = value.startsWith('"') && value.endsWith('"');
-    const isSingleQuoted = value.startsWith("'") && value.endsWith("'");
-    if (!isDoubleQuoted && !isSingleQuoted) {
-      const hashIndex = value.indexOf("#");
-      if (hashIndex >= 0) value = value.slice(0, hashIndex);
-      value = value.trim();
-    } else {
-      value = value.slice(1, -1);
-    }
-
-    if (process.env[key] == null) {
-      process.env[key] = value;
-    }
-  }
-}
 
 loadDotEnvFile(path.resolve(__dirname, ".env"));
 loadDotEnvFile(path.resolve(__dirname, ".env.local"));
@@ -46,6 +19,7 @@ const VAULT_ROOT = path.resolve(__dirname, "..", "..");
 const INBOX_PATH = process.env.CALENDAR_INBOX_PATH || "6. Obsidian/Inbox";
 const DEFAULT_BASE_PATH = process.env.OBSIDIAN_BASE_PATH || "6. Obsidian/Live/Kalender.base";
 const DEFAULT_BASE_VIEW = process.env.OBSIDIAN_BASE_VIEW || "Tabelle";
+const KALENDER_MAP_BASE_PATH = "6. Obsidian/Live/Kalender.base";
 const OBSIDIAN_VAULT_NAME = String(process.env.OBSIDIAN_VAULT_NAME || "").trim();
 const GOOGLE_CALENDAR_API_KEY = String(process.env.GOOGLE_CALENDAR_API_KEY || "").trim();
 const GOOGLE_CALENDAR_IDS = String(process.env.GOOGLE_CALENDAR_IDS || "")
@@ -54,7 +28,9 @@ const GOOGLE_CALENDAR_IDS = String(process.env.GOOGLE_CALENDAR_IDS || "")
   .filter(Boolean);
 const BOOKMARKS_FILE = path.resolve(VAULT_ROOT, ".obsidian", "bookmarks.json");
 const FILTER_STATE_FILE = path.resolve(ROOT, "calendar.filter-state.json");
+const PID_FILE = path.resolve(ROOT, "calendar.preview.pid");
 const KALENDAR_BASES_GROUP = "Kalendar Bases";
+const API_TOKEN = String(process.env.CALENDAR_API_TOKEN || "").trim() || crypto.randomBytes(24).toString("hex");
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -70,6 +46,39 @@ const MIME_TYPES = {
 
 function normalizeVaultRelativePath(value) {
   return String(value || "").replace(/\\/g, "/").replace(/^\/+/, "").trim();
+}
+
+function normalizeCoordinateNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseCoordinatesInput(value) {
+  if (value == null) return null;
+
+  if (Array.isArray(value)) {
+    if (value.length < 2) return null;
+    const lat = normalizeCoordinateNumber(value[0]);
+    const lng = normalizeCoordinateNumber(value[1]);
+    if (lat == null || lng == null) return null;
+    return { lat, lng };
+  }
+
+  if (typeof value === "object") {
+    const lat = normalizeCoordinateNumber(value.lat ?? value.latitude);
+    const lng = normalizeCoordinateNumber(value.lng ?? value.lon ?? value.long ?? value.longitude);
+    if (lat == null || lng == null) return null;
+    return { lat, lng };
+  }
+
+  const raw = String(value || "").trim();
+  if (!raw) return null;
+  const match = raw.match(/(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)/);
+  if (!match) return null;
+  const lat = normalizeCoordinateNumber(match[1]);
+  const lng = normalizeCoordinateNumber(match[2]);
+  if (lat == null || lng == null) return null;
+  return { lat, lng };
 }
 
 function sanitizeBaseFilter(basePath, baseView, title = "") {
@@ -169,11 +178,82 @@ function selectCurrentBaseFilter(availableFilters) {
 }
 
 function safeResolve(urlPath) {
-  const decoded = decodeURIComponent(urlPath.split("?")[0]);
+  let decoded = "";
+  try {
+    decoded = decodeURIComponent(String(urlPath || "/").split("?")[0]);
+  } catch {
+    return null;
+  }
   const normalized = decoded === "/" ? "/cal.html" : decoded;
   const resolved = path.resolve(ROOT, `.${normalized}`);
   if (!resolved.startsWith(ROOT)) return null;
   return resolved;
+}
+
+function parseOriginHeader(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    return new URL(raw).origin.toLowerCase();
+  } catch {
+    return "";
+  }
+}
+
+function allowedHostHeaders() {
+  return new Set(
+    [
+      `${HOST}:${PORT}`,
+      `localhost:${PORT}`,
+      `127.0.0.1:${PORT}`,
+      `[::1]:${PORT}`
+    ].map((value) => String(value || "").toLowerCase())
+  );
+}
+
+function allowedOrigins() {
+  return new Set(
+    [
+      `http://${HOST}:${PORT}`,
+      `http://localhost:${PORT}`,
+      `http://127.0.0.1:${PORT}`,
+      `http://[::1]:${PORT}`
+    ].map((value) => String(value || "").toLowerCase())
+  );
+}
+
+function hasJsonContentType(req) {
+  const value = String(req.headers["content-type"] || "").toLowerCase();
+  return value.startsWith("application/json");
+}
+
+function isValidApiToken(value) {
+  const provided = String(value || "").trim();
+  if (!provided) return false;
+  const expectedBuffer = Buffer.from(API_TOKEN, "utf8");
+  const providedBuffer = Buffer.from(provided, "utf8");
+  if (expectedBuffer.length !== providedBuffer.length) return false;
+  return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
+}
+
+function validateMutationRequest(req) {
+  const requestHost = String(req.headers.host || "").trim().toLowerCase();
+  if (!requestHost || !allowedHostHeaders().has(requestHost)) {
+    return "Forbidden host";
+  }
+
+  const origin = parseOriginHeader(req.headers.origin || req.headers.referer || "");
+  if (origin && !allowedOrigins().has(origin)) {
+    return "Forbidden origin";
+  }
+
+  const tokenHeader = req.headers["x-calendar-token"];
+  const tokenValue = Array.isArray(tokenHeader) ? tokenHeader[0] : tokenHeader;
+  if (!isValidApiToken(tokenValue)) {
+    return "Invalid or missing API token";
+  }
+
+  return "";
 }
 
 function safeResolveVaultPath(relativePath) {
@@ -254,13 +334,178 @@ function mergeDateWithIncomingTime(existingValue, incomingValue) {
   return `${existing.datePart}${incoming.timePart}`;
 }
 
+function splitFrontmatter(content) {
+  const normalizedContent = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+  const lineBreak = normalizedContent.includes("\r\n") ? "\r\n" : "\n";
+  const lines = normalizedContent.split(/\r?\n/);
+  if (!lines.length || String(lines[0]).trim() !== "---") {
+    throw new Error("File has no YAML frontmatter");
+  }
+
+  let endIndex = -1;
+  for (let i = 1; i < lines.length; i += 1) {
+    if (String(lines[i]).trim() === "---") {
+      endIndex = i;
+      break;
+    }
+  }
+  if (endIndex < 0) {
+    throw new Error("File has no YAML frontmatter");
+  }
+
+  const frontmatterLines = lines.slice(1, endIndex);
+  const rest = lines.slice(endIndex + 1).join(lineBreak);
+  return { lineBreak, frontmatterLines, rest };
+}
+
+function stripFrontmatter(content) {
+  const normalizedContent = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
+  const lines = normalizedContent.split(/\r?\n/);
+  if (!lines.length || String(lines[0]).trim() !== "---") {
+    return normalizedContent;
+  }
+
+  for (let i = 1; i < lines.length; i += 1) {
+    if (String(lines[i]).trim() === "---") {
+      return lines.slice(i + 1).join("\n");
+    }
+  }
+
+  return normalizedContent;
+}
+
+function topLevelKeyAndValue(line) {
+  const match = String(line || "").match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
+  if (!match) return null;
+  return { key: String(match[1]).toLowerCase(), rawValue: String(match[2] || "").trim() };
+}
+
 function frontmatterFieldValue(lines, fieldName) {
-  const pattern = new RegExp(`^${fieldName}\\s*:\\s*(.+)$`, "i");
+  const target = String(fieldName || "").toLowerCase();
   for (const line of lines) {
-    const match = line.match(pattern);
-    if (match && match[1]) return String(match[1]).trim();
+    const parsed = topLevelKeyAndValue(line);
+    if (!parsed || parsed.key !== target) continue;
+    if (!parsed.rawValue) return "";
+    return parsed.rawValue;
   }
   return "";
+}
+
+function parseFrontmatterScalar(rawValue) {
+  const raw = String(rawValue || "").trim();
+  if (!raw) return "";
+  if ((raw.startsWith('"') && raw.endsWith('"')) || (raw.startsWith("'") && raw.endsWith("'"))) {
+    return raw.slice(1, -1);
+  }
+  return raw;
+}
+
+function firstFrontmatterValue(content, ...keys) {
+  if (!Array.isArray(keys) || keys.length === 0) return "";
+  try {
+    const { frontmatterLines } = splitFrontmatter(content);
+    for (const key of keys) {
+      const rawValue = frontmatterFieldValue(frontmatterLines, key);
+      const parsedValue = parseFrontmatterScalar(rawValue);
+      if (parsedValue) return parsedValue;
+    }
+  } catch {
+    return "";
+  }
+  return "";
+}
+
+function extractFirstMarkdownBlock(content) {
+  const body = stripFrontmatter(content);
+  const lines = String(body || "").split(/\r?\n/);
+  let i = 0;
+  while (i < lines.length && !String(lines[i] || "").trim()) {
+    i += 1;
+  }
+  if (i >= lines.length) return "";
+
+  const firstLine = String(lines[i] || "");
+  const isBlockquote = /^\s*>/.test(firstLine);
+  const block = [];
+
+  for (; i < lines.length; i += 1) {
+    const line = String(lines[i] || "");
+    if (!line.trim()) {
+      if (block.length > 0) break;
+      continue;
+    }
+    if (isBlockquote && !/^\s*>/.test(line)) break;
+    if (!isBlockquote && /^\s*>/.test(line)) break;
+    block.push(line);
+  }
+
+  return block.join("\n").trim();
+}
+
+function readEventPreview(sourcePath) {
+  const markdownPath = safeResolveVaultPath(sourcePath);
+  if (!markdownPath || !fs.existsSync(markdownPath)) {
+    throw new Error(`Source markdown file not found for path: ${sourcePath}`);
+  }
+
+  const content = fs.readFileSync(markdownPath, "utf8");
+  const title =
+    firstFrontmatterValue(content, "title") || path.basename(markdownPath, ".md");
+  const start =
+    firstFrontmatterValue(content, "event_start", "startDate");
+  const end =
+    firstFrontmatterValue(content, "event_end", "endDate");
+
+  return {
+    sourcePath: path.relative(VAULT_ROOT, markdownPath).replace(/\\/g, "/"),
+    title,
+    start,
+    end,
+    previewMarkdown: extractFirstMarkdownBlock(content)
+  };
+}
+
+function rewriteTopLevelScalarFields(lines, replacements, removeKeys = []) {
+  const removeSet = new Set(removeKeys.map((key) => String(key || "").toLowerCase()));
+  const replacementEntries = Object.entries(replacements || {}).filter(([key]) => String(key || "").trim());
+  const replacementMap = new Map(
+    replacementEntries.map(([key, value]) => [String(key).toLowerCase(), { key: String(key), value: String(value) }])
+  );
+  const written = new Set();
+  const out = [];
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const parsed = topLevelKeyAndValue(line);
+    if (!parsed) {
+      out.push(line);
+      continue;
+    }
+
+    if (removeSet.has(parsed.key)) {
+      continue;
+    }
+
+    const replacement = replacementMap.get(parsed.key);
+    if (!replacement) {
+      out.push(line);
+      continue;
+    }
+
+    if (written.has(parsed.key)) {
+      continue;
+    }
+
+    out.push(`${replacement.key}: ${replacement.value}`);
+    written.add(parsed.key);
+  }
+
+  for (const [normalizedKey, replacement] of replacementMap.entries()) {
+    if (written.has(normalizedKey)) continue;
+    out.push(`${replacement.key}: ${replacement.value}`);
+  }
+
+  return out;
 }
 
 function addOneDay(isoDate) {
@@ -355,50 +600,27 @@ function createEventMarkdownFile({ title, start, end, allDay }) {
 }
 
 function updateFrontmatterSchedule(content, { start, end, allDay, recurringSeriesEdit = false }) {
-  const normalizedContent = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
-  const fmMatch = normalizedContent.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!fmMatch) {
-    throw new Error("File has no YAML frontmatter");
-  }
-
-  const lineBreak = normalizedContent.includes("\r\n") ? "\r\n" : "\n";
-  const frontmatter = fmMatch[1];
-  const rest = normalizedContent.slice(fmMatch[0].length);
-
-  const lines = frontmatter.split(/\r?\n/);
+  const { lineBreak, frontmatterLines, rest } = splitFrontmatter(content);
   const isTimed = allDay === false;
   const desiredStartField = isTimed ? "event_start" : "startDate";
   const desiredEndField = isTimed ? "event_end" : "endDate";
-  const removePatterns = isTimed
-    ? [/^startDate\s*:/i, /^endDate\s*:/i]
-    : [/^event_start\s*:/i, /^event_end\s*:/i];
-
-  const retained = lines.filter((line) => !removePatterns.some((pattern) => pattern.test(line)));
-  const persistedStart = recurringSeriesEdit && isTimed ? frontmatterFieldValue(lines, "event_start") : "";
-  const persistedEnd = recurringSeriesEdit && isTimed ? frontmatterFieldValue(lines, "event_end") : "";
+  const removeKeys = isTimed ? ["startDate", "endDate"] : ["event_start", "event_end"];
+  const persistedStart = recurringSeriesEdit && isTimed ? frontmatterFieldValue(frontmatterLines, "event_start") : "";
+  const persistedEnd = recurringSeriesEdit && isTimed ? frontmatterFieldValue(frontmatterLines, "event_end") : "";
   const writeStart =
     recurringSeriesEdit && isTimed ? mergeDateWithIncomingTime(persistedStart, start) : start;
   const writeEnd = recurringSeriesEdit && isTimed ? mergeDateWithIncomingTime(persistedEnd, end) : end;
-  let hasStart = false;
-  let hasEnd = false;
-
-  const nextLines = retained.map((line) => {
-    if (new RegExp(`^${desiredStartField}\\s*:`, "i").test(line)) {
-      hasStart = true;
-      return `${desiredStartField}: ${writeStart}`;
-    }
-    if (new RegExp(`^${desiredEndField}\\s*:`, "i").test(line)) {
-      hasEnd = true;
-      return `${desiredEndField}: ${writeEnd}`;
-    }
-    return line;
-  });
-
-  if (!hasStart) nextLines.push(`${desiredStartField}: ${writeStart}`);
-  if (!hasEnd) nextLines.push(`${desiredEndField}: ${writeEnd}`);
+  const nextLines = rewriteTopLevelScalarFields(
+    frontmatterLines,
+    {
+      [desiredStartField]: writeStart,
+      [desiredEndField]: writeEnd
+    },
+    removeKeys
+  );
 
   const newFrontmatter = nextLines.join(lineBreak);
-  return `---${lineBreak}${newFrontmatter}${lineBreak}---${rest}`;
+  return `---${lineBreak}${newFrontmatter}${lineBreak}---${lineBreak}${rest}`;
 }
 
 function readRequestBody(req) {
@@ -436,6 +658,98 @@ function openMarkdownInObsidianNewTab(sourcePath) {
   return vaultRelativePath;
 }
 
+function openKalenderBaseMapInObsidianNewTab(coordinates = null) {
+  const basePath = normalizeVaultRelativePath(KALENDER_MAP_BASE_PATH);
+  if (!basePath || !basePathExists(basePath)) {
+    throw new Error(`Base file not found: ${basePath || KALENDER_MAP_BASE_PATH}`);
+  }
+
+  const safeCoordinates =
+    coordinates &&
+    Number.isFinite(Number(coordinates.lat)) &&
+    Number.isFinite(Number(coordinates.lng))
+      ? { lat: Number(coordinates.lat), lng: Number(coordinates.lng) }
+      : null;
+  const zoom = 14;
+
+  execFileSync("obsidian", withVaultArgs(["tab:open", "view=bases", `file=${basePath}`]), {
+    cwd: VAULT_ROOT,
+    encoding: "utf8",
+    stdio: "pipe",
+    timeout: 10000
+  });
+
+  const script = `
+const basePath = ${JSON.stringify(basePath)};
+const coords = ${JSON.stringify(safeCoordinates)};
+const desiredZoom = ${zoom};
+const leaves = app.workspace.getLeavesOfType("bases") || [];
+const leaf = leaves.length ? leaves[leaves.length - 1] : null;
+if (!leaf) throw new Error("No bases tab found after opening " + basePath);
+leaf.setViewState({
+  type: "bases",
+  state: { file: basePath, viewName: "Map" },
+  active: true
+});
+if (coords) {
+  const applyMapFocus = () => {
+    const controller = leaf.view?.controller || null;
+    const mapView = Array.isArray(controller?._children)
+      ? controller._children.find((child) => child && child.type === "map")
+      : null;
+    if (!mapView) return false;
+
+    const map = mapView.map || null;
+    const ephemeral = { center: { lng: coords.lng, lat: coords.lat }, zoom: desiredZoom };
+    if (typeof mapView.setEphemeralState === "function") {
+      mapView.setEphemeralState(ephemeral);
+    }
+    if (mapView.mapConfig) {
+      mapView.mapConfig.center = [coords.lat, coords.lng];
+      mapView.mapConfig.defaultZoom = desiredZoom;
+    }
+
+    if (!map) return false;
+    if (typeof map.jumpTo === "function") {
+      map.jumpTo({ center: [coords.lng, coords.lat], zoom: desiredZoom });
+    } else {
+      if (typeof map.setCenter === "function") map.setCenter([coords.lng, coords.lat]);
+      if (typeof map.setZoom === "function") map.setZoom(desiredZoom);
+    }
+    return true;
+  };
+
+  let attempts = 0;
+  const maxAttempts = 20;
+  const retryId = window.setInterval(() => {
+    attempts += 1;
+    const focused = applyMapFocus();
+    if (focused || attempts >= maxAttempts) {
+      window.clearInterval(retryId);
+    }
+  }, 250);
+  applyMapFocus();
+}
+JSON.stringify({ basePath, view: "Map", centered: Boolean(coords) });
+`.trim();
+
+  const raw = execFileSync("obsidian", withVaultArgs(["eval", `code=${script}`]), {
+    cwd: VAULT_ROOT,
+    encoding: "utf8",
+    stdio: "pipe",
+    timeout: 10000
+  });
+  const clean = String(raw || "").replace(/^=>\s*/, "").trim();
+  if (!clean) {
+    throw new Error("Obsidian eval returned no output while opening map view");
+  }
+  try {
+    return JSON.parse(clean);
+  } catch {
+    throw new Error(`Unexpected response while opening map view: ${clean}`);
+  }
+}
+
 function rebuildEventsFile(baseFilter) {
   const filter = sanitizeBaseFilter(baseFilter.path, baseFilter.view, baseFilter.title);
   if (!isValidBasePath(filter.path) || !basePathExists(filter.path)) {
@@ -451,6 +765,21 @@ function rebuildEventsFile(baseFilter) {
     encoding: "utf8",
     stdio: "pipe"
   });
+}
+
+function writePidFile() {
+  fs.writeFileSync(PID_FILE, `${process.pid}\n`, "utf8");
+}
+
+function clearPidFile() {
+  try {
+    if (!fs.existsSync(PID_FILE)) return;
+    const current = String(fs.readFileSync(PID_FILE, "utf8") || "").trim();
+    if (current && Number(current) !== process.pid) return;
+    fs.unlinkSync(PID_FILE);
+  } catch {
+    // ignore cleanup failures on shutdown
+  }
 }
 
 function readObsidianThemeSnapshot() {
@@ -617,6 +946,27 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "GET" && req.url === "/api/session") {
+    res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+    res.end(JSON.stringify({ ok: true, token: API_TOKEN }));
+    return;
+  }
+
+  if (req.method === "POST") {
+    if (!hasJsonContentType(req)) {
+      res.writeHead(415, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Content-Type must be application/json");
+      return;
+    }
+
+    const authError = validateMutationRequest(req);
+    if (authError) {
+      res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end(authError);
+      return;
+    }
+  }
+
   if (req.method === "GET" && requestUrl.pathname === "/api/google-calendar/events") {
     const start = requestUrl.searchParams.get("start");
     const end = requestUrl.searchParams.get("end");
@@ -629,6 +979,25 @@ const server = http.createServer((req, res) => {
         res.writeHead(502, { "Content-Type": "text/plain; charset=utf-8" });
         res.end(error.message || "Could not load Google Calendar events");
       });
+    return;
+  }
+
+  if (req.method === "GET" && requestUrl.pathname === "/api/events/preview") {
+    const sourcePath = String(requestUrl.searchParams.get("sourcePath") || "").trim();
+    if (!sourcePath) {
+      res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Missing sourcePath");
+      return;
+    }
+
+    try {
+      const preview = readEventPreview(sourcePath);
+      res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+      res.end(JSON.stringify({ ok: true, ...preview }));
+    } catch (error) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end(error.message || "Could not read event preview");
+    }
     return;
   }
 
@@ -724,6 +1093,35 @@ const server = http.createServer((req, res) => {
       .catch((error) => {
         res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
         res.end(error.message || "Unknown error while opening note");
+      });
+    return;
+  }
+
+  if (req.method === "POST" && req.url === "/api/events/open-map") {
+    readRequestBody(req)
+      .then((rawBody) => {
+        let payload;
+        try {
+          payload = JSON.parse(rawBody || "{}");
+        } catch {
+          res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Invalid JSON payload");
+          return;
+        }
+
+        const coordinates = parseCoordinatesInput(payload.coordinates);
+        try {
+          const opened = openKalenderBaseMapInObsidianNewTab(coordinates);
+          res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+          res.end(JSON.stringify({ ok: true, ...opened }));
+        } catch (error) {
+          res.writeHead(502, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end(error.message || "Could not open map view in Obsidian");
+        }
+      })
+      .catch((error) => {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end(error.message || "Unknown error while opening map view");
       });
     return;
   }
@@ -865,9 +1263,35 @@ const server = http.createServer((req, res) => {
   fs.createReadStream(filePath).pipe(res);
 });
 
+server.on("error", (error) => {
+  if (error?.code === "EADDRINUSE") {
+    console.error(`Calendar preview failed to start: ${HOST}:${PORT} is already in use.`);
+    console.error("Run `npm.cmd --prefix .\\Tools\\Calendar run stop:preview` and try again.");
+  } else {
+    console.error(`Calendar preview server error: ${error?.message || error}`);
+  }
+  clearPidFile();
+  process.exit(1);
+});
+
 server.listen(PORT, HOST, () => {
+  writePidFile();
   console.log(`Calendar preview server: http://${HOST}:${PORT}/cal.html`);
   console.log(
-    "Calendar API endpoints ready: GET /api/ping, GET /api/obsidian/theme, GET /api/calendar/filters, GET /api/google-calendar/config, GET /api/google-calendar/events, POST /api/events/update-dates, POST /api/events/open-note, POST /api/events/create, POST /api/events/rebuild"
+    "Calendar API endpoints ready: GET /api/ping, GET /api/obsidian/theme, GET /api/calendar/filters, GET /api/google-calendar/config, GET /api/google-calendar/events, GET /api/session, GET /api/events/preview, POST /api/events/update-dates, POST /api/events/open-note, POST /api/events/open-map, POST /api/events/create, POST /api/events/rebuild"
   );
+});
+
+process.on("SIGINT", () => {
+  clearPidFile();
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  clearPidFile();
+  process.exit(0);
+});
+
+process.on("exit", () => {
+  clearPidFile();
 });

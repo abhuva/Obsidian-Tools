@@ -2,35 +2,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
+import { loadDotEnvFile } from "./lib/env.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-function loadDotEnvFile(filePath) {
-  if (!fs.existsSync(filePath)) return;
-  const raw = fs.readFileSync(filePath, "utf8");
-  const lines = raw.split(/\r?\n/);
-  for (const line of lines) {
-    const trimmed = String(line || "").trim();
-    if (!trimmed || trimmed.startsWith("#")) continue;
-    const match = trimmed.match(/^([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)$/);
-    if (!match) continue;
-    const key = match[1];
-    let value = match[2] || "";
-    const isDoubleQuoted = value.startsWith('"') && value.endsWith('"');
-    const isSingleQuoted = value.startsWith("'") && value.endsWith("'");
-    if (!isDoubleQuoted && !isSingleQuoted) {
-      const hashIndex = value.indexOf("#");
-      if (hashIndex >= 0) value = value.slice(0, hashIndex);
-      value = value.trim();
-    } else {
-      value = value.slice(1, -1);
-    }
-    if (process.env[key] == null) {
-      process.env[key] = value;
-    }
-  }
-}
 
 loadDotEnvFile(path.resolve(__dirname, ".env"));
 loadDotEnvFile(path.resolve(__dirname, ".env.local"));
@@ -40,6 +15,7 @@ const OUTPUT_FILE = path.resolve(__dirname, "events.generated.js");
 const BASE_PATH = process.env.OBSIDIAN_BASE_PATH || "6. Obsidian/Live/Kalender.base";
 const BASE_VIEW = process.env.OBSIDIAN_BASE_VIEW || "Tabelle";
 const OBSIDIAN_VAULT_NAME = String(process.env.OBSIDIAN_VAULT_NAME || "").trim();
+const ALLOW_MARKDOWN_FALLBACK = parseBoolean(process.env.ALLOW_MARKDOWN_FALLBACK || "");
 const EXCLUDE_DIRS = new Set([".obsidian", ".trash", "8. Emails", "Attachments", "Excalidraw"]);
 
 function isMarkdownFile(filePath) {
@@ -75,37 +51,90 @@ function extractFrontmatter(content) {
   return content.slice(4, end);
 }
 
-function extractField(frontmatter, ...names) {
+function stripWrappingQuotes(value) {
+  return String(value ?? "").trim().replace(/^["']|["']$/g, "");
+}
+
+function stripYamlInlineComment(raw) {
+  const value = String(raw ?? "");
+  const singleQuoted = value.startsWith("'") && value.endsWith("'");
+  const doubleQuoted = value.startsWith('"') && value.endsWith('"');
+  if (singleQuoted || doubleQuoted) return value;
+  const hashIndex = value.indexOf("#");
+  if (hashIndex < 0) return value;
+  return value.slice(0, hashIndex).trimEnd();
+}
+
+function parseInlineYamlArray(raw) {
+  return stripYamlInlineComment(raw)
+    .trim()
+    .replace(/^\[|\]$/g, "")
+    .split(",")
+    .map((value) => stripWrappingQuotes(value))
+    .filter(Boolean);
+}
+
+function parseFrontmatterData(frontmatter) {
+  const out = Object.create(null);
+  const lines = String(frontmatter || "").split(/\r?\n/);
+  for (let i = 0; i < lines.length; i += 1) {
+    const rawLine = lines[i];
+    const line = String(rawLine || "");
+    if (!line.trim() || line.trim().startsWith("#")) continue;
+
+    const keyMatch = line.match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
+    if (!keyMatch) continue;
+    const key = String(keyMatch[1] || "").trim().toLowerCase();
+    const rawValue = stripYamlInlineComment(keyMatch[2]).trim();
+
+    if (!rawValue) {
+      const listValues = [];
+      let j = i + 1;
+      while (j < lines.length) {
+        const listMatch = String(lines[j] || "").match(/^\s*-\s*(.+)\s*$/);
+        if (!listMatch) break;
+        listValues.push(stripWrappingQuotes(listMatch[1]));
+        j += 1;
+      }
+      out[key] = listValues;
+      i = j - 1;
+      continue;
+    }
+
+    if (rawValue.startsWith("[") && rawValue.endsWith("]")) {
+      out[key] = parseInlineYamlArray(rawValue);
+      continue;
+    }
+
+    out[key] = stripWrappingQuotes(rawValue);
+  }
+  return out;
+}
+
+function frontmatterLookup(frontmatterData, name) {
+  if (!frontmatterData || typeof frontmatterData !== "object") return undefined;
+  return frontmatterData[String(name || "").toLowerCase()];
+}
+
+function extractField(frontmatterData, ...names) {
   for (const name of names) {
-    const pattern = new RegExp(`^${name}[ \\t]*:[ \\t]*(.*)$`, "mi");
-    const match = frontmatter.match(pattern);
-    if (match) {
-      return match[1].trim().replace(/^["']|["']$/g, "");
+    const value = frontmatterLookup(frontmatterData, name);
+    if (Array.isArray(value)) continue;
+    if (value != null && String(value).trim()) {
+      return stripWrappingQuotes(value);
     }
   }
   return "";
 }
 
-function extractListField(frontmatter, ...names) {
+function extractListField(frontmatterData, ...names) {
   for (const name of names) {
-    const inlinePattern = new RegExp(`^${name}[ \\t]*:[ \\t]*\\[(.*)\\][ \\t]*$`, "mi");
-    const inlineMatch = frontmatter.match(inlinePattern);
-    if (inlineMatch?.[1] != null) {
-      return inlineMatch[1]
-        .split(",")
-        .map((v) => v.trim().replace(/^["']|["']$/g, ""))
-        .filter(Boolean);
+    const value = frontmatterLookup(frontmatterData, name);
+    if (Array.isArray(value)) {
+      return value.map((entry) => stripWrappingQuotes(entry)).filter(Boolean);
     }
-
-    const blockPattern = new RegExp(`^${name}[ \\t]*:[ \\t]*\\n((?:[ \\t]*-[ \\t]*.+\\n?)*)`, "mi");
-    const blockMatch = frontmatter.match(blockPattern);
-    if (blockMatch?.[1]) {
-      return blockMatch[1]
-        .split(/\r?\n/)
-        .map((line) => line.trim())
-        .filter((line) => line.startsWith("-"))
-        .map((line) => line.replace(/^-+\s*/, "").trim().replace(/^["']|["']$/g, ""))
-        .filter(Boolean);
+    if (typeof value === "string" && value.trim().startsWith("[") && value.trim().endsWith("]")) {
+      return parseInlineYamlArray(value);
     }
   }
   return [];
@@ -122,6 +151,34 @@ function parseBoolean(value) {
 function parseInteger(value, fallback = 0) {
   const num = Number.parseInt(String(value ?? "").trim(), 10);
   return Number.isInteger(num) ? num : fallback;
+}
+
+function normalizeCoordinatesValue(value) {
+  if (value == null) return "";
+
+  if (Array.isArray(value)) {
+    if (value.length < 2) return "";
+    const lat = Number(value[0]);
+    const lng = Number(value[1]);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+    return `${lat}, ${lng}`;
+  }
+
+  if (typeof value === "object") {
+    const lat = Number(value.lat ?? value.latitude);
+    const lng = Number(value.lng ?? value.lon ?? value.long ?? value.longitude);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+    return `${lat}, ${lng}`;
+  }
+
+  const raw = String(value).trim();
+  if (!raw) return "";
+  const match = raw.match(/(-?\d+(?:\.\d+)?)\s*[,;]\s*(-?\d+(?:\.\d+)?)/);
+  if (!match) return "";
+  const lat = Number(match[1]);
+  const lng = Number(match[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return "";
+  return `${lat}, ${lng}`;
 }
 
 function parseIsoDateList(value) {
@@ -206,30 +263,19 @@ function parseJsonField(value) {
   }
 }
 
-function extractTags(frontmatter) {
-  const tags = [];
-
-  const inlineMatch = frontmatter.match(/^tags\s*:\s*\[(.+)\]$/mi);
-  if (inlineMatch?.[1]) {
-    inlineMatch[1]
-      .split(",")
-      .map((t) => t.trim().replace(/^["'#]|["']$/g, ""))
-      .filter(Boolean)
-      .forEach((t) => tags.push(t.toLowerCase()));
+function extractTags(frontmatterData) {
+  const tags = extractListField(frontmatterData, "tags");
+  if (!tags.length) {
+    const scalar = extractField(frontmatterData, "tags");
+    if (scalar) {
+      scalar
+        .split(",")
+        .map((entry) => entry.trim())
+        .filter(Boolean)
+        .forEach((entry) => tags.push(entry));
+    }
   }
-
-  const blockMatch = frontmatter.match(/^tags\s*:\s*\n((?:\s*-\s*.+\n?)*)/mi);
-  if (blockMatch?.[1]) {
-    blockMatch[1]
-      .split(/\r?\n/)
-      .map((line) => line.trim())
-      .filter((line) => line.startsWith("-"))
-      .map((line) => line.replace(/^-+\s*/, "").trim().replace(/^["'#]|["']$/g, ""))
-      .filter(Boolean)
-      .forEach((t) => tags.push(t.toLowerCase()));
-  }
-
-  return [...new Set(tags)];
+  return [...new Set(tags.map((tag) => String(tag).replace(/^#/, "").toLowerCase()).filter(Boolean))];
 }
 
 function hasInlineEventTag(content) {
@@ -250,8 +296,18 @@ function isDateOrDateTime(value) {
   return isIsoDate(value) || isIsoDateTime(value);
 }
 
+function dateToLocalIsoDate(value) {
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 function parseDateLikeToIsoDate(value) {
   if (value == null) return "";
+  if (value instanceof Date) return dateToLocalIsoDate(value);
   const raw = String(value).trim();
   if (!raw) return "";
   if (isIsoDate(raw)) return raw;
@@ -259,18 +315,19 @@ function parseDateLikeToIsoDate(value) {
   if (dateOnlyMatch?.[1] && isIsoDate(dateOnlyMatch[1])) return dateOnlyMatch[1];
   const timestamp = Date.parse(raw);
   if (Number.isNaN(timestamp)) return "";
-  return new Date(timestamp).toISOString().slice(0, 10);
+  return dateToLocalIsoDate(new Date(timestamp));
 }
 
 function parseDateLikeToCalendarValue(value) {
   if (value == null) return "";
+  if (value instanceof Date) return dateToLocalIsoDate(value);
   const raw = String(value).trim().replace(/^["']|["']$/g, "");
   if (!raw) return "";
   if (isIsoDate(raw)) return raw;
   if (isIsoDateTime(raw)) return raw.replace(" ", "T");
-  const timestamp = Date.parse(raw);
-  if (Number.isNaN(timestamp)) return "";
-  return new Date(timestamp).toISOString();
+  const dateOnlyMatch = raw.match(/^(\d{4}-\d{2}-\d{2})[T\s].*$/);
+  if (dateOnlyMatch?.[1] && isIsoDate(dateOnlyMatch[1])) return dateOnlyMatch[1];
+  return "";
 }
 
 function getStartDateFromFileMeta(filePath) {
@@ -329,20 +386,21 @@ function toCalendarEvent(filePath) {
   const content = fs.readFileSync(filePath, "utf8");
   const frontmatter = extractFrontmatter(content);
   if (!frontmatter) return null;
+  const frontmatterData = parseFrontmatterData(frontmatter);
 
-  const tags = extractTags(frontmatter);
+  const tags = extractTags(frontmatterData);
   const taggedAsEvent = tags.includes("event") || hasInlineEventTag(content);
   if (!taggedAsEvent) return null;
 
   const startDateFromFrontmatter = extractField(
-    frontmatter,
+    frontmatterData,
     "event_start",
     "eventStart",
     "startDate",
     "startdate"
   );
   const createdDateFromFrontmatter = extractField(
-    frontmatter,
+    frontmatterData,
     "created",
     "creationDate",
     "created_at",
@@ -356,38 +414,39 @@ function toCalendarEvent(filePath) {
     getStartDateFromFileMeta(filePath);
   const startDate = parseDateLikeToIsoDate(startValue);
   const endValue = parseDateLikeToCalendarValue(
-    extractField(frontmatter, "event_end", "eventEnd", "endDate", "enddate")
+    extractField(frontmatterData, "event_end", "eventEnd", "endDate", "enddate")
   );
   const isTimedEvent = isIsoDateTime(startValue);
   if (!startDate || !isDateOrDateTime(startValue)) return null;
 
-  const titleFromFm = extractField(frontmatter, "title");
-  const eventColor = extractField(frontmatter, "event_color", "eventColor", "color");
+  const titleFromFm = extractField(frontmatterData, "title");
+  const eventColor = extractField(frontmatterData, "event_color", "eventColor", "color");
   const eventBackground = parseBoolean(
-    extractField(frontmatter, "event_background", "eventBackground")
+    extractField(frontmatterData, "event_background", "eventBackground")
   );
-  const recurrenceType = extractField(frontmatter, "event_recurrence", "eventRecurrence").toLowerCase();
-  const recurrenceUntil = extractField(frontmatter, "event_recurrence_until", "eventRecurrenceUntil");
+  const recurrenceType = extractField(frontmatterData, "event_recurrence", "eventRecurrence").toLowerCase();
+  const recurrenceUntil = extractField(frontmatterData, "event_recurrence_until", "eventRecurrenceUntil");
   const recurrenceInterval = parseInteger(
-    extractField(frontmatter, "event_recurrence_interval", "eventRecurrenceInterval"),
+    extractField(frontmatterData, "event_recurrence_interval", "eventRecurrenceInterval"),
     1
   );
   const recurrenceCount = parseInteger(
-    extractField(frontmatter, "event_recurrence_count", "eventRecurrenceCount"),
+    extractField(frontmatterData, "event_recurrence_count", "eventRecurrenceCount"),
     0
   );
   const recurrenceDays = parseDaysOfWeek(
-    extractListField(frontmatter, "event_recurrence_days", "eventRecurrenceDays")
+    extractListField(frontmatterData, "event_recurrence_days", "eventRecurrenceDays")
   );
   const recurrenceExdates = parseIsoDateList(
-    extractListField(frontmatter, "event_recurrence_exdates", "eventRecurrenceExdates")
+    extractListField(frontmatterData, "event_recurrence_exdates", "eventRecurrenceExdates")
   );
   const recurrenceRdates = parseIsoDateList(
-    extractListField(frontmatter, "event_recurrence_rdates", "eventRecurrenceRdates")
+    extractListField(frontmatterData, "event_recurrence_rdates", "eventRecurrenceRdates")
   );
   const recurrenceExrule = parseJsonField(
-    extractField(frontmatter, "event_recurrence_exrule", "event_recurrence_exrules")
+    extractField(frontmatterData, "event_recurrence_exrule", "event_recurrence_exrules")
   );
+  const coordinates = normalizeCoordinatesValue(extractField(frontmatterData, "coordinates"));
   const title = titleFromFm || path.basename(filePath, ".md");
   const event = {
     id: path.relative(VAULT_ROOT, filePath).replace(/\\/g, "/"),
@@ -401,6 +460,13 @@ function toCalendarEvent(filePath) {
   if (eventColor) {
     event.backgroundColor = eventColor;
     event.borderColor = eventColor;
+  }
+
+  if (eventBackground) {
+    event.display = "background";
+  }
+  if (coordinates) {
+    event.extendedProps.coordinates = coordinates;
   }
 
   if (recurrenceType === "weekly") {
@@ -461,10 +527,7 @@ function toCalendarEvent(filePath) {
 
     if (isTimedEvent && recurringDurationMs > 0) {
       overrideEvents.forEach((overrideEvent) => {
-        const startTs = Date.parse(String(overrideEvent.start || ""));
-        if (Number.isFinite(startTs)) {
-          overrideEvent.end = new Date(startTs + recurringDurationMs).toISOString();
-        }
+        overrideEvent.duration = { milliseconds: recurringDurationMs };
       });
     }
 
@@ -478,10 +541,6 @@ function toCalendarEvent(filePath) {
         event.end = addOneDay(endValue);
       }
     }
-  }
-
-  if (eventBackground) {
-    event.display = "background";
   }
 
   return [event];
@@ -504,6 +563,7 @@ function queryBaseRows() {
 function baseRowToCalendarEvent(row) {
   const sourcePath = String(row.path ?? "").trim();
   const sourceFilePath = sourcePath ? path.resolve(VAULT_ROOT, sourcePath) : "";
+  let titleFromFrontmatter = "";
   let startValue =
     parseDateLikeToCalendarValue(
       row.event_start ??
@@ -531,11 +591,13 @@ function baseRowToCalendarEvent(row) {
     const content = fs.readFileSync(sourceFilePath, "utf8");
     const frontmatter = extractFrontmatter(content);
     if (frontmatter) {
+      const frontmatterData = parseFrontmatterData(frontmatter);
+      titleFromFrontmatter = extractField(frontmatterData, "title");
       const fmStartValue = parseDateLikeToCalendarValue(
-        extractField(frontmatter, "event_start", "eventStart", "startDate", "startdate")
+        extractField(frontmatterData, "event_start", "eventStart", "startDate", "startdate")
       );
       const fmEndValue = parseDateLikeToCalendarValue(
-        extractField(frontmatter, "event_end", "eventEnd", "endDate", "enddate")
+        extractField(frontmatterData, "event_end", "eventEnd", "endDate", "enddate")
       );
 
       if (!isTimedEvent && fmStartValue && isIsoDateTime(fmStartValue)) {
@@ -577,6 +639,7 @@ function baseRowToCalendarEvent(row) {
     row.event_recurrence_rdates ?? row.eventRecurrenceRdates ?? row.rdates ?? [];
   let recurrenceExrule =
     row.event_recurrence_exrule ?? row.event_recurrence_exrules ?? row.eventRecurrenceExrule ?? "";
+  let coordinates = normalizeCoordinatesValue(row.coordinates);
 
   // Base views may not expose all fields. Fallback to direct markdown frontmatter.
   if (
@@ -597,57 +660,72 @@ function baseRowToCalendarEvent(row) {
     if (fs.existsSync(sourceFile)) {
       const content = fs.readFileSync(sourceFile, "utf8");
       const frontmatter = extractFrontmatter(content);
-      eventColor = extractField(frontmatter, "event_color", "eventColor", "color");
-      eventBackground = extractField(frontmatter, "event_background", "eventBackground");
+      const frontmatterData = parseFrontmatterData(frontmatter);
+      if (!titleFromFrontmatter) {
+        titleFromFrontmatter = extractField(frontmatterData, "title");
+      }
+      if (!eventColor) {
+        eventColor = extractField(frontmatterData, "event_color", "eventColor", "color");
+      }
+      if (eventBackground === "" || eventBackground == null) {
+        eventBackground = extractField(frontmatterData, "event_background", "eventBackground");
+      }
       recurrenceType =
-        recurrenceType || extractField(frontmatter, "event_recurrence", "eventRecurrence").toLowerCase();
+        recurrenceType || extractField(frontmatterData, "event_recurrence", "eventRecurrence").toLowerCase();
       recurrenceUntil =
-        recurrenceUntil || extractField(frontmatter, "event_recurrence_until", "eventRecurrenceUntil");
+        recurrenceUntil || extractField(frontmatterData, "event_recurrence_until", "eventRecurrenceUntil");
       if (recurrenceInterval === "") {
         recurrenceInterval = extractField(
-          frontmatter,
+          frontmatterData,
           "event_recurrence_interval",
           "eventRecurrenceInterval"
         );
       }
       if (recurrenceCount === "") {
         recurrenceCount = extractField(
-          frontmatter,
+          frontmatterData,
           "event_recurrence_count",
           "eventRecurrenceCount"
         );
       }
       if (!recurrenceDays || recurrenceDays.length === 0) {
-        recurrenceDays = extractListField(frontmatter, "event_recurrence_days", "eventRecurrenceDays");
+        recurrenceDays = extractListField(frontmatterData, "event_recurrence_days", "eventRecurrenceDays");
       }
       if (!recurrenceExdates || recurrenceExdates.length === 0) {
         recurrenceExdates = extractListField(
-          frontmatter,
+          frontmatterData,
           "event_recurrence_exdates",
           "eventRecurrenceExdates"
         );
       }
       if (!recurrenceRdates || recurrenceRdates.length === 0) {
         recurrenceRdates = extractListField(
-          frontmatter,
+          frontmatterData,
           "event_recurrence_rdates",
           "eventRecurrenceRdates"
         );
       }
       if (!recurrenceExrule) {
         recurrenceExrule = extractField(
-          frontmatter,
+          frontmatterData,
           "event_recurrence_exrule",
           "event_recurrence_exrules",
           "eventRecurrenceExrule"
         );
       }
+      if (!coordinates) {
+        coordinates = normalizeCoordinatesValue(extractField(frontmatterData, "coordinates"));
+      }
     }
   }
 
+  const titleFromRow = String(row.title ?? row.Title ?? "").trim();
   const title =
+    titleFromRow ||
+    String(titleFromFrontmatter || "").trim() ||
     String(row.Dateiname ?? "").trim() ||
     (sourcePath ? path.basename(sourcePath, ".md") : "Event");
+  const isBackgroundEvent = parseBoolean(eventBackground);
 
   const event = {
     id: sourcePath,
@@ -661,6 +739,13 @@ function baseRowToCalendarEvent(row) {
   if (eventColor) {
     event.backgroundColor = eventColor;
     event.borderColor = eventColor;
+  }
+
+  if (isBackgroundEvent) {
+    event.display = "background";
+  }
+  if (coordinates) {
+    event.extendedProps.coordinates = coordinates;
   }
 
   if (recurrenceType === "weekly") {
@@ -695,7 +780,9 @@ function baseRowToCalendarEvent(row) {
 
     const parsedExdates = parseIsoDateList(recurrenceExdates);
     if (parsedExdates.length) {
-      event.exdate = parsedExdates;
+      event.exdate = isTimedEvent
+        ? parsedExdates.map((dateStr) => mergeDateWithTimePortion(dateStr, recurringTimePortion))
+        : parsedExdates;
     }
 
     const parsedExrule = parseJsonField(recurrenceExrule);
@@ -725,10 +812,7 @@ function baseRowToCalendarEvent(row) {
 
     if (isTimedEvent && recurringDurationMs > 0) {
       overrideEvents.forEach((overrideEvent) => {
-        const startTs = Date.parse(String(overrideEvent.start || ""));
-        if (Number.isFinite(startTs)) {
-          overrideEvent.end = new Date(startTs + recurringDurationMs).toISOString();
-        }
+        overrideEvent.duration = { milliseconds: recurringDurationMs };
       });
     }
 
@@ -742,10 +826,6 @@ function baseRowToCalendarEvent(row) {
         event.end = addOneDay(endValue);
       }
     }
-  }
-
-  if (parseBoolean(eventBackground)) {
-    event.display = "background";
   }
 
   return [event];
@@ -768,9 +848,16 @@ try {
   events = collectEventsFromBase();
   sourceLabel = `Obsidian Base (${BASE_PATH} :: ${BASE_VIEW})`;
 } catch (error) {
+  if (!ALLOW_MARKDOWN_FALLBACK) {
+    const message =
+      `Base query failed for ${BASE_PATH} :: ${BASE_VIEW} and markdown fallback is disabled.\n` +
+      `Set ALLOW_MARKDOWN_FALLBACK=true to permit full markdown scan fallback.\n` +
+      `Original error: ${error.message}`;
+    throw new Error(message);
+  }
   events = collectEventsFromMarkdownScan();
   sourceLabel = "Markdown fallback scan";
-  console.warn(`Base query failed, using fallback scan.\n${error.message}`);
+  console.warn(`Base query failed, using fallback scan because ALLOW_MARKDOWN_FALLBACK=true.\n${error.message}`);
 }
 
 function eventSortDate(event) {
