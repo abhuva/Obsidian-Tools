@@ -50,7 +50,7 @@ window.CALENDAR_EVENTS = [
       "count": 20
     },
     "duration": {
-      "milliseconds": 11580000
+      "milliseconds": 10800000
     },
     "exdate": [
       "2026-04-02T14:00:00+02:00",
@@ -364,7 +364,7 @@ window.CALENDAR_EVENTS = [
       "isRecurringOverride": true
     },
     "duration": {
-      "milliseconds": 11580000
+      "milliseconds": 10800000
     }
   },
   {
@@ -418,7 +418,7 @@ window.CALENDAR_EVENTS = [
       "isRecurringOverride": true
     },
     "duration": {
-      "milliseconds": 11580000
+      "milliseconds": 10800000
     }
   },
   {
@@ -472,7 +472,7 @@ window.CALENDAR_EVENTS = [
       "isRecurringOverride": true
     },
     "duration": {
-      "milliseconds": 11580000
+      "milliseconds": 10800000
     }
   },
   {
@@ -508,7 +508,7 @@ window.CALENDAR_EVENTS = [
       "isRecurringOverride": true
     },
     "duration": {
-      "milliseconds": 11580000
+      "milliseconds": 10800000
     }
   },
   {
@@ -544,7 +544,7 @@ window.CALENDAR_EVENTS = [
       "isRecurringOverride": true
     },
     "duration": {
-      "milliseconds": 11580000
+      "milliseconds": 10800000
     }
   },
   {
@@ -566,6 +566,18 @@ window.CALENDAR_EVENTS = [
     }
   },
   {
+    "id": "2. Projektverwaltung/2026 Tohu Convention/Tohuwabohu Convention.md",
+    "title": "Tohuwabohu Convention",
+    "allDay": true,
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 Tohu Convention/Tohuwabohu Convention.md"
+    },
+    "backgroundColor": "red",
+    "borderColor": "red",
+    "start": "2026-10-01",
+    "end": "2026-10-05"
+  },
+  {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-10-01",
     "title": "JEP",
     "start": "2026-10-01T14:00:00+02:00",
@@ -580,7 +592,7 @@ window.CALENDAR_EVENTS = [
       "isRecurringOverride": true
     },
     "duration": {
-      "milliseconds": 11580000
+      "milliseconds": 10800000
     }
   },
   {
@@ -616,7 +628,7 @@ window.CALENDAR_EVENTS = [
       "isRecurringOverride": true
     },
     "duration": {
-      "milliseconds": 11580000
+      "milliseconds": 10800000
     }
   },
   {
@@ -652,7 +664,7 @@ window.CALENDAR_EVENTS = [
       "isRecurringOverride": true
     },
     "duration": {
-      "milliseconds": 11580000
+      "milliseconds": 10800000
     }
   },
   {
@@ -670,7 +682,7 @@ window.CALENDAR_EVENTS = [
       "isRecurringOverride": true
     },
     "duration": {
-      "milliseconds": 11580000
+      "milliseconds": 10800000
     }
   },
   {

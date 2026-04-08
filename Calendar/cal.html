@@ -44,7 +44,7 @@
     <div id='calendar'></div>
     <div id='calendar-label-settings' class='calendar-settings-popover' aria-hidden='true'>
       <p class='calendar-settings-popover__title'>Calendar settings</p>
-      <p class='calendar-settings-popover__hint'>Control labels, Google source, month width, and global roundness.</p>
+      <p class='calendar-settings-popover__hint'>Control labels, Google source, month width, roundness, and day/week row density.</p>
       <label class='calendar-settings-popover__check'>
         <input id='toggle-society-badges' type='checkbox' checked />
         <span>Show NICA/TOHU badges</span>
@@ -54,32 +54,79 @@
         <span>Show REC badge</span>
       </label>
       <label class='calendar-settings-popover__check'>
-        <input id='toggle-google-events' type='checkbox' />
-        <span>Show Google events</span>
+        <input id='toggle-google-create-events' type='checkbox' />
+        <span>Create new events on Google</span>
       </label>
+      <label class='calendar-settings-popover__check'>
+        <input id='toggle-nextcloud-create-events' type='checkbox' />
+        <span>Create new events on Nextcloud</span>
+      </label>
+      <div id='setting-nextcloud-calendars' class='calendar-settings-popover__group' hidden>
+        <p class='calendar-settings-popover__field'>Nextcloud calendars</p>
+        <div id='setting-nextcloud-calendars-list' class='calendar-settings-popover__checks'></div>
+      </div>
+      <div class='calendar-settings-popover__actions'>
+        <button id='google-oauth-connect' class='event-preview-popover__btn event-preview-popover__btn--primary' type='button'>Connect Google OAuth</button>
+        <button id='google-oauth-disconnect' class='event-preview-popover__btn' type='button'>Disconnect</button>
+      </div>
       <label class='calendar-settings-popover__check'>
         <input id='toggle-event-preview' type='checkbox' checked />
         <span>Click opens preview pop-up</span>
       </label>
+      <label class='calendar-settings-popover__check'>
+        <input id='toggle-vacation-texture' type='checkbox' checked />
+        <span>Use texture for background events</span>
+      </label>
       <p id='setting-google-status' class='calendar-settings-popover__status'>Google source not configured.</p>
+      <p id='setting-nextcloud-status' class='calendar-settings-popover__status'>Nextcloud source not configured.</p>
       <label class='calendar-settings-popover__field' for='setting-month-width'>Year view month width</label>
       <div class='calendar-settings-popover__range-wrap'>
-        <input id='setting-month-width' class='calendar-settings-popover__range' type='range' min='220' max='520' step='10' />
-        <span id='setting-month-width-value' class='calendar-settings-popover__value'>300 px</span>
+        <input id='setting-month-width' class='calendar-settings-popover__range' type='range' min='20' max='50' step='1' />
+        <span id='setting-month-width-value' class='calendar-settings-popover__value'>30 %</span>
       </div>
       <label class='calendar-settings-popover__field' for='setting-roundness'>Global roundness</label>
       <div class='calendar-settings-popover__range-wrap'>
         <input id='setting-roundness' class='calendar-settings-popover__range' type='range' min='0' max='24' step='1' />
         <span id='setting-roundness-value' class='calendar-settings-popover__value'>8 px</span>
       </div>
+      <label class='calendar-settings-popover__field' for='setting-timegrid-row-height'>Day/week row height</label>
+      <div class='calendar-settings-popover__range-wrap'>
+        <input id='setting-timegrid-row-height' class='calendar-settings-popover__range' type='range' min='16' max='48' step='1' />
+        <span id='setting-timegrid-row-height-value' class='calendar-settings-popover__value'>26 px</span>
+      </div>
     </div>
     <div id='create-event-modal' class='event-modal' aria-hidden='true'>
       <div class='event-modal__card' role='dialog' aria-modal='true' aria-label='Create event'>
         <h3 class='event-modal__title'>Create event</h3>
         <input id='create-event-title' class='event-modal__input' type='text' placeholder='Event title' />
+        <div id='create-event-tabs' class='event-modal__tabs' role='tablist' aria-label='Create target'>
+          <button id='create-event-tab-md' class='event-modal__tab is-active' type='button' role='tab' aria-selected='true' aria-controls='create-event-panel-md'>md</button>
+          <button id='create-event-tab-google' class='event-modal__tab' type='button' role='tab' aria-selected='false' aria-controls='create-event-panel-google'>google</button>
+          <button id='create-event-tab-nextcloud' class='event-modal__tab' type='button' role='tab' aria-selected='false' aria-controls='create-event-panel-nextcloud'>nextcloud</button>
+        </div>
+        <div id='create-event-panel-md' class='event-modal__panel is-active' role='tabpanel' aria-labelledby='create-event-tab-md'>
+          <div class='event-modal__panel-actions'>
+            <button id='create-event-confirm-md' class='event-modal__btn event-modal__btn--primary' type='button'>Create event</button>
+          </div>
+        </div>
+        <div id='create-event-panel-google' class='event-modal__panel' role='tabpanel' aria-labelledby='create-event-tab-google' hidden>
+          <label class='event-modal__field' for='create-event-google-color'>Color</label>
+          <select id='create-event-google-color' class='event-modal__select'></select>
+          <p id='create-event-google-color-hint' class='event-modal__hint' hidden></p>
+          <div class='event-modal__panel-actions'>
+            <button id='create-event-confirm-google' class='event-modal__btn event-modal__btn--primary' type='button'>Create event</button>
+          </div>
+        </div>
+        <div id='create-event-panel-nextcloud' class='event-modal__panel' role='tabpanel' aria-labelledby='create-event-tab-nextcloud' hidden>
+          <p class='event-modal__field'>Calendar</p>
+          <div id='create-event-nextcloud-calendars' class='event-modal__radios'></div>
+          <p id='create-event-nextcloud-calendar-hint' class='event-modal__hint' hidden></p>
+          <div class='event-modal__panel-actions'>
+            <button id='create-event-confirm-nextcloud' class='event-modal__btn event-modal__btn--primary' type='button'>Create event</button>
+          </div>
+        </div>
         <div class='event-modal__actions'>
           <button id='create-event-cancel' class='event-modal__btn' type='button'>Cancel</button>
-          <button id='create-event-confirm' class='event-modal__btn event-modal__btn--primary' type='button'>Create</button>
         </div>
       </div>
     </div>
@@ -94,6 +141,8 @@
       <div id='event-preview-body' class='event-preview-popover__body'></div>
       <div class='event-preview-popover__actions'>
         <button id='event-preview-open-map' class='event-preview-popover__btn' type='button' hidden>map</button>
+        <button id='event-preview-edit-google' class='event-preview-popover__btn' type='button' hidden>Rename</button>
+        <button id='event-preview-delete-google' class='event-preview-popover__btn' type='button' hidden>Delete</button>
         <button id='event-preview-open-note' class='event-preview-popover__btn event-preview-popover__btn--primary' type='button'>Open note in new tab</button>
       </div>
     </div>
