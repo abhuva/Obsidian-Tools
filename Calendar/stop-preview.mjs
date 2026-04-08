@@ -1,15 +1,21 @@
+import fs from "node:fs";
+import path from "node:path";
 import { execSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
-const port = Number(process.env.CALENDAR_PORT || 4173);
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const PID_FILE = path.resolve(__dirname, "calendar.preview.pid");
+const PORT = Number(process.env.CALENDAR_PORT || 4173);
 
-function listPidsOnPort(targetPort) {
+function readPidFromFile() {
   try {
-    const cmd = `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort ${targetPort} -State Listen | Select-Object -ExpandProperty OwningProcess"`;
-    const output = execSync(cmd, { encoding: "utf8", stdio: "pipe" }).trim();
-    if (!output) return [];
-    return [...new Set(output.split(/\r?\n/).map((x) => x.trim()).filter(Boolean))].map(Number);
+    if (!fs.existsSync(PID_FILE)) return 0;
+    const raw = String(fs.readFileSync(PID_FILE, "utf8") || "").trim();
+    const pid = Number.parseInt(raw, 10);
+    return Number.isInteger(pid) && pid > 0 ? pid : 0;
   } catch {
-    return [];
+    return 0;
   }
 }
 
@@ -22,16 +28,83 @@ function killPid(pid) {
   }
 }
 
-const pids = listPidsOnPort(port);
+function clearPidFile() {
+  try {
+    if (fs.existsSync(PID_FILE)) {
+      fs.unlinkSync(PID_FILE);
+    }
+  } catch {
+    // ignore
+  }
+}
 
-if (pids.length === 0) {
-  console.log(`No listening process found on port ${port}.`);
+function listListenerProcessesOnPort(port) {
+  try {
+    const ps = [
+      "$ErrorActionPreference='Stop';",
+      `$pids = Get-NetTCPConnection -LocalPort ${port} -State Listen | Select-Object -ExpandProperty OwningProcess -Unique;`,
+      "$items = @();",
+      "foreach ($pid in $pids) {",
+      "  $proc = Get-CimInstance Win32_Process -Filter \"ProcessId = $pid\";",
+      "  if ($proc) {",
+      "    $items += [PSCustomObject]@{",
+      "      pid = [int]$proc.ProcessId;",
+      "      name = [string]$proc.Name;",
+      "      commandLine = [string]$proc.CommandLine",
+      "    };",
+      "  }",
+      "}",
+      "$items | ConvertTo-Json -Compress"
+    ].join(" ");
+    const raw = execSync(`powershell -NoProfile -Command "${ps}"`, {
+      encoding: "utf8",
+      stdio: "pipe"
+    }).trim();
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [parsed];
+  } catch {
+    return [];
+  }
+}
+
+function looksLikeCalendarServerProcess(proc) {
+  const name = String(proc?.name || "").toLowerCase();
+  const commandLine = String(proc?.commandLine || "").toLowerCase();
+  if (name !== "node.exe" && name !== "node") return false;
+  return commandLine.includes("tools\\calendar\\serve.mjs") || commandLine.includes("tools/calendar/serve.mjs");
+}
+
+function stopLegacyCalendarByPort() {
+  const listeners = listListenerProcessesOnPort(PORT);
+  const candidates = listeners.filter(looksLikeCalendarServerProcess);
+  if (!candidates.length) return { stopped: 0, found: listeners.length };
+  let stopped = 0;
+  for (const proc of candidates) {
+    if (killPid(Number(proc.pid))) stopped += 1;
+  }
+  return { stopped, found: listeners.length, candidates: candidates.map((p) => p.pid) };
+}
+
+const pid = readPidFromFile();
+
+if (!pid) {
+  const result = stopLegacyCalendarByPort();
+  if (result.stopped > 0) {
+    console.log(
+      `Stopped ${result.stopped} legacy calendar process(es) on port ${PORT} (pid: ${result.candidates.join(", ")}).`
+    );
+  } else {
+    console.log("No preview PID file found.");
+  }
   process.exit(0);
 }
 
-let killed = 0;
-for (const pid of pids) {
-  if (killPid(pid)) killed += 1;
+const killed = killPid(pid);
+if (killed) {
+  clearPidFile();
+  console.log(`Stopped preview process ${pid}.`);
+} else {
+  clearPidFile();
+  console.log(`Preview PID ${pid} was not running.`);
 }
-
-console.log(`Stopped ${killed}/${pids.length} process(es) on port ${port}.`);
