@@ -30,6 +30,30 @@ window.CALENDAR_EVENTS = [
     "editable": true
   },
   {
+    "id": "2. Projektverwaltung/2026 TOHU Einradkurs/Einrad Kröllwitz.md",
+    "title": "Einrad Kröllwitz",
+    "allDay": false,
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 TOHU Einradkurs/Einrad Kröllwitz.md",
+      "isRecurring": true
+    },
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "rrule": {
+      "freq": "weekly",
+      "interval": 1,
+      "byweekday": [
+        "tu"
+      ],
+      "dtstart": "2026-04-07T14:00:00",
+      "count": 10
+    },
+    "duration": {
+      "milliseconds": 7200000
+    },
+    "editable": true
+  },
+  {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
     "title": "JEP",
     "allDay": false,
@@ -63,6 +87,42 @@ window.CALENDAR_EVENTS = [
       "2026-04-30T14:00:00+02:00",
       "2026-05-07T14:00:00+02:00",
       "2026-08-13T14:00:00+02:00"
+    ],
+    "editable": true
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
+    "title": "Kita",
+    "allDay": false,
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
+      "isRecurring": true
+    },
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "rrule": {
+      "freq": "weekly",
+      "interval": 1,
+      "byweekday": [
+        "th"
+      ],
+      "dtstart": "2026-04-16T09:00:00+02:00",
+      "count": 20
+    },
+    "duration": {
+      "milliseconds": 10800000
+    },
+    "exdate": [
+      "2026-04-02T09:00:00+02:00",
+      "2026-05-28T09:00:00+02:00",
+      "2026-07-09T09:00:00+02:00",
+      "2026-07-16T09:00:00+02:00",
+      "2026-07-23T09:00:00+02:00",
+      "2026-07-30T09:00:00+02:00",
+      "2026-08-06T09:00:00+02:00",
+      "2026-04-30T09:00:00+02:00",
+      "2026-05-07T09:00:00+02:00",
+      "2026-08-13T09:00:00+02:00"
     ],
     "editable": true
   },
@@ -116,19 +176,6 @@ window.CALENDAR_EVENTS = [
     "end": "2026-02-07"
   },
   {
-    "id": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 3.md",
-    "title": "Ferien 3",
-    "allDay": true,
-    "extendedProps": {
-      "sourcePath": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 3.md",
-      "coordinates": "51.46884, 11.99226"
-    },
-    "backgroundColor": "blue",
-    "borderColor": "blue",
-    "start": "2026-03-30",
-    "end": "2026-04-04"
-  },
-  {
     "id": "6. Obsidian/Inbox/Osterferien 2026.md",
     "title": "Osterferien",
     "allDay": true,
@@ -151,7 +198,7 @@ window.CALENDAR_EVENTS = [
     "backgroundColor": "red",
     "borderColor": "red",
     "start": "2026-04-27",
-    "end": "2026-05-02"
+    "end": "2026-05-01"
   },
   {
     "id": "2. Projektverwaltung/2026 NICA - Tanzgruppe Leipzig/Tanzgruppe Woche 2.md",
@@ -223,6 +270,18 @@ window.CALENDAR_EVENTS = [
     }
   },
   {
+    "id": "2. Projektverwaltung/2026 TOHU ZGV - Wanderzirkus Neustadt/Ferienwoche Admin.md",
+    "title": "Admin",
+    "allDay": true,
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 TOHU ZGV - Wanderzirkus Neustadt/Ferienwoche Admin.md"
+    },
+    "backgroundColor": "blue",
+    "borderColor": "blue",
+    "start": "2026-07-07",
+    "end": "2026-07-11"
+  },
+  {
     "id": "2. Projektverwaltung/2026 TOHU ZGV - Wanderzirkus Neustadt/Ferienwoche CVJM Schnitte Ost.md",
     "title": "Schnitte Ost",
     "allDay": true,
@@ -288,6 +347,19 @@ window.CALENDAR_EVENTS = [
     "end": "2026-08-01"
   },
   {
+    "id": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 2.md",
+    "title": "Ferien 2",
+    "allDay": true,
+    "extendedProps": {
+      "sourcePath": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 2.md",
+      "coordinates": "51.46886, 11.99127"
+    },
+    "backgroundColor": "red",
+    "borderColor": "red",
+    "start": "2026-08-03",
+    "end": "2026-08-08"
+  },
+  {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Ferienwoche Blauer Elefant.md",
     "title": "Blauer Elefant",
     "allDay": true,
@@ -297,19 +369,6 @@ window.CALENDAR_EVENTS = [
     },
     "backgroundColor": "red",
     "borderColor": "red",
-    "start": "2026-08-03",
-    "end": "2026-08-08"
-  },
-  {
-    "id": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 2.md",
-    "title": "Ferien 2",
-    "allDay": true,
-    "extendedProps": {
-      "sourcePath": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 2.md",
-      "coordinates": "51.46886, 11.99127"
-    },
-    "backgroundColor": "blue",
-    "borderColor": "blue",
     "start": "2026-08-10",
     "end": "2026-08-15"
   },
@@ -404,6 +463,23 @@ window.CALENDAR_EVENTS = [
     }
   },
   {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md#rdate-2026-09-03",
+    "title": "Kita",
+    "start": "2026-09-03T09:00:00+02:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
+      "isRecurring": true,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 10800000
+    }
+  },
+  {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-03",
     "title": "JEP",
     "start": "2026-09-03T14:00:00+02:00",
@@ -458,6 +534,23 @@ window.CALENDAR_EVENTS = [
     }
   },
   {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md#rdate-2026-09-10",
+    "title": "Kita",
+    "start": "2026-09-10T09:00:00+02:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
+      "isRecurring": true,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 10800000
+    }
+  },
+  {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-10",
     "title": "JEP",
     "start": "2026-09-10T14:00:00+02:00",
@@ -494,6 +587,23 @@ window.CALENDAR_EVENTS = [
     }
   },
   {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md#rdate-2026-09-17",
+    "title": "Kita",
+    "start": "2026-09-17T09:00:00+02:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
+      "isRecurring": true,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 10800000
+    }
+  },
+  {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-09-17",
     "title": "JEP",
     "start": "2026-09-17T14:00:00+02:00",
@@ -522,6 +632,23 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
+      "isRecurring": true,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 10800000
+    }
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md#rdate-2026-09-24",
+    "title": "Kita",
+    "start": "2026-09-24T09:00:00+02:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
       "isRecurringOverride": true
     },
@@ -578,6 +705,23 @@ window.CALENDAR_EVENTS = [
     "end": "2026-10-05"
   },
   {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md#rdate-2026-10-01",
+    "title": "Kita",
+    "start": "2026-10-01T09:00:00+02:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
+      "isRecurring": true,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 10800000
+    }
+  },
+  {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-10-01",
     "title": "JEP",
     "start": "2026-10-01T14:00:00+02:00",
@@ -606,6 +750,23 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
+      "isRecurring": true,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 10800000
+    }
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md#rdate-2026-10-08",
+    "title": "Kita",
+    "start": "2026-10-08T09:00:00+02:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
       "isRecurringOverride": true
     },
@@ -650,6 +811,23 @@ window.CALENDAR_EVENTS = [
     }
   },
   {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md#rdate-2026-10-15",
+    "title": "Kita",
+    "start": "2026-10-15T09:00:00+02:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
+      "isRecurring": true,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 10800000
+    }
+  },
+  {
     "id": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md#rdate-2026-10-15",
     "title": "JEP",
     "start": "2026-10-15T14:00:00+02:00",
@@ -660,6 +838,23 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
+      "isRecurring": true,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 10800000
+    }
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md#rdate-2026-10-16",
+    "title": "Kita",
+    "start": "2026-10-16T09:00:00+02:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
       "isRecurringOverride": true
     },
@@ -686,6 +881,19 @@ window.CALENDAR_EVENTS = [
     }
   },
   {
+    "id": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 3.md",
+    "title": "Ferien 3",
+    "allDay": true,
+    "extendedProps": {
+      "sourcePath": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 3.md",
+      "coordinates": "51.46884, 11.99226"
+    },
+    "backgroundColor": "blue",
+    "borderColor": "blue",
+    "start": "2026-10-19",
+    "end": "2026-10-24"
+  },
+  {
     "id": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 4.md",
     "title": "Ferien 4",
     "allDay": true,
@@ -709,19 +917,6 @@ window.CALENDAR_EVENTS = [
     "borderColor": "orange",
     "display": "background",
     "start": "2026-10-19",
-    "end": "2026-10-31"
-  },
-  {
-    "id": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 5.md",
-    "title": "Ferien 5",
-    "allDay": true,
-    "extendedProps": {
-      "sourcePath": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 5.md",
-      "coordinates": "51.46884, 11.99226"
-    },
-    "backgroundColor": "blue",
-    "borderColor": "blue",
-    "start": "2026-10-26",
     "end": "2026-10-31"
   }
 ];
