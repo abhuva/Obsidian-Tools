@@ -1,6 +1,7 @@
 import { renderBookmarksModule } from "../modules/bookmarks.js";
 import { renderClockInElement } from "../modules/clock.js";
 import { renderNewProjectModule } from "../modules/new-project.js";
+import { renderUpdoModule } from "../modules/updo.js";
 
 const pageTitleEl = document.getElementById("pageTitle");
 const moduleGridEl = document.getElementById("moduleGrid");
@@ -90,6 +91,9 @@ const moduleRegistry = {
   },
   newProject: {
     render: renderNewProjectModule
+  },
+  updo: {
+    render: renderUpdoModule
   }
 };
 
@@ -323,7 +327,7 @@ async function renderPage() {
       const title = String(moduleCfg?.title || moduleKey);
       const shell = createModuleShell(title);
       moduleGridEl.appendChild(shell.root);
-      if (moduleKey === "bookmarks") {
+      if (["bookmarks", "updo", "newProject"].includes(moduleKey)) {
         addCleanup(makeShellCollapsible(shell, false));
       }
 

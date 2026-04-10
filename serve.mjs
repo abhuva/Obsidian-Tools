@@ -1,8 +1,9 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import tls from "node:tls";
 import { fileURLToPath } from "node:url";
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,6 +12,8 @@ const HOST = process.env.HOMEPAGE_HOST || "127.0.0.1";
 const PORT = Number(process.env.HOMEPAGE_PORT || 4174);
 const ROOT = __dirname;
 const VAULT_ROOT = path.resolve(__dirname, "..");
+const OBSIDIAN_VAULT_NAME = String(process.env.OBSIDIAN_VAULT_NAME || "").trim();
+const OBSIDIAN_BIN = resolveObsidianBin();
 
 const BOOKMARKS_FILE = path.join(VAULT_ROOT, ".obsidian", "bookmarks.json");
 const SETTINGS_DIR = path.join(ROOT, "config");
@@ -67,9 +70,105 @@ const DEFAULT_SETTINGS_FALLBACK = {
       enabled: true,
       title: "Projektverwaltung",
       openInNewTab: true
+    },
+    updo: {
+      enabled: true,
+      title: "Website Monitoring",
+      refreshSec: 5,
+      windowMinutes: 60,
+      maxPoints: 720,
+      targets: [
+        { id: "www", name: "www.nica.network", url: "https://www.nica.network" },
+        { id: "cloud", name: "cloud.nica.network", url: "https://cloud.nica.network" },
+        { id: "campus", name: "campus.nica.network", url: "https://campus.nica.network" }
+      ]
     }
   }
 };
+
+const UPDO_BASE_RESTART_DELAY_MS = 3000;
+const UPDO_MAX_RESTART_DELAY_MS = 60000;
+const UPDO_MAX_RESTART_ATTEMPTS = 5;
+const UPDO_SSL_PROBE_TTL_MS = 5 * 60 * 1000;
+const updoState = {
+  process: null,
+  restartTimer: null,
+  restartAttempts: 0,
+  stdoutBuffer: "",
+  stderrBuffer: "",
+  configSignature: "",
+  stopRequested: false,
+  lastError: "",
+  startedAt: "",
+  latestByUrl: new Map(),
+  seriesByUrl: new Map(),
+  sslProbeByUrl: new Map()
+};
+
+function getObsidianBinCandidates() {
+  const candidates = [];
+  const fromEnv = String(process.env.OBSIDIAN_BIN || "").trim();
+  if (fromEnv) {
+    candidates.push(fromEnv);
+  }
+
+  if (process.platform === "win32") {
+    const localAppData = String(process.env.LOCALAPPDATA || "").trim();
+    if (localAppData) {
+      candidates.push(path.join(localAppData, "Programs", "Obsidian", "Obsidian.com"));
+      candidates.push(path.join(localAppData, "Programs", "Obsidian", "Obsidian.exe"));
+    }
+  }
+
+  candidates.push("obsidian");
+  return Array.from(new Set(candidates));
+}
+
+function resolveObsidianBin() {
+  for (const candidate of getObsidianBinCandidates()) {
+    if (!candidate) continue;
+    if (path.isAbsolute(candidate)) {
+      if (fs.existsSync(candidate)) return candidate;
+      continue;
+    }
+    return candidate;
+  }
+  return "obsidian";
+}
+
+function withVaultArgs(args) {
+  if (!OBSIDIAN_VAULT_NAME) return args;
+  return [args[0], `vault=${OBSIDIAN_VAULT_NAME}`, ...args.slice(1)];
+}
+
+function isVaultTargetingError(error) {
+  const text = String(error?.stderr || error?.stdout || error?.message || "").toLowerCase();
+  return (
+    text.includes("vault") ||
+    text.includes("unable to find the vault") ||
+    text.includes("does not exist")
+  );
+}
+
+function runObsidian(args, options = {}) {
+  const execOptions = {
+    cwd: VAULT_ROOT,
+    encoding: "utf8",
+    stdio: "pipe",
+    ...options
+  };
+  if (!OBSIDIAN_VAULT_NAME) {
+    return execFileSync(OBSIDIAN_BIN, args, execOptions);
+  }
+  try {
+    return execFileSync(OBSIDIAN_BIN, withVaultArgs(args), execOptions);
+  } catch (error) {
+    if (!isVaultTargetingError(error)) {
+      throw error;
+    }
+    return execFileSync(OBSIDIAN_BIN, args, execOptions);
+  }
+}
 
 function safeResolve(urlPath) {
   const decoded = decodeURIComponent(urlPath.split("?")[0]);
@@ -157,6 +256,65 @@ function toIntInRange(value, fallback, min, max) {
 function oneOf(value, allowed, fallback) {
   const normalized = String(value || "").trim().toLowerCase();
   return allowed.includes(normalized) ? normalized : fallback;
+}
+
+function toFiniteNumber(value, fallback = 0) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toCleanUrl(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "";
+  try {
+    const parsed = new URL(raw);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return "";
+    return parsed.toString();
+  } catch {
+    return "";
+  }
+}
+
+function toUpdoId(value) {
+  const cleaned = String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9-_]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return cleaned || "";
+}
+
+function normalizeUpdoTargets(input) {
+  const source = Array.isArray(input) ? input : [];
+  const out = [];
+  const usedIds = new Set();
+  const usedUrls = new Set();
+
+  for (const entry of source) {
+    const url = toCleanUrl(entry?.url);
+    if (!url || usedUrls.has(url)) continue;
+    const host = (() => {
+      try {
+        return new URL(url).host;
+      } catch {
+        return url;
+      }
+    })();
+    let id = toUpdoId(entry?.id || host);
+    if (!id) id = `target-${out.length + 1}`;
+    while (usedIds.has(id)) {
+      id = `${id}-${out.length + 1}`;
+    }
+    usedIds.add(id);
+    usedUrls.add(url);
+    out.push({
+      id,
+      name: toCleanString(entry?.name, host),
+      url
+    });
+  }
+
+  return out;
 }
 
 function normalizeProjectTitle(value) {
@@ -365,6 +523,34 @@ function normalizeSettings(input) {
           merged?.modules?.newProject?.openInNewTab,
           DEFAULT_SETTINGS_FALLBACK.modules.newProject.openInNewTab
         )
+      },
+      updo: {
+        enabled: toBool(merged?.modules?.updo?.enabled, DEFAULT_SETTINGS_FALLBACK.modules.updo.enabled),
+        title: toCleanString(merged?.modules?.updo?.title, DEFAULT_SETTINGS_FALLBACK.modules.updo.title),
+        refreshSec: toIntInRange(
+          merged?.modules?.updo?.refreshSec,
+          DEFAULT_SETTINGS_FALLBACK.modules.updo.refreshSec,
+          3,
+          300
+        ),
+        windowMinutes: toIntInRange(
+          merged?.modules?.updo?.windowMinutes,
+          DEFAULT_SETTINGS_FALLBACK.modules.updo.windowMinutes,
+          5,
+          1440
+        ),
+        maxPoints: toIntInRange(
+          merged?.modules?.updo?.maxPoints,
+          DEFAULT_SETTINGS_FALLBACK.modules.updo.maxPoints,
+          60,
+          5000
+        ),
+        targets: (() => {
+          const normalized = normalizeUpdoTargets(merged?.modules?.updo?.targets);
+          return normalized.length
+            ? normalized
+            : normalizeUpdoTargets(DEFAULT_SETTINGS_FALLBACK.modules.updo.targets);
+        })()
       }
     }
   };
@@ -390,6 +576,429 @@ function writeLocalSettings(nextSettings) {
   const normalized = normalizeSettings(nextSettings);
   fs.writeFileSync(LOCAL_SETTINGS_FILE, `${JSON.stringify(normalized, null, 2)}\n`, "utf8");
   return normalized;
+}
+
+function getUpdoConfigFromSettings(settings) {
+  const moduleCfg = settings?.modules?.updo || {};
+  const targets = normalizeUpdoTargets(moduleCfg.targets);
+  return {
+    enabled: Boolean(moduleCfg.enabled),
+    refreshSec: toIntInRange(moduleCfg.refreshSec, DEFAULT_SETTINGS_FALLBACK.modules.updo.refreshSec, 3, 300),
+    windowMinutes: toIntInRange(
+      moduleCfg.windowMinutes,
+      DEFAULT_SETTINGS_FALLBACK.modules.updo.windowMinutes,
+      5,
+      1440
+    ),
+    maxPoints: toIntInRange(moduleCfg.maxPoints, DEFAULT_SETTINGS_FALLBACK.modules.updo.maxPoints, 60, 5000),
+    targets
+  };
+}
+
+function stopUpdoMonitor() {
+  updoState.stopRequested = true;
+  if (updoState.restartTimer) {
+    clearTimeout(updoState.restartTimer);
+    updoState.restartTimer = null;
+  }
+  if (updoState.process && !updoState.process.killed) {
+    updoState.process.kill();
+  }
+  updoState.process = null;
+}
+
+function ensureUpdoSeriesForUrl(url) {
+  if (!updoState.seriesByUrl.has(url)) {
+    updoState.seriesByUrl.set(url, []);
+  }
+  return updoState.seriesByUrl.get(url);
+}
+
+function trimUpdoSeries(maxPoints) {
+  for (const [url, series] of updoState.seriesByUrl.entries()) {
+    if (!Array.isArray(series)) continue;
+    if (series.length > maxPoints) {
+      updoState.seriesByUrl.set(url, series.slice(-maxPoints));
+    }
+  }
+}
+
+function pruneUpdoStateForTargets(targets) {
+  const keepUrls = new Set((Array.isArray(targets) ? targets : []).map((target) => target.url));
+  const maps = [updoState.latestByUrl, updoState.seriesByUrl, updoState.sslProbeByUrl];
+  for (const map of maps) {
+    for (const url of map.keys()) {
+      if (!keepUrls.has(url)) {
+        map.delete(url);
+      }
+    }
+  }
+}
+
+function probeSslIssue(url) {
+  return new Promise((resolve) => {
+    let parsed = null;
+    try {
+      parsed = new URL(url);
+    } catch {
+      resolve(null);
+      return;
+    }
+    if (parsed.protocol !== "https:") {
+      resolve(null);
+      return;
+    }
+
+    const host = parsed.hostname;
+    const port = parsed.port ? Number.parseInt(parsed.port, 10) : 443;
+    const socket = tls.connect(
+      {
+        host,
+        port: Number.isFinite(port) ? port : 443,
+        servername: host,
+        rejectUnauthorized: false,
+        timeout: 10000
+      },
+      () => {
+        let issue = null;
+        try {
+          const cert = socket.getPeerCertificate(true);
+          if (!cert || !Object.keys(cert).length) {
+            issue = {
+              type: "tls",
+              code: "NO_CERT",
+              message: "No TLS certificate presented"
+            };
+          } else {
+            const identityError = tls.checkServerIdentity(host, cert);
+            if (identityError) {
+              issue = {
+                type: "tls",
+                code: String(identityError.code || "TLS_IDENTITY_ERROR"),
+                message: String(identityError.message || "TLS certificate identity check failed")
+              };
+            } else if (cert.valid_to) {
+              const expiresAt = Date.parse(String(cert.valid_to));
+              if (Number.isFinite(expiresAt) && expiresAt < Date.now()) {
+                issue = {
+                  type: "tls",
+                  code: "CERT_EXPIRED",
+                  message: "TLS certificate expired"
+                };
+              }
+            }
+          }
+        } catch (error) {
+          issue = {
+            type: "tls",
+            code: String(error?.code || "TLS_PROBE_ERROR"),
+            message: String(error?.message || "TLS probe failed")
+          };
+        }
+        socket.end();
+        resolve(issue);
+      }
+    );
+
+    socket.on("error", (error) => {
+      resolve({
+        type: "tls",
+        code: String(error?.code || "TLS_PROBE_ERROR"),
+        message: String(error?.message || "TLS probe failed")
+      });
+    });
+
+    socket.on("timeout", () => {
+      socket.destroy();
+      resolve({
+        type: "tls",
+        code: "TLS_TIMEOUT",
+        message: "TLS probe timed out"
+      });
+    });
+  });
+}
+
+function maybeProbeSslIssue(url) {
+  let parsed = null;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return;
+  }
+  if (parsed.protocol !== "https:") return;
+
+  const now = Date.now();
+  const cached = updoState.sslProbeByUrl.get(url);
+  if (cached?.pending) return;
+  if (cached && now - toFiniteNumber(cached.checkedAt, 0) < UPDO_SSL_PROBE_TTL_MS) return;
+
+  updoState.sslProbeByUrl.set(url, {
+    checkedAt: now,
+    pending: true,
+    issue: cached?.issue || null
+  });
+
+  probeSslIssue(url)
+    .then((issue) => {
+      updoState.sslProbeByUrl.set(url, {
+        checkedAt: Date.now(),
+        pending: false,
+        issue: issue || null
+      });
+      const current = updoState.latestByUrl.get(url);
+      if (current && !current.success) {
+        updoState.latestByUrl.set(url, {
+          ...current,
+          sslIssue: issue || null
+        });
+      }
+    })
+    .catch((error) => {
+      updoState.sslProbeByUrl.set(url, {
+        checkedAt: Date.now(),
+        pending: false,
+        issue: {
+          type: "tls",
+          code: String(error?.code || "TLS_PROBE_ERROR"),
+          message: String(error?.message || "TLS probe failed")
+        }
+      });
+    });
+}
+
+function handleUpdoJsonEvent(event, config) {
+  if (!event || typeof event !== "object") return;
+  const url = toCleanUrl(event.url);
+  if (!url) return;
+  const targetKnown = config.targets.some((target) => target.url === url);
+  if (!targetKnown) return;
+
+  if (event.type === "check") {
+    const sslIssue = updoState.sslProbeByUrl.get(url)?.issue || null;
+    const point = {
+      timestamp: String(event.timestamp || new Date().toISOString()),
+      success: Boolean(event.success),
+      statusCode: Number.isInteger(event.status_code) ? event.status_code : 0,
+      responseTimeMs: Math.max(0, Math.round(toFiniteNumber(event.response_time_ms, 0))),
+      sslIssue: event.success ? null : sslIssue
+    };
+    updoState.latestByUrl.set(url, point);
+    if (!point.success) maybeProbeSslIssue(url);
+    const series = ensureUpdoSeriesForUrl(url);
+    series.push(point);
+    if (series.length > config.maxPoints) {
+      series.splice(0, series.length - config.maxPoints);
+    }
+    return;
+  }
+
+  if (event.type === "warning") {
+    const current = updoState.latestByUrl.get(url) || {};
+    const sslIssue = updoState.sslProbeByUrl.get(url)?.issue || current.sslIssue || null;
+    updoState.latestByUrl.set(url, {
+      ...current,
+      warning: toCleanString(event.message, "Request failed"),
+      timestamp: String(event.timestamp || current.timestamp || new Date().toISOString()),
+      sslIssue
+    });
+    maybeProbeSslIssue(url);
+  }
+}
+
+function processUpdoLine(line, config) {
+  const trimmed = String(line || "").trim();
+  if (!trimmed) return;
+  try {
+    const parsed = JSON.parse(trimmed);
+    handleUpdoJsonEvent(parsed, config);
+  } catch {
+    // Ignore non-JSON lines from updo.
+  }
+}
+
+function processUpdoChunk(kind, chunk, config) {
+  if (!chunk) return;
+  const key = kind === "stderr" ? "stderrBuffer" : "stdoutBuffer";
+  updoState[key] += String(chunk);
+  const lines = updoState[key].split(/\r?\n/);
+  updoState[key] = lines.pop() || "";
+  for (const line of lines) {
+    processUpdoLine(line, config);
+  }
+}
+
+function formatUpdoStartError(error) {
+  if (error?.code === "ENOENT") {
+    return "updo not found in PATH (ENOENT)";
+  }
+  return error?.message || "Could not start updo";
+}
+
+function startUpdoMonitor(config) {
+  if (!config.enabled || !config.targets.length) {
+    stopUpdoMonitor();
+    return;
+  }
+
+  const args = [
+    "monitor",
+    "--log",
+    "--simple",
+    "--request",
+    "HEAD",
+    "--refresh",
+    String(config.refreshSec),
+    ...config.targets.map((target) => target.url)
+  ];
+
+  updoState.stopRequested = false;
+  updoState.stdoutBuffer = "";
+  updoState.stderrBuffer = "";
+  updoState.lastError = "";
+
+  try {
+    const child = spawn("updo", args, {
+      cwd: VAULT_ROOT,
+      stdio: ["ignore", "pipe", "pipe"]
+    });
+    updoState.process = child;
+    updoState.startedAt = new Date().toISOString();
+    let restartHandled = false;
+    const scheduleRestart = () => {
+      if (restartHandled) return;
+      restartHandled = true;
+      if (updoState.stopRequested) return;
+      const settings = getEffectiveSettings();
+      const nextConfig = getUpdoConfigFromSettings(settings);
+      if (!nextConfig.enabled || !nextConfig.targets.length) return;
+      updoState.restartAttempts += 1;
+      if (updoState.restartAttempts > UPDO_MAX_RESTART_ATTEMPTS) {
+        updoState.lastError = "Too many updo restart attempts, monitor stopped";
+        return;
+      }
+      const restartDelayMs = Math.min(
+        UPDO_BASE_RESTART_DELAY_MS * Math.pow(2, updoState.restartAttempts - 1),
+        UPDO_MAX_RESTART_DELAY_MS
+      );
+      if (updoState.restartTimer) clearTimeout(updoState.restartTimer);
+      updoState.restartTimer = setTimeout(() => {
+        updoState.restartTimer = null;
+        ensureUpdoMonitor();
+      }, restartDelayMs);
+    };
+
+    child.stdout.on("data", (chunk) => processUpdoChunk("stdout", chunk, config));
+    child.stderr.on("data", (chunk) => processUpdoChunk("stderr", chunk, config));
+    child.on("error", (error) => {
+      updoState.lastError = formatUpdoStartError(error);
+      updoState.process = null;
+      updoState.startedAt = "";
+      scheduleRestart();
+    });
+    child.on("exit", () => {
+      updoState.process = null;
+      scheduleRestart();
+    });
+  } catch (error) {
+    updoState.lastError = formatUpdoStartError(error);
+    updoState.process = null;
+    updoState.startedAt = "";
+  }
+}
+
+function ensureUpdoMonitor() {
+  const settings = getEffectiveSettings();
+  const config = getUpdoConfigFromSettings(settings);
+  const signature = JSON.stringify(config);
+  pruneUpdoStateForTargets(config.targets);
+  trimUpdoSeries(config.maxPoints);
+
+  if (!config.enabled || !config.targets.length) {
+    updoState.restartAttempts = 0;
+    updoState.configSignature = signature;
+    stopUpdoMonitor();
+    return config;
+  }
+
+  const running = updoState.process && !updoState.process.killed;
+  if (running && updoState.configSignature === signature) {
+    return config;
+  }
+
+  const signatureChanged = updoState.configSignature !== signature;
+  stopUpdoMonitor();
+  if (signatureChanged) {
+    updoState.restartAttempts = 0;
+  }
+  updoState.configSignature = signature;
+  startUpdoMonitor(config);
+  return config;
+}
+
+function computePercentile(sortedValues, ratio) {
+  if (!sortedValues.length) return null;
+  const idx = Math.ceil(sortedValues.length * ratio) - 1;
+  const safeIdx = Math.max(0, Math.min(sortedValues.length - 1, idx));
+  return sortedValues[safeIdx];
+}
+
+function buildUpdoSnapshot(requestedWindowMinutes = null) {
+  const config = ensureUpdoMonitor();
+  const nowMs = Date.now();
+  const windowMinutes = toIntInRange(
+    requestedWindowMinutes,
+    config.windowMinutes || DEFAULT_SETTINGS_FALLBACK.modules.updo.windowMinutes,
+    5,
+    1440
+  );
+  const windowStart = nowMs - windowMinutes * 60 * 1000;
+
+  const targets = config.targets.map((target) => {
+    const fullSeries = updoState.seriesByUrl.get(target.url) || [];
+    const series = fullSeries.filter((point) => {
+      const t = Date.parse(point.timestamp);
+      return Number.isFinite(t) && t >= windowStart;
+    });
+    const checks = series.length;
+    const successes = series.filter((point) => point.success).length;
+    const uptimePercent = checks ? (successes / checks) * 100 : 0;
+    const latencies = series
+      .map((point) => toFiniteNumber(point.responseTimeMs, NaN))
+      .filter((value) => Number.isFinite(value) && value >= 0)
+      .sort((a, b) => a - b);
+    const avgMs = latencies.length
+      ? Math.round(latencies.reduce((sum, value) => sum + value, 0) / latencies.length)
+      : null;
+    const p95Ms = latencies.length ? Math.round(computePercentile(latencies, 0.95)) : null;
+
+    return {
+      id: target.id,
+      name: target.name,
+      url: target.url,
+      latest: updoState.latestByUrl.get(target.url) || null,
+      stats: {
+        checks,
+        successes,
+        uptimePercent: Math.round(uptimePercent * 100) / 100,
+        avgMs,
+        p95Ms
+      },
+      series
+    };
+  });
+
+  return {
+    ok: true,
+    generatedAt: new Date().toISOString(),
+    running: Boolean(updoState.process && !updoState.process.killed),
+    startedAt: updoState.startedAt || null,
+    error: updoState.lastError || null,
+    method: "HEAD",
+    refreshSec: config.refreshSec,
+    windowMinutes,
+    targets
+  };
 }
 
 function readBookmarksRootItems() {
@@ -489,11 +1098,7 @@ plugin.openBookmark(item, openTarget);
 "ok";
 `.trim();
 
-  execFileSync("obsidian", ["eval", `code=${js}`], {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe"
-  });
+  runObsidian(["eval", `code=${js}`]);
 
   return {
     ok: true,
@@ -530,11 +1135,7 @@ JSON.stringify({
 });
 `.trim();
 
-  const raw = execFileSync("obsidian", ["eval", `code=${js}`], {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe"
-  });
+  const raw = runObsidian(["eval", `code=${js}`]);
 
   const clean = String(raw || "").replace(/^=>\s*/, "").trim();
   return JSON.parse(clean);
@@ -585,11 +1186,7 @@ if (provider === "obsidian-search" && openInNewTab) {
 }
 `.trim();
 
-  const raw = execFileSync("obsidian", ["eval", `code=${js}`], {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe"
-  });
+  const raw = runObsidian(["eval", `code=${js}`]);
   const clean = String(raw || "").replace(/^=>\s*/, "").trim();
   const parsed = JSON.parse(clean);
   return {
@@ -624,11 +1221,7 @@ for (const file of app.vault.getMarkdownFiles()) {
 JSON.stringify(out);
 `.trim();
 
-  const raw = execFileSync("obsidian", ["eval", `code=${js}`], {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe"
-  });
+  const raw = runObsidian(["eval", `code=${js}`]);
   const clean = String(raw || "").replace(/^=>\s*/, "").trim();
   return JSON.parse(clean);
 }
@@ -704,11 +1297,7 @@ for (const part of parts) {
 })();
 "ok";
 `.trim();
-  execFileSync("obsidian", ["eval", `code=${js}`], {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe"
-  });
+  runObsidian(["eval", `code=${js}`]);
 }
 
 function createProjectNoteFromTemplate({ projectFolderRel, projectFileRel, projectName }) {
@@ -743,11 +1332,7 @@ JSON.stringify({ ok: true, createdPath });
 })();
 `.trim();
 
-  const raw = execFileSync("obsidian", ["eval", `code=${js}`], {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe"
-  });
+  const raw = runObsidian(["eval", `code=${js}`]);
   const normalized = String(raw || "").trim();
   if (/^Error:/i.test(normalized)) {
     throw new Error(normalized);
@@ -768,11 +1353,7 @@ JSON.stringify({ ok: true, createdPath });
 }
 
 function openProjectFile(projectFileRel, openInNewTab = false) {
-  execFileSync("obsidian", ["open", `path=${projectFileRel}`, openInNewTab ? "newtab" : ""].filter(Boolean), {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe"
-  });
+  runObsidian(["open", `path=${projectFileRel}`, openInNewTab ? "newtab" : ""].filter(Boolean));
 }
 
 function createProject(payload) {
@@ -869,12 +1450,15 @@ function sendText(res, statusCode, text) {
 }
 
 const server = http.createServer((req, res) => {
-  if (req.method === "GET" && req.url === "/api/ping") {
+  const url = new URL(req.url || "/", `http://${HOST}:${PORT}`);
+  const pathname = url.pathname;
+
+  if (req.method === "GET" && pathname === "/api/ping") {
     sendJson(res, 200, { ok: true });
     return;
   }
 
-  if (req.method === "GET" && req.url === "/api/settings") {
+  if (req.method === "GET" && pathname === "/api/settings") {
     const settings = getEffectiveSettings();
     sendJson(res, 200, {
       ok: true,
@@ -887,7 +1471,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "POST" && req.url === "/api/settings") {
+  if (req.method === "POST" && pathname === "/api/settings") {
     readRequestBody(req)
       .then((rawBody) => {
         let payload;
@@ -902,6 +1486,7 @@ const server = http.createServer((req, res) => {
         const effectiveBefore = getEffectiveSettings();
         const nextRaw = deepMerge(effectiveBefore, patchSettings);
         const nextSettings = writeLocalSettings(nextRaw);
+        ensureUpdoMonitor();
         sendJson(res, 200, { ok: true, settings: nextSettings });
       })
       .catch((error) => {
@@ -910,7 +1495,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "GET" && req.url === "/api/bookmarks") {
+  if (req.method === "GET" && pathname === "/api/bookmarks") {
     try {
       sendJson(res, 200, buildClientBookmarksPayload());
     } catch (error) {
@@ -919,7 +1504,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "GET" && req.url === "/api/obsidian/theme") {
+  if (req.method === "GET" && pathname === "/api/obsidian/theme") {
     try {
       const theme = readObsidianThemeSnapshot();
       sendJson(res, 200, { ok: true, theme });
@@ -929,7 +1514,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "POST" && req.url === "/api/bookmarks/open") {
+  if (req.method === "POST" && pathname === "/api/bookmarks/open") {
     readRequestBody(req)
       .then((rawBody) => {
         let payload;
@@ -960,7 +1545,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "POST" && req.url === "/api/search/open") {
+  if (req.method === "POST" && pathname === "/api/search/open") {
     readRequestBody(req)
       .then((rawBody) => {
         let payload;
@@ -986,7 +1571,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "GET" && req.url === "/api/projects/meta") {
+  if (req.method === "GET" && pathname === "/api/projects/meta") {
     try {
       const payload = buildProjectMetaPayload();
       sendJson(res, 200, { ok: true, ...payload });
@@ -996,7 +1581,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "POST" && req.url === "/api/projects/create") {
+  if (req.method === "POST" && pathname === "/api/projects/create") {
     readRequestBody(req)
       .then((rawBody) => {
         let payload;
@@ -1017,6 +1602,33 @@ const server = http.createServer((req, res) => {
       .catch((error) => {
         sendText(res, 500, error.message || "Unknown error while creating project");
       });
+    return;
+  }
+
+  if (req.method === "GET" && pathname === "/api/updo/snapshot") {
+    try {
+      const windowMinutesRaw = Number.parseInt(String(url.searchParams.get("windowMinutes") || ""), 10);
+      const payload = buildUpdoSnapshot(Number.isFinite(windowMinutesRaw) ? windowMinutesRaw : null);
+      sendJson(res, 200, payload);
+    } catch (error) {
+      sendText(res, 500, error.message || "Could not build updo snapshot");
+    }
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/updo/restart") {
+    try {
+      stopUpdoMonitor();
+      updoState.restartAttempts = 0;
+      const config = ensureUpdoMonitor();
+      sendJson(res, 200, {
+        ok: true,
+        enabled: config.enabled,
+        targets: config.targets.length
+      });
+    } catch (error) {
+      sendText(res, 500, error.message || "Could not restart updo monitor");
+    }
     return;
   }
 
@@ -1043,8 +1655,19 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, HOST, () => {
+  ensureUpdoMonitor();
   console.log(`Homepage preview server: http://${HOST}:${PORT}/home.html`);
   console.log(
-    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/projects/meta, POST /api/projects/create"
+    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/projects/meta, POST /api/projects/create, GET /api/updo/snapshot, POST /api/updo/restart"
   );
+});
+
+process.on("SIGINT", () => {
+  stopUpdoMonitor();
+  process.exit(0);
+});
+
+process.on("SIGTERM", () => {
+  stopUpdoMonitor();
+  process.exit(0);
 });
