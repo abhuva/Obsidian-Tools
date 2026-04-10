@@ -174,6 +174,7 @@ export async function renderUpdoModule(shell, moduleSettings) {
   let longtermChart = null;
   let destroyed = false;
   let longtermDays = 30;
+  let refreshSeq = 0;
 
   const controls = document.createElement("div");
   controls.className = "updo-toolbar";
@@ -407,12 +408,15 @@ export async function renderUpdoModule(shell, moduleSettings) {
   }
 
   async function refreshOnce() {
+    const seq = ++refreshSeq;
+    const historyPromise = fetchHistory(longtermDays).catch((error) => {
+      console.warn("updo history fetch failed:", error);
+      return null;
+    });
     try {
-      const [snapshot, history] = await Promise.all([
-        fetchSnapshot(windowMinutes),
-        fetchHistory(longtermDays)
-      ]);
-      if (destroyed) return;
+      const snapshot = await fetchSnapshot(windowMinutes);
+      const history = await historyPromise;
+      if (destroyed || seq !== refreshSeq) return;
       const targets = Array.isArray(snapshot?.targets) ? snapshot.targets : [];
       renderCards(targets);
       updateCharts(snapshot);
@@ -427,8 +431,10 @@ export async function renderUpdoModule(shell, moduleSettings) {
       const msg = snapshot.error
         ? `Aktualisiert ${at}. Fehler: ${snapshot.error}${mismatchText}`
         : `Aktualisiert ${at}. Refresh: ${snapshot.refreshSec}s.${mismatchText}`;
+      if (destroyed || seq !== refreshSeq) return;
       setMeta(msg, snapshot.error ? "err" : "ok");
     } catch (error) {
+      if (destroyed || seq !== refreshSeq) return;
       setMeta(`Monitoring konnte nicht geladen werden: ${error.message || error}`, "err");
     }
   }
