@@ -118,6 +118,7 @@ const UPDO_BASE_RESTART_DELAY_MS = 3000;
 const UPDO_MAX_RESTART_DELAY_MS = 60000;
 const UPDO_MAX_RESTART_ATTEMPTS = 5;
 const UPDO_SSL_PROBE_TTL_MS = 5 * 60 * 1000;
+const UPDO_COMPRESSION_CHECK_INTERVAL_MS = 60 * 1000;
 const updoState = {
   process: null,
   restartTimer: null,
@@ -134,7 +135,8 @@ const updoState = {
   persistedRawByUrl: new Map(),
   lastCompressedTsByUrl: {},
   persistenceLoaded: false,
-  persistenceDirty: false
+  persistenceDirty: false,
+  lastCompressionCheckMs: 0
 };
 
 function getObsidianBinCandidates() {
@@ -1357,7 +1359,11 @@ function handleUpdoJsonEvent(event, config) {
       series.splice(0, series.length - config.maxPoints);
     }
     appendRawPoint(config, target, point);
-    maybeCompressUpdoHistory(config);
+    const nowMs = Date.now();
+    if (nowMs - updoState.lastCompressionCheckMs >= UPDO_COMPRESSION_CHECK_INTERVAL_MS) {
+      updoState.lastCompressionCheckMs = nowMs;
+      maybeCompressUpdoHistory(config);
+    }
     return;
   }
 
