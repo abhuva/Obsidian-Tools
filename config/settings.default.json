@@ -39,6 +39,29 @@
       "refreshSec": 5,
       "windowMinutes": 60,
       "maxPoints": 720,
+      "persistence": {
+        "enabled": true,
+        "rawFile": "data/updo/raw.jsonl",
+        "longtermFile": "data/updo/longterm.jsonl",
+        "incidentsFile": "data/updo/incidents.jsonl",
+        "stateFile": "data/updo/state.json"
+      },
+      "compression": {
+        "compressCount": 720,
+        "compressSpanMinutes": 1440,
+        "keepTailPoints": 120
+      },
+      "spikeDetection": {
+        "staticThresholdMs": 1200,
+        "multiplierOverAvg": 2.5,
+        "minConsecutivePoints": 2
+      },
+      "outageDetection": {
+        "minConsecutiveFailures": 2
+      },
+      "gapDetection": {
+        "gapFactor": 3
+      },
       "targets": [
         {
           "id": "www",

@@ -603,6 +603,10 @@ html[data-theme-mode="mirror-obsidian"] body {
   height: 170px;
 }
 
+.updo-chart-longterm {
+  height: 260px;
+}
+
 @media (max-width: 980px) {
   .header-clock {
     min-width: 90px;

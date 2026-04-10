@@ -19,6 +19,11 @@ const BOOKMARKS_FILE = path.join(VAULT_ROOT, ".obsidian", "bookmarks.json");
 const SETTINGS_DIR = path.join(ROOT, "config");
 const DEFAULT_SETTINGS_FILE = path.join(SETTINGS_DIR, "settings.default.json");
 const LOCAL_SETTINGS_FILE = path.join(SETTINGS_DIR, "settings.local.json");
+const DATA_DIR = path.join(ROOT, "data", "updo");
+const UPDO_RAW_FILE = path.join(DATA_DIR, "raw.jsonl");
+const UPDO_LONGTERM_FILE = path.join(DATA_DIR, "longterm.jsonl");
+const UPDO_INCIDENTS_FILE = path.join(DATA_DIR, "incidents.jsonl");
+const UPDO_STATE_FILE = path.join(DATA_DIR, "state.json");
 const PROJECTS_ROOT_REL = "2. Projektverwaltung";
 const PROJECTS_ROOT = path.join(VAULT_ROOT, PROJECTS_ROOT_REL);
 const TEMPLATE_PROJECT_FILE_REL = "6. Obsidian/_template/Projekt.md";
@@ -77,6 +82,29 @@ const DEFAULT_SETTINGS_FALLBACK = {
       refreshSec: 5,
       windowMinutes: 60,
       maxPoints: 720,
+      persistence: {
+        enabled: true,
+        rawFile: "data/updo/raw.jsonl",
+        longtermFile: "data/updo/longterm.jsonl",
+        incidentsFile: "data/updo/incidents.jsonl",
+        stateFile: "data/updo/state.json"
+      },
+      compression: {
+        compressCount: 720,
+        compressSpanMinutes: 1440,
+        keepTailPoints: 120
+      },
+      spikeDetection: {
+        staticThresholdMs: 1200,
+        multiplierOverAvg: 2.5,
+        minConsecutivePoints: 2
+      },
+      outageDetection: {
+        minConsecutiveFailures: 2
+      },
+      gapDetection: {
+        gapFactor: 3
+      },
       targets: [
         { id: "www", name: "www.nica.network", url: "https://www.nica.network" },
         { id: "cloud", name: "cloud.nica.network", url: "https://cloud.nica.network" },
@@ -102,7 +130,11 @@ const updoState = {
   startedAt: "",
   latestByUrl: new Map(),
   seriesByUrl: new Map(),
-  sslProbeByUrl: new Map()
+  sslProbeByUrl: new Map(),
+  persistedRawByUrl: new Map(),
+  lastCompressedTsByUrl: {},
+  persistenceLoaded: false,
+  persistenceDirty: false
 };
 
 function getObsidianBinCandidates() {
@@ -261,6 +293,49 @@ function oneOf(value, allowed, fallback) {
 function toFiniteNumber(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function toNumberInRange(value, fallback, min, max) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  return Math.max(min, Math.min(max, parsed));
+}
+
+function resolveDataPath(relativePath, fallbackAbsolutePath) {
+  const raw = String(relativePath || "").trim();
+  if (!raw) return fallbackAbsolutePath;
+  const normalized = raw.replace(/^[/\\]+/, "").replace(/[\\/]+/g, path.sep);
+  return path.resolve(ROOT, normalized);
+}
+
+function ensureParentDir(filePath) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+}
+
+function appendJsonLine(filePath, payload) {
+  ensureParentDir(filePath);
+  fs.appendFileSync(filePath, `${JSON.stringify(payload)}\n`, "utf8");
+}
+
+function readJsonLines(filePath) {
+  if (!fs.existsSync(filePath)) return [];
+  const raw = fs.readFileSync(filePath, "utf8");
+  const out = [];
+  for (const line of raw.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      out.push(JSON.parse(trimmed));
+    } catch {
+      // Ignore malformed lines and keep processing.
+    }
+  }
+  return out;
+}
+
+function writeJson(filePath, payload) {
+  ensureParentDir(filePath);
+  fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
 function toCleanUrl(value) {
@@ -545,6 +620,84 @@ function normalizeSettings(input) {
           60,
           5000
         ),
+        persistence: {
+          enabled: toBool(
+            merged?.modules?.updo?.persistence?.enabled,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.persistence.enabled
+          ),
+          rawFile: toCleanString(
+            merged?.modules?.updo?.persistence?.rawFile,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.persistence.rawFile
+          ),
+          longtermFile: toCleanString(
+            merged?.modules?.updo?.persistence?.longtermFile,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.persistence.longtermFile
+          ),
+          incidentsFile: toCleanString(
+            merged?.modules?.updo?.persistence?.incidentsFile,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.persistence.incidentsFile
+          ),
+          stateFile: toCleanString(
+            merged?.modules?.updo?.persistence?.stateFile,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.persistence.stateFile
+          )
+        },
+        compression: {
+          compressCount: toIntInRange(
+            merged?.modules?.updo?.compression?.compressCount,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.compression.compressCount,
+            120,
+            20000
+          ),
+          compressSpanMinutes: toIntInRange(
+            merged?.modules?.updo?.compression?.compressSpanMinutes,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.compression.compressSpanMinutes,
+            30,
+            60 * 24 * 14
+          ),
+          keepTailPoints: toIntInRange(
+            merged?.modules?.updo?.compression?.keepTailPoints,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.compression.keepTailPoints,
+            10,
+            5000
+          )
+        },
+        spikeDetection: {
+          staticThresholdMs: toIntInRange(
+            merged?.modules?.updo?.spikeDetection?.staticThresholdMs,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.spikeDetection.staticThresholdMs,
+            100,
+            120000
+          ),
+          multiplierOverAvg: toNumberInRange(
+            merged?.modules?.updo?.spikeDetection?.multiplierOverAvg,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.spikeDetection.multiplierOverAvg,
+            1.1,
+            20
+          ),
+          minConsecutivePoints: toIntInRange(
+            merged?.modules?.updo?.spikeDetection?.minConsecutivePoints,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.spikeDetection.minConsecutivePoints,
+            1,
+            100
+          )
+        },
+        outageDetection: {
+          minConsecutiveFailures: toIntInRange(
+            merged?.modules?.updo?.outageDetection?.minConsecutiveFailures,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.outageDetection.minConsecutiveFailures,
+            1,
+            100
+          )
+        },
+        gapDetection: {
+          gapFactor: toNumberInRange(
+            merged?.modules?.updo?.gapDetection?.gapFactor,
+            DEFAULT_SETTINGS_FALLBACK.modules.updo.gapDetection.gapFactor,
+            1.1,
+            100
+          )
+        },
         targets: (() => {
           const normalized = normalizeUpdoTargets(merged?.modules?.updo?.targets);
           return normalized.length
@@ -581,6 +734,11 @@ function writeLocalSettings(nextSettings) {
 function getUpdoConfigFromSettings(settings) {
   const moduleCfg = settings?.modules?.updo || {};
   const targets = normalizeUpdoTargets(moduleCfg.targets);
+  const persistenceCfg = moduleCfg.persistence || {};
+  const compressionCfg = moduleCfg.compression || {};
+  const spikeCfg = moduleCfg.spikeDetection || {};
+  const outageCfg = moduleCfg.outageDetection || {};
+  const gapCfg = moduleCfg.gapDetection || {};
   return {
     enabled: Boolean(moduleCfg.enabled),
     refreshSec: toIntInRange(moduleCfg.refreshSec, DEFAULT_SETTINGS_FALLBACK.modules.updo.refreshSec, 3, 300),
@@ -591,6 +749,69 @@ function getUpdoConfigFromSettings(settings) {
       1440
     ),
     maxPoints: toIntInRange(moduleCfg.maxPoints, DEFAULT_SETTINGS_FALLBACK.modules.updo.maxPoints, 60, 5000),
+    persistence: {
+      enabled: toBool(persistenceCfg.enabled, DEFAULT_SETTINGS_FALLBACK.modules.updo.persistence.enabled),
+      rawFile: resolveDataPath(persistenceCfg.rawFile, UPDO_RAW_FILE),
+      longtermFile: resolveDataPath(persistenceCfg.longtermFile, UPDO_LONGTERM_FILE),
+      incidentsFile: resolveDataPath(persistenceCfg.incidentsFile, UPDO_INCIDENTS_FILE),
+      stateFile: resolveDataPath(persistenceCfg.stateFile, UPDO_STATE_FILE)
+    },
+    compression: {
+      compressCount: toIntInRange(
+        compressionCfg.compressCount,
+        DEFAULT_SETTINGS_FALLBACK.modules.updo.compression.compressCount,
+        120,
+        20000
+      ),
+      compressSpanMinutes: toIntInRange(
+        compressionCfg.compressSpanMinutes,
+        DEFAULT_SETTINGS_FALLBACK.modules.updo.compression.compressSpanMinutes,
+        30,
+        60 * 24 * 14
+      ),
+      keepTailPoints: toIntInRange(
+        compressionCfg.keepTailPoints,
+        DEFAULT_SETTINGS_FALLBACK.modules.updo.compression.keepTailPoints,
+        10,
+        5000
+      )
+    },
+    spikeDetection: {
+      staticThresholdMs: toIntInRange(
+        spikeCfg.staticThresholdMs,
+        DEFAULT_SETTINGS_FALLBACK.modules.updo.spikeDetection.staticThresholdMs,
+        100,
+        120000
+      ),
+      multiplierOverAvg: toNumberInRange(
+        spikeCfg.multiplierOverAvg,
+        DEFAULT_SETTINGS_FALLBACK.modules.updo.spikeDetection.multiplierOverAvg,
+        1.1,
+        20
+      ),
+      minConsecutivePoints: toIntInRange(
+        spikeCfg.minConsecutivePoints,
+        DEFAULT_SETTINGS_FALLBACK.modules.updo.spikeDetection.minConsecutivePoints,
+        1,
+        100
+      )
+    },
+    outageDetection: {
+      minConsecutiveFailures: toIntInRange(
+        outageCfg.minConsecutiveFailures,
+        DEFAULT_SETTINGS_FALLBACK.modules.updo.outageDetection.minConsecutiveFailures,
+        1,
+        100
+      )
+    },
+    gapDetection: {
+      gapFactor: toNumberInRange(
+        gapCfg.gapFactor,
+        DEFAULT_SETTINGS_FALLBACK.modules.updo.gapDetection.gapFactor,
+        1.1,
+        100
+      )
+    },
     targets
   };
 }
@@ -625,11 +846,356 @@ function trimUpdoSeries(maxPoints) {
 
 function pruneUpdoStateForTargets(targets) {
   const keepUrls = new Set((Array.isArray(targets) ? targets : []).map((target) => target.url));
-  const maps = [updoState.latestByUrl, updoState.seriesByUrl, updoState.sslProbeByUrl];
+  const maps = [updoState.latestByUrl, updoState.seriesByUrl, updoState.sslProbeByUrl, updoState.persistedRawByUrl];
   for (const map of maps) {
     for (const url of map.keys()) {
       if (!keepUrls.has(url)) {
         map.delete(url);
+      }
+    }
+  }
+}
+
+function pointTimestampMs(point) {
+  const t = Date.parse(String(point?.timestamp || point?.ts || ""));
+  return Number.isFinite(t) ? t : NaN;
+}
+
+function ensurePersistedRawForUrl(url) {
+  if (!updoState.persistedRawByUrl.has(url)) {
+    updoState.persistedRawByUrl.set(url, []);
+  }
+  return updoState.persistedRawByUrl.get(url);
+}
+
+function sortPointsByTs(points) {
+  return points
+    .filter((point) => Number.isFinite(pointTimestampMs(point)))
+    .sort((a, b) => pointTimestampMs(a) - pointTimestampMs(b));
+}
+
+function loadUpdoPersistence(config) {
+  if (!config.persistence.enabled) {
+    updoState.persistedRawByUrl.clear();
+    updoState.lastCompressedTsByUrl = {};
+    updoState.persistenceLoaded = true;
+    return;
+  }
+  if (updoState.persistenceLoaded) return;
+
+  const state = readJsonFileSafe(config.persistence.stateFile, { version: 1, lastCompressedTsByUrl: {} });
+  updoState.lastCompressedTsByUrl =
+    state && typeof state === "object" && state.lastCompressedTsByUrl && typeof state.lastCompressedTsByUrl === "object"
+      ? { ...state.lastCompressedTsByUrl }
+      : {};
+
+  const rawRows = readJsonLines(config.persistence.rawFile);
+  updoState.persistedRawByUrl.clear();
+  for (const row of rawRows) {
+    const url = toCleanUrl(row?.targetUrl);
+    if (!url) continue;
+    const ts = String(row?.ts || row?.timestamp || "").trim();
+    if (!ts || !Number.isFinite(Date.parse(ts))) continue;
+    const points = ensurePersistedRawForUrl(url);
+    points.push({
+      timestamp: ts,
+      success: toBool(row?.success, false),
+      statusCode: Number.isInteger(row?.statusCode) ? row.statusCode : 0,
+      responseTimeMs: Math.max(0, Math.round(toFiniteNumber(row?.responseTimeMs, 0))),
+      sslIssue: row?.sslIssueCode
+        ? {
+            code: String(row.sslIssueCode),
+            message: String(row?.sslIssueMessage || "")
+          }
+        : null
+    });
+  }
+  for (const [url, points] of updoState.persistedRawByUrl.entries()) {
+    updoState.persistedRawByUrl.set(url, sortPointsByTs(points));
+  }
+  updoState.persistenceLoaded = true;
+}
+
+function writeUpdoStateFile(config) {
+  if (!config.persistence.enabled) return;
+  writeJson(config.persistence.stateFile, {
+    version: 1,
+    lastCompressedTsByUrl: updoState.lastCompressedTsByUrl
+  });
+}
+
+function rewriteUpdoRawFile(config) {
+  if (!config.persistence.enabled) return;
+  const allRows = [];
+  for (const target of config.targets) {
+    const rows = updoState.persistedRawByUrl.get(target.url) || [];
+    for (const point of rows) {
+      allRows.push({
+        ts: String(point.timestamp || ""),
+        targetId: target.id,
+        targetUrl: target.url,
+        success: Boolean(point.success),
+        statusCode: Number.isInteger(point.statusCode) ? point.statusCode : 0,
+        responseTimeMs: Math.max(0, Math.round(toFiniteNumber(point.responseTimeMs, 0))),
+        sslIssueCode: point?.sslIssue?.code ? String(point.sslIssue.code) : null,
+        sslIssueMessage: point?.sslIssue?.message ? String(point.sslIssue.message) : null
+      });
+    }
+  }
+  allRows.sort((a, b) => Date.parse(a.ts) - Date.parse(b.ts));
+  ensureParentDir(config.persistence.rawFile);
+  const content = allRows.map((row) => JSON.stringify(row)).join("\n");
+  fs.writeFileSync(config.persistence.rawFile, content ? `${content}\n` : "", "utf8");
+}
+
+function appendRawPoint(config, target, point) {
+  if (!config.persistence.enabled) return;
+  const rawRecord = {
+    ts: String(point.timestamp || ""),
+    targetId: target.id,
+    targetUrl: target.url,
+    success: Boolean(point.success),
+    statusCode: Number.isInteger(point.statusCode) ? point.statusCode : 0,
+    responseTimeMs: Math.max(0, Math.round(toFiniteNumber(point.responseTimeMs, 0))),
+    sslIssueCode: point?.sslIssue?.code ? String(point.sslIssue.code) : null,
+    sslIssueMessage: point?.sslIssue?.message ? String(point.sslIssue.message) : null
+  };
+  appendJsonLine(config.persistence.rawFile, rawRecord);
+  const rows = ensurePersistedRawForUrl(target.url);
+  rows.push({
+    timestamp: rawRecord.ts,
+    success: rawRecord.success,
+    statusCode: rawRecord.statusCode,
+    responseTimeMs: rawRecord.responseTimeMs,
+    sslIssue:
+      rawRecord.sslIssueCode || rawRecord.sslIssueMessage
+        ? {
+            code: rawRecord.sslIssueCode || "",
+            message: rawRecord.sslIssueMessage || ""
+          }
+        : null
+  });
+  updoState.persistenceDirty = true;
+}
+
+function collectRuns(points, isInRun) {
+  const runs = [];
+  let start = -1;
+  for (let i = 0; i < points.length; i += 1) {
+    if (isInRun(points[i], i, points)) {
+      if (start === -1) start = i;
+      continue;
+    }
+    if (start !== -1) {
+      runs.push([start, i - 1]);
+      start = -1;
+    }
+  }
+  if (start !== -1) runs.push([start, points.length - 1]);
+  return runs;
+}
+
+function appendUpdoIncidents(config, incidents) {
+  if (!config.persistence.enabled || !incidents.length) return;
+  for (const incident of incidents) {
+    appendJsonLine(config.persistence.incidentsFile, incident);
+  }
+}
+
+function appendUpdoLongtermSummary(config, summary) {
+  if (!config.persistence.enabled) return;
+  appendJsonLine(config.persistence.longtermFile, summary);
+}
+
+function compressTargetHistory(config, target) {
+  if (!config.persistence.enabled) return null;
+
+  const allRaw = sortPointsByTs(updoState.persistedRawByUrl.get(target.url) || []);
+  const lastCompressedTs = String(updoState.lastCompressedTsByUrl[target.id] || "").trim();
+  const lastCompressedMs = Number.isFinite(Date.parse(lastCompressedTs)) ? Date.parse(lastCompressedTs) : -Infinity;
+  const eligible = allRaw.filter((point) => pointTimestampMs(point) > lastCompressedMs);
+  if (!eligible.length) return null;
+
+  const firstMs = pointTimestampMs(eligible[0]);
+  const lastMs = pointTimestampMs(eligible[eligible.length - 1]);
+  const spanMinutes = Math.max(0, Math.round((lastMs - firstMs) / 60000));
+  const shouldCompress =
+    eligible.length >= config.compression.compressCount || spanMinutes >= config.compression.compressSpanMinutes;
+  if (!shouldCompress) return null;
+
+  const successes = eligible.filter((point) => point.success);
+  const failures = eligible.filter((point) => !point.success);
+  const latencyValues = successes
+    .map((point) => Math.max(0, Math.round(toFiniteNumber(point.responseTimeMs, NaN))))
+    .filter((value) => Number.isFinite(value))
+    .sort((a, b) => a - b);
+  const avgLatencyMs = latencyValues.length
+    ? Math.round(latencyValues.reduce((sum, value) => sum + value, 0) / latencyValues.length)
+    : null;
+  const p95LatencyMs = latencyValues.length ? Math.round(computePercentile(latencyValues, 0.95)) : null;
+  const maxLatencyMs = latencyValues.length ? latencyValues[latencyValues.length - 1] : null;
+  const uptimePercent = eligible.length ? (successes.length / eligible.length) * 100 : 0;
+  const spikeThresholdMs = Math.max(
+    config.spikeDetection.staticThresholdMs,
+    Number.isFinite(avgLatencyMs) ? avgLatencyMs * config.spikeDetection.multiplierOverAvg : 0
+  );
+
+  const outageRuns = collectRuns(eligible, (point) => !point.success).filter(
+    ([start, end]) => end - start + 1 >= config.outageDetection.minConsecutiveFailures
+  );
+  const spikeRuns = collectRuns(
+    eligible,
+    (point) => point.success && toFiniteNumber(point.responseTimeMs, 0) >= spikeThresholdMs
+  ).filter(([start, end]) => end - start + 1 >= config.spikeDetection.minConsecutivePoints);
+  const gapRuns = [];
+  const maxExpectedGapMs = config.refreshSec * 1000 * config.gapDetection.gapFactor;
+  for (let i = 1; i < eligible.length; i += 1) {
+    const prevMs = pointTimestampMs(eligible[i - 1]);
+    const currMs = pointTimestampMs(eligible[i]);
+    if (currMs - prevMs > maxExpectedGapMs) {
+      gapRuns.push([i - 1, i]);
+    }
+  }
+
+  const incidents = [];
+  let outageSeconds = 0;
+  for (const [startIdx, endIdx] of outageRuns) {
+    const startPoint = eligible[startIdx];
+    const endPoint = eligible[endIdx];
+    const startMs = pointTimestampMs(startPoint);
+    const endMs = pointTimestampMs(endPoint);
+    const durationSec = Math.max(0, Math.round((endMs - startMs) / 1000));
+    outageSeconds += durationSec;
+    incidents.push({
+      type: "outage",
+      targetId: target.id,
+      targetUrl: target.url,
+      start: new Date(startMs).toISOString(),
+      end: new Date(endMs).toISOString(),
+      durationSec,
+      points: endIdx - startIdx + 1,
+      statusCodes: Array.from(new Set(eligible.slice(startIdx, endIdx + 1).map((point) => point.statusCode))),
+      sslIssueCode: eligible
+        .slice(startIdx, endIdx + 1)
+        .map((point) => point?.sslIssue?.code)
+        .find((value) => value) || null
+    });
+  }
+
+  for (const [startIdx, endIdx] of spikeRuns) {
+    const runPoints = eligible.slice(startIdx, endIdx + 1);
+    const startMs = pointTimestampMs(runPoints[0]);
+    const endMs = pointTimestampMs(runPoints[runPoints.length - 1]);
+    incidents.push({
+      type: "spike",
+      targetId: target.id,
+      targetUrl: target.url,
+      start: new Date(startMs).toISOString(),
+      end: new Date(endMs).toISOString(),
+      durationSec: Math.max(0, Math.round((endMs - startMs) / 1000)),
+      points: runPoints.length,
+      peakMs: Math.max(...runPoints.map((point) => Math.max(0, toFiniteNumber(point.responseTimeMs, 0)))),
+      thresholdMs: Math.round(spikeThresholdMs)
+    });
+  }
+
+  for (const [prevIdx, nextIdx] of gapRuns) {
+    const startMs = pointTimestampMs(eligible[prevIdx]);
+    const endMs = pointTimestampMs(eligible[nextIdx]);
+    incidents.push({
+      type: "gap",
+      targetId: target.id,
+      targetUrl: target.url,
+      start: new Date(startMs).toISOString(),
+      end: new Date(endMs).toISOString(),
+      durationSec: Math.max(0, Math.round((endMs - startMs) / 1000)),
+      reason: "monitor_inactive_or_no_events"
+    });
+  }
+
+  const summary = {
+    windowStart: new Date(firstMs).toISOString(),
+    windowEnd: new Date(lastMs).toISOString(),
+    targetId: target.id,
+    targetUrl: target.url,
+    points: eligible.length,
+    successes: successes.length,
+    failures: failures.length,
+    uptimePercent: Math.round(uptimePercent * 100) / 100,
+    latencyAvgMs: avgLatencyMs,
+    latencyP95Ms: p95LatencyMs,
+    latencyMaxMs: maxLatencyMs,
+    spikeCount: spikeRuns.length,
+    outageCount: outageRuns.length,
+    outageSeconds,
+    gapCount: gapRuns.length
+  };
+
+  appendUpdoLongtermSummary(config, summary);
+  appendUpdoIncidents(config, incidents);
+  updoState.lastCompressedTsByUrl[target.id] = summary.windowEnd;
+
+  const keepTail = Math.max(0, config.compression.keepTailPoints);
+  const tail = keepTail ? allRaw.slice(-keepTail) : [];
+  const uncompressed = allRaw.filter((point) => pointTimestampMs(point) > lastMs);
+  const merged = sortPointsByTs([...tail, ...uncompressed]);
+  updoState.persistedRawByUrl.set(target.url, merged);
+  updoState.persistenceDirty = true;
+
+  return { summary, incidentsCount: incidents.length };
+}
+
+function maybeCompressUpdoHistory(config) {
+  if (!config.persistence.enabled) return [];
+  loadUpdoPersistence(config);
+  const compressed = [];
+  for (const target of config.targets) {
+    const result = compressTargetHistory(config, target);
+    if (result) compressed.push({ targetId: target.id, ...result });
+  }
+  if (compressed.length) {
+    rewriteUpdoRawFile(config);
+    writeUpdoStateFile(config);
+  }
+  return compressed;
+}
+
+function buildUpdoHistory(config, rangeDays = 30) {
+  if (!config.persistence.enabled) {
+    return { summaries: [], incidents: [] };
+  }
+  const safeRangeDays = toIntInRange(rangeDays, 30, 1, 365);
+  const thresholdMs = Date.now() - safeRangeDays * 24 * 60 * 60 * 1000;
+  const allowedTargetIds = new Set(config.targets.map((target) => target.id));
+
+  const summaries = readJsonLines(config.persistence.longtermFile).filter((entry) => {
+    if (!allowedTargetIds.has(String(entry?.targetId || ""))) return false;
+    const endMs = Date.parse(String(entry?.windowEnd || ""));
+    return Number.isFinite(endMs) && endMs >= thresholdMs;
+  });
+
+  const incidents = readJsonLines(config.persistence.incidentsFile).filter((entry) => {
+    if (!allowedTargetIds.has(String(entry?.targetId || ""))) return false;
+    const endMs = Date.parse(String(entry?.end || entry?.windowEnd || ""));
+    return Number.isFinite(endMs) && endMs >= thresholdMs;
+  });
+
+  summaries.sort((a, b) => Date.parse(String(a.windowStart || "")) - Date.parse(String(b.windowStart || "")));
+  incidents.sort((a, b) => Date.parse(String(a.start || "")) - Date.parse(String(b.start || "")));
+  return { summaries, incidents };
+}
+
+function syncLiveStateFromPersisted(config) {
+  for (const target of config.targets) {
+    const persisted = sortPointsByTs(updoState.persistedRawByUrl.get(target.url) || []);
+    if (!persisted.length) continue;
+    const tail = persisted.slice(-config.maxPoints);
+    updoState.seriesByUrl.set(target.url, tail.map((point) => ({ ...point })));
+    const latest = tail[tail.length - 1];
+    if (latest) {
+      const currentLatest = updoState.latestByUrl.get(target.url);
+      if (!currentLatest || !currentLatest.timestamp) {
+        updoState.latestByUrl.set(target.url, { ...latest });
       }
     }
   }
@@ -771,8 +1337,8 @@ function handleUpdoJsonEvent(event, config) {
   if (!event || typeof event !== "object") return;
   const url = toCleanUrl(event.url);
   if (!url) return;
-  const targetKnown = config.targets.some((target) => target.url === url);
-  if (!targetKnown) return;
+  const target = config.targets.find((entry) => entry.url === url);
+  if (!target) return;
 
   if (event.type === "check") {
     const sslIssue = updoState.sslProbeByUrl.get(url)?.issue || null;
@@ -790,6 +1356,8 @@ function handleUpdoJsonEvent(event, config) {
     if (series.length > config.maxPoints) {
       series.splice(0, series.length - config.maxPoints);
     }
+    appendRawPoint(config, target, point);
+    maybeCompressUpdoHistory(config);
     return;
   }
 
@@ -911,7 +1479,13 @@ function ensureUpdoMonitor() {
   const settings = getEffectiveSettings();
   const config = getUpdoConfigFromSettings(settings);
   const signature = JSON.stringify(config);
+  const signatureChanged = updoState.configSignature !== signature;
+  if (signatureChanged) {
+    updoState.persistenceLoaded = false;
+  }
+  loadUpdoPersistence(config);
   pruneUpdoStateForTargets(config.targets);
+  syncLiveStateFromPersisted(config);
   trimUpdoSeries(config.maxPoints);
 
   if (!config.enabled || !config.targets.length) {
@@ -926,7 +1500,6 @@ function ensureUpdoMonitor() {
     return config;
   }
 
-  const signatureChanged = updoState.configSignature !== signature;
   stopUpdoMonitor();
   if (signatureChanged) {
     updoState.restartAttempts = 0;
@@ -1616,6 +2189,32 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "GET" && pathname === "/api/updo/history") {
+    try {
+      const config = ensureUpdoMonitor();
+      maybeCompressUpdoHistory(config);
+      const rangeDaysRaw = Number.parseInt(String(url.searchParams.get("rangeDays") || ""), 10);
+      const targetId = String(url.searchParams.get("targetId") || "").trim();
+      const history = buildUpdoHistory(config, Number.isFinite(rangeDaysRaw) ? rangeDaysRaw : 30);
+      const filteredSummaries = targetId
+        ? history.summaries.filter((entry) => String(entry?.targetId || "") === targetId)
+        : history.summaries;
+      const filteredIncidents = targetId
+        ? history.incidents.filter((entry) => String(entry?.targetId || "") === targetId)
+        : history.incidents;
+      sendJson(res, 200, {
+        ok: true,
+        generatedAt: new Date().toISOString(),
+        rangeDays: Number.isFinite(rangeDaysRaw) ? rangeDaysRaw : 30,
+        summaries: filteredSummaries,
+        incidents: filteredIncidents
+      });
+    } catch (error) {
+      sendText(res, 500, error.message || "Could not build updo history");
+    }
+    return;
+  }
+
   if (req.method === "POST" && pathname === "/api/updo/restart") {
     try {
       stopUpdoMonitor();
@@ -1658,7 +2257,7 @@ server.listen(PORT, HOST, () => {
   ensureUpdoMonitor();
   console.log(`Homepage preview server: http://${HOST}:${PORT}/home.html`);
   console.log(
-    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/projects/meta, POST /api/projects/create, GET /api/updo/snapshot, POST /api/updo/restart"
+    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/projects/meta, POST /api/projects/create, GET /api/updo/snapshot, GET /api/updo/history, POST /api/updo/restart"
   );
 });
 

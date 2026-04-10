@@ -89,6 +89,67 @@ async function fetchSnapshot(windowMinutes) {
   return response.json();
 }
 
+async function fetchHistory(rangeDays) {
+  const safeRange = Number.isFinite(rangeDays) ? rangeDays : 30;
+  const response = await fetch(`/api/updo/history?rangeDays=${safeRange}`);
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Could not load monitoring history");
+  }
+  return response.json();
+}
+
+function buildLongtermSeries(summaries, targets) {
+  const byTargetId = new Map();
+  for (const summary of summaries || []) {
+    const targetId = String(summary?.targetId || "");
+    if (!targetId) continue;
+    if (!byTargetId.has(targetId)) byTargetId.set(targetId, []);
+    byTargetId.get(targetId).push(summary);
+  }
+
+  const series = [];
+  for (const target of targets || []) {
+    const targetSummaries = (byTargetId.get(target.id) || [])
+      .slice()
+      .sort((a, b) => Date.parse(String(a?.windowEnd || "")) - Date.parse(String(b?.windowEnd || "")));
+    series.push({
+      name: `${target.name} avg`,
+      type: "line",
+      smooth: true,
+      showSymbol: false,
+      yAxisIndex: 0,
+      data: targetSummaries.map((entry) => [entry.windowEnd, Number(entry?.latencyAvgMs ?? null)])
+    });
+    series.push({
+      name: `${target.name} uptime`,
+      type: "line",
+      smooth: true,
+      showSymbol: false,
+      lineStyle: { type: "dashed", width: 1.6 },
+      yAxisIndex: 1,
+      data: targetSummaries.map((entry) => [entry.windowEnd, Number(entry?.uptimePercent ?? null)])
+    });
+  }
+  return series;
+}
+
+function buildIncidentScatter(incidents) {
+  return (incidents || [])
+    .map((entry) => {
+      const ts = String(entry?.start || "");
+      if (!ts) return null;
+      const type = String(entry?.type || "");
+      const y = type === "spike" ? Number(entry?.peakMs ?? entry?.thresholdMs ?? 0) : 0;
+      return {
+        value: [ts, Number.isFinite(y) ? y : 0],
+        incidentType: type,
+        durationSec: Number(entry?.durationSec ?? 0)
+      };
+    })
+    .filter(Boolean);
+}
+
 export async function renderUpdoModule(shell, moduleSettings) {
   const refreshSec = Math.max(3, Number.parseInt(String(moduleSettings?.refreshSec || 5), 10) || 5);
   let windowMinutes = Math.max(
@@ -100,7 +161,9 @@ export async function renderUpdoModule(shell, moduleSettings) {
   let resizeObserver = null;
   let latencyChart = null;
   let availabilityChart = null;
+  let longtermChart = null;
   let destroyed = false;
+  let longtermDays = 30;
 
   const controls = document.createElement("div");
   controls.className = "updo-toolbar";
@@ -109,6 +172,11 @@ export async function renderUpdoModule(shell, moduleSettings) {
       <button type="button" class="btn btn-ghost updo-window-btn" data-window="15">15m</button>
       <button type="button" class="btn btn-ghost updo-window-btn" data-window="60">1h</button>
       <button type="button" class="btn btn-ghost updo-window-btn" data-window="360">6h</button>
+    </div>
+    <div class="updo-window-buttons" role="group" aria-label="Langzeitfenster">
+      <button type="button" class="btn btn-ghost updo-history-btn" data-range="7">7d</button>
+      <button type="button" class="btn btn-ghost updo-history-btn" data-range="30">30d</button>
+      <button type="button" class="btn btn-ghost updo-history-btn" data-range="90">90d</button>
     </div>
     <button type="button" class="btn btn-ghost" id="updoRefreshBtn">Neu laden</button>
   `;
@@ -125,8 +193,11 @@ export async function renderUpdoModule(shell, moduleSettings) {
   latencyHost.className = "updo-chart updo-chart-latency";
   const availabilityHost = document.createElement("div");
   availabilityHost.className = "updo-chart updo-chart-availability";
+  const longtermHost = document.createElement("div");
+  longtermHost.className = "updo-chart updo-chart-longterm";
   chartWrap.appendChild(latencyHost);
   chartWrap.appendChild(availabilityHost);
+  chartWrap.appendChild(longtermHost);
 
   shell.body.appendChild(controls);
   shell.body.appendChild(meta);
@@ -134,11 +205,19 @@ export async function renderUpdoModule(shell, moduleSettings) {
   shell.body.appendChild(chartWrap);
 
   const windowButtons = Array.from(controls.querySelectorAll(".updo-window-btn"));
+  const historyButtons = Array.from(controls.querySelectorAll(".updo-history-btn"));
   const refreshBtn = controls.querySelector("#updoRefreshBtn");
 
   function applyWindowButtonState() {
     for (const btn of windowButtons) {
       const isActive = Number.parseInt(String(btn.dataset.window || ""), 10) === windowMinutes;
+      btn.classList.toggle("updo-window-btn-active", isActive);
+    }
+  }
+
+  function applyHistoryButtonState() {
+    for (const btn of historyButtons) {
+      const isActive = Number.parseInt(String(btn.dataset.range || ""), 10) === longtermDays;
       btn.classList.toggle("updo-window-btn-active", isActive);
     }
   }
@@ -264,13 +343,70 @@ export async function renderUpdoModule(shell, moduleSettings) {
     );
   }
 
+  function updateLongtermChart(snapshot, history) {
+    if (!longtermChart) return;
+    const targets = Array.isArray(snapshot?.targets) ? snapshot.targets : [];
+    const summaries = Array.isArray(history?.summaries) ? history.summaries : [];
+    const incidents = Array.isArray(history?.incidents) ? history.incidents : [];
+
+    longtermChart.setOption(
+      {
+        animation: false,
+        tooltip: {
+          trigger: "axis",
+          axisPointer: { type: "cross" }
+        },
+        legend: { top: 2, textStyle: { fontSize: 11 } },
+        grid: { left: 46, right: 42, top: 32, bottom: 24 },
+        xAxis: { type: "time" },
+        yAxis: [
+          { type: "value", name: "avg ms", min: 0 },
+          { type: "value", name: "uptime %", min: 0, max: 100 }
+        ],
+        series: [
+          ...buildLongtermSeries(summaries, targets),
+          {
+            name: "Incidents",
+            type: "scatter",
+            yAxisIndex: 0,
+            symbolSize: 9,
+            data: buildIncidentScatter(incidents),
+            tooltip: {
+              trigger: "item",
+              formatter: (params) => {
+                const data = params?.data || {};
+                const tsRaw = Array.isArray(data.value) ? data.value[0] : null;
+                const ts = tsRaw ? new Date(tsRaw).toLocaleString("de-DE", { hour12: false }) : "-";
+                const incidentType = String(data.incidentType || "incident").toUpperCase();
+                return `${incidentType}<br/>${ts}<br/>Dauer: ${Math.round(Number(data.durationSec || 0))}s`;
+              }
+            },
+            itemStyle: {
+              color: (params) => {
+                const type = String(params?.data?.incidentType || "");
+                if (type === "outage") return "#a42130";
+                if (type === "spike") return "#d17a00";
+                return "#365f9c";
+              }
+            }
+          }
+        ]
+      },
+      { notMerge: true }
+    );
+  }
+
   async function refreshOnce() {
     try {
-      const snapshot = await fetchSnapshot(windowMinutes);
+      const [snapshot, history] = await Promise.all([
+        fetchSnapshot(windowMinutes),
+        fetchHistory(longtermDays)
+      ]);
       if (destroyed) return;
       const targets = Array.isArray(snapshot?.targets) ? snapshot.targets : [];
       renderCards(targets);
       updateCharts(snapshot);
+      updateLongtermChart(snapshot, history);
       const at = new Date(snapshot.generatedAt || Date.now()).toLocaleTimeString("de-DE", { hour12: false });
       const mismatchHosts = targets
         .filter((target) => target?.latest?.sslIssue?.code === "ERR_TLS_CERT_ALTNAME_INVALID")
@@ -294,20 +430,30 @@ export async function renderUpdoModule(shell, moduleSettings) {
       void refreshOnce();
     });
   }
+  for (const btn of historyButtons) {
+    btn.addEventListener("click", () => {
+      longtermDays = Number.parseInt(String(btn.dataset.range || ""), 10) || 30;
+      applyHistoryButtonState();
+      void refreshOnce();
+    });
+  }
   if (refreshBtn) {
     refreshBtn.addEventListener("click", () => void refreshOnce());
   }
 
   applyWindowButtonState();
+  applyHistoryButtonState();
 
   try {
     const echarts = await loadEcharts();
     if (destroyed) return () => {};
     latencyChart = echarts.init(latencyHost);
     availabilityChart = echarts.init(availabilityHost);
+    longtermChart = echarts.init(longtermHost);
     resizeObserver = new ResizeObserver(() => {
       latencyChart?.resize();
       availabilityChart?.resize();
+      longtermChart?.resize();
     });
     resizeObserver.observe(shell.root);
     await refreshOnce();
@@ -323,7 +469,9 @@ export async function renderUpdoModule(shell, moduleSettings) {
     if (resizeObserver) resizeObserver.disconnect();
     latencyChart?.dispose();
     availabilityChart?.dispose();
+    longtermChart?.dispose();
     latencyChart = null;
     availabilityChart = null;
+    longtermChart = null;
   };
 }
