@@ -623,6 +623,18 @@ function trimUpdoSeries(maxPoints) {
   }
 }
 
+function pruneUpdoStateForTargets(targets) {
+  const keepUrls = new Set((Array.isArray(targets) ? targets : []).map((target) => target.url));
+  const maps = [updoState.latestByUrl, updoState.seriesByUrl, updoState.sslProbeByUrl];
+  for (const map of maps) {
+    for (const url of map.keys()) {
+      if (!keepUrls.has(url)) {
+        map.delete(url);
+      }
+    }
+  }
+}
+
 function probeSslIssue(url) {
   return new Promise((resolve) => {
     let parsed = null;
@@ -851,16 +863,11 @@ function startUpdoMonitor(config) {
       stdio: ["ignore", "pipe", "pipe"]
     });
     updoState.process = child;
-    updoState.restartAttempts = 0;
     updoState.startedAt = new Date().toISOString();
-
-    child.stdout.on("data", (chunk) => processUpdoChunk("stdout", chunk, config));
-    child.stderr.on("data", (chunk) => processUpdoChunk("stderr", chunk, config));
-    child.on("error", (error) => {
-      updoState.lastError = formatUpdoStartError(error);
-    });
-    child.on("exit", () => {
-      updoState.process = null;
+    let restartHandled = false;
+    const scheduleRestart = () => {
+      if (restartHandled) return;
+      restartHandled = true;
       if (updoState.stopRequested) return;
       const settings = getEffectiveSettings();
       const nextConfig = getUpdoConfigFromSettings(settings);
@@ -879,10 +886,24 @@ function startUpdoMonitor(config) {
         updoState.restartTimer = null;
         ensureUpdoMonitor();
       }, restartDelayMs);
+    };
+
+    child.stdout.on("data", (chunk) => processUpdoChunk("stdout", chunk, config));
+    child.stderr.on("data", (chunk) => processUpdoChunk("stderr", chunk, config));
+    child.on("error", (error) => {
+      updoState.lastError = formatUpdoStartError(error);
+      updoState.process = null;
+      updoState.startedAt = "";
+      scheduleRestart();
+    });
+    child.on("exit", () => {
+      updoState.process = null;
+      scheduleRestart();
     });
   } catch (error) {
     updoState.lastError = formatUpdoStartError(error);
     updoState.process = null;
+    updoState.startedAt = "";
   }
 }
 
@@ -890,9 +911,11 @@ function ensureUpdoMonitor() {
   const settings = getEffectiveSettings();
   const config = getUpdoConfigFromSettings(settings);
   const signature = JSON.stringify(config);
+  pruneUpdoStateForTargets(config.targets);
   trimUpdoSeries(config.maxPoints);
 
   if (!config.enabled || !config.targets.length) {
+    updoState.restartAttempts = 0;
     updoState.configSignature = signature;
     stopUpdoMonitor();
     return config;
@@ -903,7 +926,11 @@ function ensureUpdoMonitor() {
     return config;
   }
 
+  const signatureChanged = updoState.configSignature !== signature;
   stopUpdoMonitor();
+  if (signatureChanged) {
+    updoState.restartAttempts = 0;
+  }
   updoState.configSignature = signature;
   startUpdoMonitor(config);
   return config;
@@ -1592,6 +1619,7 @@ const server = http.createServer((req, res) => {
   if (req.method === "POST" && pathname === "/api/updo/restart") {
     try {
       stopUpdoMonitor();
+      updoState.restartAttempts = 0;
       const config = ensureUpdoMonitor();
       sendJson(res, 200, {
         ok: true,
