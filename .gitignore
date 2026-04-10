@@ -10,3 +10,4 @@ Thumbs.db
 .env.*
 Calendar/.env
 Calendar/calendar.preview.pid
+data/updo/

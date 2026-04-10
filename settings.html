@@ -553,6 +553,45 @@
             <label for="updoMaxPoints">Max Datenpunkte je Ziel</label>
             <input id="updoMaxPoints" type="number" min="60" max="5000" step="10" />
           </div>
+          <label class="toggle-line" for="updoPersistenceEnabled">
+            <input id="updoPersistenceEnabled" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Persistenz aktiv</span>
+              <span class="toggle-help">Speichert Monitoring-Daten dauerhaft auf der Festplatte.</span>
+            </span>
+          </label>
+          <div class="field">
+            <label for="updoCompressCount">Kompression bei Punkten (>=)</label>
+            <input id="updoCompressCount" type="number" min="120" max="20000" step="10" />
+          </div>
+          <div class="field">
+            <label for="updoCompressSpanMinutes">Kompression bei Zeitspanne (Minuten >=)</label>
+            <input id="updoCompressSpanMinutes" type="number" min="30" max="20160" step="30" />
+          </div>
+          <div class="field">
+            <label for="updoKeepTailPoints">Live-Tail nach Kompression (Punkte)</label>
+            <input id="updoKeepTailPoints" type="number" min="10" max="5000" step="10" />
+          </div>
+          <div class="field">
+            <label for="updoSpikeStaticThresholdMs">Spike: statischer Schwellenwert (ms)</label>
+            <input id="updoSpikeStaticThresholdMs" type="number" min="100" max="120000" step="50" />
+          </div>
+          <div class="field">
+            <label for="updoSpikeMultiplierOverAvg">Spike: Multiplikator ueber Durchschnitt</label>
+            <input id="updoSpikeMultiplierOverAvg" type="number" min="1.1" max="20" step="0.1" />
+          </div>
+          <div class="field">
+            <label for="updoSpikeMinConsecutivePoints">Spike: min. aufeinanderfolgende Punkte</label>
+            <input id="updoSpikeMinConsecutivePoints" type="number" min="1" max="100" step="1" />
+          </div>
+          <div class="field">
+            <label for="updoOutageMinConsecutiveFailures">Outage: min. aufeinanderfolgende Fehler</label>
+            <input id="updoOutageMinConsecutiveFailures" type="number" min="1" max="100" step="1" />
+          </div>
+          <div class="field">
+            <label for="updoGapFactor">Gap-Faktor (Delta > refresh * Faktor)</label>
+            <input id="updoGapFactor" type="number" min="1.1" max="100" step="0.1" />
+          </div>
           <div class="field">
             <label for="updoTargets">Ziele (eine URL pro Zeile)</label>
             <textarea id="updoTargets" rows="4" style="width: 100%;"></textarea>
@@ -597,6 +636,15 @@
       const updoRefreshSec = document.getElementById("updoRefreshSec");
       const updoWindowMinutes = document.getElementById("updoWindowMinutes");
       const updoMaxPoints = document.getElementById("updoMaxPoints");
+      const updoPersistenceEnabled = document.getElementById("updoPersistenceEnabled");
+      const updoCompressCount = document.getElementById("updoCompressCount");
+      const updoCompressSpanMinutes = document.getElementById("updoCompressSpanMinutes");
+      const updoKeepTailPoints = document.getElementById("updoKeepTailPoints");
+      const updoSpikeStaticThresholdMs = document.getElementById("updoSpikeStaticThresholdMs");
+      const updoSpikeMultiplierOverAvg = document.getElementById("updoSpikeMultiplierOverAvg");
+      const updoSpikeMinConsecutivePoints = document.getElementById("updoSpikeMinConsecutivePoints");
+      const updoOutageMinConsecutiveFailures = document.getElementById("updoOutageMinConsecutiveFailures");
+      const updoGapFactor = document.getElementById("updoGapFactor");
       const updoTargets = document.getElementById("updoTargets");
       const saveBtn = document.getElementById("saveBtn");
       const reloadBtn = document.getElementById("reloadBtn");
@@ -840,6 +888,25 @@
         const parsedUpdoRefreshSec = Number.parseInt(String(updoRefreshSec.value || ""), 10);
         const parsedUpdoWindowMinutes = Number.parseInt(String(updoWindowMinutes.value || ""), 10);
         const parsedUpdoMaxPoints = Number.parseInt(String(updoMaxPoints.value || ""), 10);
+        const parsedUpdoCompressCount = Number.parseInt(String(updoCompressCount.value || ""), 10);
+        const parsedUpdoCompressSpanMinutes = Number.parseInt(String(updoCompressSpanMinutes.value || ""), 10);
+        const parsedUpdoKeepTailPoints = Number.parseInt(String(updoKeepTailPoints.value || ""), 10);
+        const parsedUpdoSpikeStaticThresholdMs = Number.parseInt(
+          String(updoSpikeStaticThresholdMs.value || ""),
+          10
+        );
+        const parsedUpdoSpikeMultiplierOverAvg = Number.parseFloat(
+          String(updoSpikeMultiplierOverAvg.value || "")
+        );
+        const parsedUpdoSpikeMinConsecutivePoints = Number.parseInt(
+          String(updoSpikeMinConsecutivePoints.value || ""),
+          10
+        );
+        const parsedUpdoOutageMinConsecutiveFailures = Number.parseInt(
+          String(updoOutageMinConsecutiveFailures.value || ""),
+          10
+        );
+        const parsedUpdoGapFactor = Number.parseFloat(String(updoGapFactor.value || ""));
         return {
           schemaVersion: 1,
           ui: {
@@ -887,6 +954,45 @@
               maxPoints: Number.isFinite(parsedUpdoMaxPoints)
                 ? Math.max(60, Math.min(5000, parsedUpdoMaxPoints))
                 : 720,
+              persistence: {
+                enabled: Boolean(updoPersistenceEnabled.checked),
+                rawFile: "data/updo/raw.jsonl",
+                longtermFile: "data/updo/longterm.jsonl",
+                incidentsFile: "data/updo/incidents.jsonl",
+                stateFile: "data/updo/state.json"
+              },
+              compression: {
+                compressCount: Number.isFinite(parsedUpdoCompressCount)
+                  ? Math.max(120, Math.min(20000, parsedUpdoCompressCount))
+                  : 720,
+                compressSpanMinutes: Number.isFinite(parsedUpdoCompressSpanMinutes)
+                  ? Math.max(30, Math.min(20160, parsedUpdoCompressSpanMinutes))
+                  : 1440,
+                keepTailPoints: Number.isFinite(parsedUpdoKeepTailPoints)
+                  ? Math.max(10, Math.min(5000, parsedUpdoKeepTailPoints))
+                  : 120
+              },
+              spikeDetection: {
+                staticThresholdMs: Number.isFinite(parsedUpdoSpikeStaticThresholdMs)
+                  ? Math.max(100, Math.min(120000, parsedUpdoSpikeStaticThresholdMs))
+                  : 1200,
+                multiplierOverAvg: Number.isFinite(parsedUpdoSpikeMultiplierOverAvg)
+                  ? Math.max(1.1, Math.min(20, parsedUpdoSpikeMultiplierOverAvg))
+                  : 2.5,
+                minConsecutivePoints: Number.isFinite(parsedUpdoSpikeMinConsecutivePoints)
+                  ? Math.max(1, Math.min(100, parsedUpdoSpikeMinConsecutivePoints))
+                  : 2
+              },
+              outageDetection: {
+                minConsecutiveFailures: Number.isFinite(parsedUpdoOutageMinConsecutiveFailures)
+                  ? Math.max(1, Math.min(100, parsedUpdoOutageMinConsecutiveFailures))
+                  : 2
+              },
+              gapDetection: {
+                gapFactor: Number.isFinite(parsedUpdoGapFactor)
+                  ? Math.max(1.1, Math.min(100, parsedUpdoGapFactor))
+                  : 3
+              },
               targets: parseUpdoTargetsFromTextarea(updoTargets.value)
             }
           }
@@ -917,6 +1023,21 @@
         updoRefreshSec.value = String(settings?.modules?.updo?.refreshSec ?? 5);
         updoWindowMinutes.value = String(settings?.modules?.updo?.windowMinutes ?? 60);
         updoMaxPoints.value = String(settings?.modules?.updo?.maxPoints ?? 720);
+        updoPersistenceEnabled.checked = Boolean(settings?.modules?.updo?.persistence?.enabled ?? true);
+        updoCompressCount.value = String(settings?.modules?.updo?.compression?.compressCount ?? 720);
+        updoCompressSpanMinutes.value = String(settings?.modules?.updo?.compression?.compressSpanMinutes ?? 1440);
+        updoKeepTailPoints.value = String(settings?.modules?.updo?.compression?.keepTailPoints ?? 120);
+        updoSpikeStaticThresholdMs.value = String(settings?.modules?.updo?.spikeDetection?.staticThresholdMs ?? 1200);
+        updoSpikeMultiplierOverAvg.value = String(
+          settings?.modules?.updo?.spikeDetection?.multiplierOverAvg ?? 2.5
+        );
+        updoSpikeMinConsecutivePoints.value = String(
+          settings?.modules?.updo?.spikeDetection?.minConsecutivePoints ?? 2
+        );
+        updoOutageMinConsecutiveFailures.value = String(
+          settings?.modules?.updo?.outageDetection?.minConsecutiveFailures ?? 2
+        );
+        updoGapFactor.value = String(settings?.modules?.updo?.gapDetection?.gapFactor ?? 3);
         const lines = Array.isArray(settings?.modules?.updo?.targets)
           ? settings.modules.updo.targets
               .map((target) => String(target?.url || "").trim())
