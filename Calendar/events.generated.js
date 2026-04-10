@@ -210,7 +210,7 @@ window.CALENDAR_EVENTS = [
     "backgroundColor": "red",
     "borderColor": "red",
     "start": "2026-05-04",
-    "end": "2026-05-09"
+    "end": "2026-05-10"
   },
   {
     "id": "2. Projektverwaltung/2026 NICA - Zirkustreffen Nord/Workshop Zirkustreffen Nord.md",

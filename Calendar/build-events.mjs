@@ -1,7 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { execSync } from "node:child_process";
+import { execFileSync } from "node:child_process";
 import { loadDotEnvFile } from "./lib/env.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -15,8 +15,49 @@ const OUTPUT_FILE = path.resolve(__dirname, "events.generated.js");
 const BASE_PATH = process.env.OBSIDIAN_BASE_PATH || "6. Obsidian/Live/Kalender.base";
 const BASE_VIEW = process.env.OBSIDIAN_BASE_VIEW || "Tabelle";
 const OBSIDIAN_VAULT_NAME = String(process.env.OBSIDIAN_VAULT_NAME || "").trim();
+const OBSIDIAN_BIN = resolveObsidianBin();
 const ALLOW_MARKDOWN_FALLBACK = parseBoolean(process.env.ALLOW_MARKDOWN_FALLBACK || "");
 const EXCLUDE_DIRS = new Set([".obsidian", ".trash", "8. Emails", "Attachments", "Excalidraw"]);
+
+function getObsidianBinCandidates() {
+  const candidates = [];
+  const fromEnv = String(process.env.OBSIDIAN_BIN || "").trim();
+  if (fromEnv) {
+    candidates.push(fromEnv);
+  }
+
+  if (process.platform === "win32") {
+    const localAppData = String(process.env.LOCALAPPDATA || "").trim();
+    if (localAppData) {
+      candidates.push(path.join(localAppData, "Programs", "Obsidian", "Obsidian.com"));
+      candidates.push(path.join(localAppData, "Programs", "Obsidian", "Obsidian.exe"));
+    }
+  }
+
+  candidates.push("obsidian");
+  return Array.from(new Set(candidates));
+}
+
+function resolveObsidianBin() {
+  for (const candidate of getObsidianBinCandidates()) {
+    if (!candidate) continue;
+    if (path.isAbsolute(candidate)) {
+      if (fs.existsSync(candidate)) return candidate;
+      continue;
+    }
+    return candidate;
+  }
+  return "obsidian";
+}
+
+function isVaultTargetingError(error) {
+  const text = String(error?.stderr || error?.stdout || error?.message || "").toLowerCase();
+  return (
+    text.includes("vault") ||
+    text.includes("unable to find the vault") ||
+    text.includes("does not exist")
+  );
+}
 
 function isMarkdownFile(filePath) {
   return filePath.toLowerCase().endsWith(".md");
@@ -547,17 +588,32 @@ function toCalendarEvent(filePath) {
 }
 
 function queryBaseRows() {
-  const escapedVaultName = OBSIDIAN_VAULT_NAME.replace(/"/g, '\\"');
-  const escapedBasePath = BASE_PATH.replace(/"/g, '\\"');
-  const escapedView = BASE_VIEW.replace(/"/g, '\\"');
-  const vaultArg = escapedVaultName ? ` vault="${escapedVaultName}"` : "";
+  const run = (useVault) => {
+    const args = ["base:query"];
+    if (useVault && OBSIDIAN_VAULT_NAME) {
+      args.push(`vault=${OBSIDIAN_VAULT_NAME}`);
+    }
+    args.push(`path=${BASE_PATH}`, `view=${BASE_VIEW}`, "format=json");
+    const raw = execFileSync(OBSIDIAN_BIN, args, {
+      cwd: VAULT_ROOT,
+      encoding: "utf8",
+      stdio: "pipe"
+    });
+    return JSON.parse(raw);
+  };
 
-  const raw = execSync(`obsidian base:query${vaultArg} path="${escapedBasePath}" view="${escapedView}" format=json`, {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe"
-  });
-  return JSON.parse(raw);
+  if (!OBSIDIAN_VAULT_NAME) {
+    return run(false);
+  }
+
+  try {
+    return run(true);
+  } catch (error) {
+    if (!isVaultTargetingError(error)) {
+      throw error;
+    }
+    return run(false);
+  }
 }
 
 function baseRowToCalendarEvent(row) {

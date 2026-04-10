@@ -21,6 +21,7 @@ const DEFAULT_BASE_PATH = process.env.OBSIDIAN_BASE_PATH || "6. Obsidian/Live/Ka
 const DEFAULT_BASE_VIEW = process.env.OBSIDIAN_BASE_VIEW || "Tabelle";
 const KALENDER_MAP_BASE_PATH = "6. Obsidian/Live/Kalender.base";
 const OBSIDIAN_VAULT_NAME = String(process.env.OBSIDIAN_VAULT_NAME || "").trim();
+const OBSIDIAN_BIN = resolveObsidianBin();
 const GOOGLE_CALENDAR_API_KEY = String(process.env.GOOGLE_CALENDAR_API_KEY || "").trim();
 const GOOGLE_CALENDAR_IDS = String(process.env.GOOGLE_CALENDAR_IDS || "")
   .split(",")
@@ -70,6 +71,37 @@ const MIME_TYPES = {
   ".jpeg": "image/jpeg",
   ".ico": "image/x-icon"
 };
+
+function getObsidianBinCandidates() {
+  const candidates = [];
+  const fromEnv = String(process.env.OBSIDIAN_BIN || "").trim();
+  if (fromEnv) {
+    candidates.push(fromEnv);
+  }
+
+  if (process.platform === "win32") {
+    const localAppData = String(process.env.LOCALAPPDATA || "").trim();
+    if (localAppData) {
+      candidates.push(path.join(localAppData, "Programs", "Obsidian", "Obsidian.com"));
+      candidates.push(path.join(localAppData, "Programs", "Obsidian", "Obsidian.exe"));
+    }
+  }
+
+  candidates.push("obsidian");
+  return Array.from(new Set(candidates));
+}
+
+function resolveObsidianBin() {
+  for (const candidate of getObsidianBinCandidates()) {
+    if (!candidate) continue;
+    if (path.isAbsolute(candidate)) {
+      if (fs.existsSync(candidate)) return candidate;
+      continue;
+    }
+    return candidate;
+  }
+  return "obsidian";
+}
 
 function normalizeVaultRelativePath(value) {
   return String(value || "").replace(/\\/g, "/").replace(/^\/+/, "").trim();
@@ -670,6 +702,35 @@ function withVaultArgs(args) {
   return [args[0], `vault=${OBSIDIAN_VAULT_NAME}`, ...args.slice(1)];
 }
 
+function isVaultTargetingError(error) {
+  const text = String(error?.stderr || error?.stdout || error?.message || "").toLowerCase();
+  return (
+    text.includes("vault") ||
+    text.includes("unable to find the vault") ||
+    text.includes("does not exist")
+  );
+}
+
+function runObsidian(args, options = {}) {
+  const execOptions = {
+    cwd: VAULT_ROOT,
+    encoding: "utf8",
+    stdio: "pipe",
+    ...options
+  };
+  if (!OBSIDIAN_VAULT_NAME) {
+    return execFileSync(OBSIDIAN_BIN, args, execOptions);
+  }
+  try {
+    return execFileSync(OBSIDIAN_BIN, withVaultArgs(args), execOptions);
+  } catch (error) {
+    if (!isVaultTargetingError(error)) {
+      throw error;
+    }
+    return execFileSync(OBSIDIAN_BIN, args, execOptions);
+  }
+}
+
 function openMarkdownInObsidianNewTab(sourcePath) {
   const markdownPath = safeResolveVaultPath(sourcePath);
   if (!markdownPath) {
@@ -677,11 +738,7 @@ function openMarkdownInObsidianNewTab(sourcePath) {
   }
 
   const vaultRelativePath = path.relative(VAULT_ROOT, markdownPath).replace(/\\/g, "/");
-  execFileSync("obsidian", withVaultArgs(["open", `path=${vaultRelativePath}`, "newtab"]), {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe"
-  });
+  runObsidian(["open", `path=${vaultRelativePath}`, "newtab"]);
   return vaultRelativePath;
 }
 
@@ -699,10 +756,7 @@ function openKalenderBaseMapInObsidianNewTab(coordinates = null) {
       : null;
   const zoom = 14;
 
-  execFileSync("obsidian", withVaultArgs(["tab:open", "view=bases", `file=${basePath}`]), {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe",
+  runObsidian(["tab:open", "view=bases", `file=${basePath}`], {
     timeout: 10000
   });
 
@@ -760,10 +814,7 @@ if (coords) {
 JSON.stringify({ basePath, view: "Map", centered: Boolean(coords) });
 `.trim();
 
-  const raw = execFileSync("obsidian", withVaultArgs(["eval", `code=${script}`]), {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe",
+  const raw = runObsidian(["eval", `code=${script}`], {
     timeout: 10000
   });
   const clean = String(raw || "").replace(/^=>\s*/, "").trim();
@@ -835,11 +886,7 @@ JSON.stringify({
 });
 `.trim();
 
-  const raw = execFileSync("obsidian", withVaultArgs(["eval", `code=${js}`]), {
-    cwd: VAULT_ROOT,
-    encoding: "utf8",
-    stdio: "pipe"
-  });
+  const raw = runObsidian(["eval", `code=${js}`]);
   const clean = String(raw || "").replace(/^=>\s*/, "").trim();
   return JSON.parse(clean);
 }
