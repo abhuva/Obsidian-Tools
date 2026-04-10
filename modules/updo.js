@@ -119,7 +119,12 @@ function buildLongtermSeries(summaries, targets) {
       smooth: true,
       showSymbol: false,
       yAxisIndex: 0,
-      data: targetSummaries.map((entry) => [entry.windowEnd, Number(entry?.latencyAvgMs ?? null)])
+      data: targetSummaries.map((entry) => {
+        const raw = entry?.latencyAvgMs;
+        if (raw == null) return [entry.windowEnd, null];
+        const value = Number(raw);
+        return [entry.windowEnd, Number.isFinite(value) ? value : null];
+      })
     });
     series.push({
       name: `${target.name} uptime`,
@@ -128,7 +133,12 @@ function buildLongtermSeries(summaries, targets) {
       showSymbol: false,
       lineStyle: { type: "dashed", width: 1.6 },
       yAxisIndex: 1,
-      data: targetSummaries.map((entry) => [entry.windowEnd, Number(entry?.uptimePercent ?? null)])
+      data: targetSummaries.map((entry) => {
+        const raw = entry?.uptimePercent;
+        if (raw == null) return [entry.windowEnd, null];
+        const value = Number(raw);
+        return [entry.windowEnd, Number.isFinite(value) ? value : null];
+      })
     });
   }
   return series;
