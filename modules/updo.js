@@ -144,17 +144,25 @@ function buildLongtermSeries(summaries, targets) {
   return series;
 }
 
-function buildIncidentScatter(incidents) {
+function buildIncidentScatter(incidents, targets) {
+  const targetNameById = new Map(
+    (targets || []).map((target) => [String(target?.id || ""), String(target?.name || target?.url || "-")])
+  );
   return (incidents || [])
     .map((entry) => {
       const ts = String(entry?.start || "");
       if (!ts) return null;
       const type = String(entry?.type || "");
+      const targetId = String(entry?.targetId || "");
+      const targetName =
+        targetNameById.get(targetId) || String(entry?.targetUrl || entry?.targetId || "Unbekanntes Ziel");
       const y = type === "spike" ? Number(entry?.peakMs ?? entry?.thresholdMs ?? 0) : 0;
       return {
         value: [ts, Number.isFinite(y) ? y : 0],
         incidentType: type,
-        durationSec: Number(entry?.durationSec ?? 0)
+        durationSec: Number(entry?.durationSec ?? 0),
+        targetId,
+        targetName
       };
     })
     .filter(Boolean);
@@ -381,7 +389,7 @@ export async function renderUpdoModule(shell, moduleSettings) {
             type: "scatter",
             yAxisIndex: 0,
             symbolSize: 9,
-            data: buildIncidentScatter(incidents),
+            data: buildIncidentScatter(incidents, targets),
             tooltip: {
               trigger: "item",
               formatter: (params) => {
@@ -389,7 +397,8 @@ export async function renderUpdoModule(shell, moduleSettings) {
                 const tsRaw = Array.isArray(data.value) ? data.value[0] : null;
                 const ts = tsRaw ? new Date(tsRaw).toLocaleString("de-DE", { hour12: false }) : "-";
                 const incidentType = String(data.incidentType || "incident").toUpperCase();
-                return `${incidentType}<br/>${ts}<br/>Dauer: ${Math.round(Number(data.durationSec || 0))}s`;
+                const targetName = String(data.targetName || "-");
+                return `${incidentType}<br/>Site: ${targetName}<br/>${ts}<br/>Dauer: ${Math.round(Number(data.durationSec || 0))}s`;
               }
             },
             itemStyle: {
