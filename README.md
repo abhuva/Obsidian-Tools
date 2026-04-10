@@ -59,6 +59,9 @@ obsidian web url="http://127.0.0.1:4174/settings.html"
 - `POST /api/search/open`: Oeffnet konfigurierte Header-Suche in Obsidian.
 - `GET /api/projects/meta`: Liefert Vorschlagswerte fuer neue Projekte (Year/Society/Type/Foerderkuerzel).
 - `POST /api/projects/create`: Erstellt neuen Projektordner + MOC-Datei per Projekt-Template und oeffnet die Datei.
+- `GET /api/updo/snapshot`: Liefert Monitoring-Snapshot fuer das `updo`-Modul.
+  - Enthält bei TLS-Fehlern ein `sslIssue`-Objekt (z. B. `ERR_TLS_CERT_ALTNAME_INVALID`).
+- `POST /api/updo/restart`: Startet den `updo`-Monitorprozess neu.
 
 ## Konfigurationsprinzip
 
@@ -77,6 +80,8 @@ Damit sind spaetere Features stabil erweiterbar (neue Module, neue Optionen).
   - Optional: Kartenbreite (`cardMaxWidth`, 205-420 px).
 - `clock` (Uhrzeit): Live-Digitaluhr im Header/Banner.
 - `newProject` (Neues Projekt erstellen): Dialog fuer neue Projekte in `2. Projektverwaltung` inkl. Naming-Validierung.
+- `updo` (Website Monitoring): Statuskarten + Latenz/Verfuegbarkeits-Charts fuer konfigurierten URL-Satz.
+  - Kennzeichnet Zertifikatsprobleme explizit (z. B. `SSL MISMATCH`) statt nur generisch `DOWN`.
 
 ## Projektnaming-Doku
 

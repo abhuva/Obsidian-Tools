@@ -505,6 +505,104 @@ html[data-theme-mode="mirror-obsidian"] body {
   background: var(--empty-bg);
 }
 
+.updo-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+}
+
+.updo-window-buttons {
+  display: inline-flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.updo-window-btn {
+  min-width: 56px;
+}
+
+.updo-window-btn-active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.updo-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.updo-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+  padding: 9px 10px;
+}
+
+.updo-card-ok {
+  border-left: 4px solid var(--ok);
+}
+
+.updo-card-down {
+  border-left: 4px solid var(--danger);
+}
+
+.updo-card-unknown {
+  border-left: 4px solid var(--text-soft);
+}
+
+.updo-card-name {
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+.updo-card-status {
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-soft);
+  margin-bottom: 5px;
+}
+
+.updo-card-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 8px;
+  font-size: 0.86rem;
+}
+
+.updo-card-issue {
+  margin-top: 7px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  font-size: 0.82rem;
+  color: var(--danger);
+}
+
+.updo-chart-wrap {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+
+.updo-chart {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--card-bg);
+}
+
+.updo-chart-latency {
+  height: 280px;
+}
+
+.updo-chart-availability {
+  height: 170px;
+}
+
 @media (max-width: 980px) {
   .header-clock {
     min-width: 90px;

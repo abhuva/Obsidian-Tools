@@ -32,6 +32,30 @@
       "enabled": true,
       "title": "Projektverwaltung",
       "openInNewTab": true
+    },
+    "updo": {
+      "enabled": true,
+      "title": "Website Monitoring",
+      "refreshSec": 5,
+      "windowMinutes": 60,
+      "maxPoints": 720,
+      "targets": [
+        {
+          "id": "www",
+          "name": "www.nica.network",
+          "url": "https://www.nica.network"
+        },
+        {
+          "id": "cloud",
+          "name": "cloud.nica.network",
+          "url": "https://cloud.nica.network"
+        },
+        {
+          "id": "campus",
+          "name": "campus.nica.network",
+          "url": "https://campus.nica.network"
+        }
+      ]
     }
   }
 }

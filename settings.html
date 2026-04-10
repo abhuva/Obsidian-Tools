@@ -297,6 +297,7 @@
 
       .field input[type="text"],
       .field input[type="number"],
+      .field textarea,
       .field select {
         border: 1px solid var(--border);
         border-radius: var(--radius-control);
@@ -525,6 +526,40 @@
         </div>
       </section>
 
+      <section class="panel panel-collapsible">
+        <header class="panel-head">
+          <div>
+            <h2 class="panel-title">Website Monitoring (updo)</h2>
+            <div class="panel-help">Status- und Latenz-Modul fuer definierte Webseiten.</div>
+          </div>
+        </header>
+        <div class="panel-body">
+          <label class="toggle-line" for="updoEnabled">
+            <input id="updoEnabled" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Modul aktiv</span>
+              <span class="toggle-help">Aktiviert das Monitoring-Modul auf der Homepage.</span>
+            </span>
+          </label>
+          <div class="field">
+            <label for="updoRefreshSec">Refresh-Intervall (Sekunden)</label>
+            <input id="updoRefreshSec" type="number" min="3" max="300" step="1" />
+          </div>
+          <div class="field">
+            <label for="updoWindowMinutes">Standard-Zeitfenster (Minuten)</label>
+            <input id="updoWindowMinutes" type="number" min="5" max="1440" step="5" />
+          </div>
+          <div class="field">
+            <label for="updoMaxPoints">Max Datenpunkte je Ziel</label>
+            <input id="updoMaxPoints" type="number" min="60" max="5000" step="10" />
+          </div>
+          <div class="field">
+            <label for="updoTargets">Ziele (eine URL pro Zeile)</label>
+            <textarea id="updoTargets" rows="4" style="width: 100%;"></textarea>
+          </div>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel-body">
           <div class="actions">
@@ -558,6 +593,11 @@
       const clock12h = document.getElementById("clock12h");
       const newProjectEnabled = document.getElementById("newProjectEnabled");
       const newProjectOpenInNewTab = document.getElementById("newProjectOpenInNewTab");
+      const updoEnabled = document.getElementById("updoEnabled");
+      const updoRefreshSec = document.getElementById("updoRefreshSec");
+      const updoWindowMinutes = document.getElementById("updoWindowMinutes");
+      const updoMaxPoints = document.getElementById("updoMaxPoints");
+      const updoTargets = document.getElementById("updoTargets");
       const saveBtn = document.getElementById("saveBtn");
       const reloadBtn = document.getElementById("reloadBtn");
       const statusEl = document.getElementById("status");
@@ -762,6 +802,32 @@
         });
       }
 
+      function parseUpdoTargetsFromTextarea(value) {
+        const lines = String(value || "")
+          .split(/\r?\n/)
+          .map((line) => line.trim())
+          .filter(Boolean);
+        const out = [];
+        const seen = new Set();
+        for (const line of lines) {
+          try {
+            const parsed = new URL(line);
+            if (parsed.protocol !== "http:" && parsed.protocol !== "https:") continue;
+            const url = parsed.toString();
+            if (seen.has(url)) continue;
+            seen.add(url);
+            out.push({
+              id: parsed.hostname.toLowerCase().replace(/[^a-z0-9-_]+/g, "-"),
+              name: parsed.hostname,
+              url
+            });
+          } catch {
+            // ignore invalid urls
+          }
+        }
+        return out;
+      }
+
       function readFormToSettings() {
         const parsedTitleSize = Number.parseInt(String(titleSizeInput.value || ""), 10);
         const titleSize = Number.isFinite(parsedTitleSize)
@@ -771,6 +837,9 @@
         const cardMaxWidth = Number.isFinite(parsedBookmarkCardMaxWidth)
           ? Math.max(205, Math.min(420, parsedBookmarkCardMaxWidth))
           : 240;
+        const parsedUpdoRefreshSec = Number.parseInt(String(updoRefreshSec.value || ""), 10);
+        const parsedUpdoWindowMinutes = Number.parseInt(String(updoWindowMinutes.value || ""), 10);
+        const parsedUpdoMaxPoints = Number.parseInt(String(updoMaxPoints.value || ""), 10);
         return {
           schemaVersion: 1,
           ui: {
@@ -805,6 +874,20 @@
               enabled: Boolean(newProjectEnabled.checked),
               title: "Projektverwaltung",
               openInNewTab: Boolean(newProjectOpenInNewTab.checked)
+            },
+            updo: {
+              enabled: Boolean(updoEnabled.checked),
+              title: "Website Monitoring",
+              refreshSec: Number.isFinite(parsedUpdoRefreshSec)
+                ? Math.max(3, Math.min(300, parsedUpdoRefreshSec))
+                : 5,
+              windowMinutes: Number.isFinite(parsedUpdoWindowMinutes)
+                ? Math.max(5, Math.min(1440, parsedUpdoWindowMinutes))
+                : 60,
+              maxPoints: Number.isFinite(parsedUpdoMaxPoints)
+                ? Math.max(60, Math.min(5000, parsedUpdoMaxPoints))
+                : 720,
+              targets: parseUpdoTargetsFromTextarea(updoTargets.value)
             }
           }
         };
@@ -830,6 +913,16 @@
         clock12h.checked = Boolean(settings?.modules?.clock?.hour12);
         newProjectEnabled.checked = Boolean(settings?.modules?.newProject?.enabled);
         newProjectOpenInNewTab.checked = Boolean(settings?.modules?.newProject?.openInNewTab);
+        updoEnabled.checked = Boolean(settings?.modules?.updo?.enabled);
+        updoRefreshSec.value = String(settings?.modules?.updo?.refreshSec ?? 5);
+        updoWindowMinutes.value = String(settings?.modules?.updo?.windowMinutes ?? 60);
+        updoMaxPoints.value = String(settings?.modules?.updo?.maxPoints ?? 720);
+        const lines = Array.isArray(settings?.modules?.updo?.targets)
+          ? settings.modules.updo.targets
+              .map((target) => String(target?.url || "").trim())
+              .filter(Boolean)
+          : [];
+        updoTargets.value = lines.join("\n");
       }
 
       async function loadSettings() {
