@@ -553,10 +553,13 @@
             <label for="updoMaxPoints">Max Datenpunkte je Ziel</label>
             <input id="updoMaxPoints" type="number" min="60" max="5000" step="10" />
           </div>
-          <div class="field">
-            <label for="updoPersistenceEnabled">Persistenz aktiv</label>
-            <input id="updoPersistenceEnabled" type="checkbox" />
-          </div>
+          <label class="toggle-line" for="updoPersistenceEnabled">
+            <input id="updoPersistenceEnabled" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Persistenz aktiv</span>
+              <span class="toggle-help">Speichert Monitoring-Daten dauerhaft auf der Festplatte.</span>
+            </span>
+          </label>
           <div class="field">
             <label for="updoCompressCount">Kompression bei Punkten (>=)</label>
             <input id="updoCompressCount" type="number" min="120" max="20000" step="10" />
