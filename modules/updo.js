@@ -167,17 +167,41 @@ export async function renderUpdoModule(shell, moduleSettings) {
         latest?.sslIssue?.code === "ERR_TLS_CERT_ALTNAME_INVALID"
           ? "TLS: Zertifikat passt nicht zum Hostnamen."
           : String(latest?.sslIssue?.message || "").trim();
-      card.innerHTML = `
-        <div class="updo-card-name">${target.name}</div>
-        <div class="updo-card-status">${statusLabel}</div>
-        <div class="updo-card-grid">
-          <div>Code: <strong>${statusCode}</strong></div>
-          <div>Latency: <strong>${toMsString(latest.responseTimeMs)}</strong></div>
-          <div>Uptime: <strong>${toPercentString(target?.stats?.uptimePercent)}</strong></div>
-          <div>Last: <strong>${toLocalTime(latest.timestamp)}</strong></div>
-        </div>
-        ${issueText ? `<div class="updo-card-issue">${issueText}</div>` : ""}
-      `;
+
+      const nameEl = document.createElement("div");
+      nameEl.className = "updo-card-name";
+      nameEl.textContent = String(target?.name || "-");
+      card.appendChild(nameEl);
+
+      const statusEl = document.createElement("div");
+      statusEl.className = "updo-card-status";
+      statusEl.textContent = statusLabel;
+      card.appendChild(statusEl);
+
+      const gridEl = document.createElement("div");
+      gridEl.className = "updo-card-grid";
+      const metrics = [
+        ["Code", String(statusCode)],
+        ["Latency", toMsString(latest.responseTimeMs)],
+        ["Uptime", toPercentString(target?.stats?.uptimePercent)],
+        ["Last", toLocalTime(latest.timestamp)]
+      ];
+      for (const [label, value] of metrics) {
+        const rowEl = document.createElement("div");
+        rowEl.append(`${label}: `);
+        const strongEl = document.createElement("strong");
+        strongEl.textContent = value;
+        rowEl.appendChild(strongEl);
+        gridEl.appendChild(rowEl);
+      }
+      card.appendChild(gridEl);
+
+      if (issueText) {
+        const issueEl = document.createElement("div");
+        issueEl.className = "updo-card-issue";
+        issueEl.textContent = issueText;
+        card.appendChild(issueEl);
+      }
       cards.appendChild(card);
     }
   }

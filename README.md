@@ -30,6 +30,8 @@ Von Repository-Root:
 npm.cmd --prefix .\Tools run preview
 ```
 
+Voraussetzung fuer Website Monitoring (`updo`-Modul): Das `updo` CLI muss installiert und im `PATH` verfuegbar sein.
+
 Stoppen:
 
 ```powershell

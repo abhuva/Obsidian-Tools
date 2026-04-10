@@ -86,11 +86,14 @@ const DEFAULT_SETTINGS_FALLBACK = {
   }
 };
 
-const UPDO_RESTART_DELAY_MS = 3000;
+const UPDO_BASE_RESTART_DELAY_MS = 3000;
+const UPDO_MAX_RESTART_DELAY_MS = 60000;
+const UPDO_MAX_RESTART_ATTEMPTS = 5;
 const UPDO_SSL_PROBE_TTL_MS = 5 * 60 * 1000;
 const updoState = {
   process: null,
   restartTimer: null,
+  restartAttempts: 0,
   stdoutBuffer: "",
   stderrBuffer: "",
   configSignature: "",
@@ -813,6 +816,13 @@ function processUpdoChunk(kind, chunk, config) {
   }
 }
 
+function formatUpdoStartError(error) {
+  if (error?.code === "ENOENT") {
+    return "updo not found in PATH (ENOENT)";
+  }
+  return error?.message || "Could not start updo";
+}
+
 function startUpdoMonitor(config) {
   if (!config.enabled || !config.targets.length) {
     stopUpdoMonitor();
@@ -841,12 +851,13 @@ function startUpdoMonitor(config) {
       stdio: ["ignore", "pipe", "pipe"]
     });
     updoState.process = child;
+    updoState.restartAttempts = 0;
     updoState.startedAt = new Date().toISOString();
 
     child.stdout.on("data", (chunk) => processUpdoChunk("stdout", chunk, config));
     child.stderr.on("data", (chunk) => processUpdoChunk("stderr", chunk, config));
     child.on("error", (error) => {
-      updoState.lastError = error?.message || "Could not start updo";
+      updoState.lastError = formatUpdoStartError(error);
     });
     child.on("exit", () => {
       updoState.process = null;
@@ -854,14 +865,23 @@ function startUpdoMonitor(config) {
       const settings = getEffectiveSettings();
       const nextConfig = getUpdoConfigFromSettings(settings);
       if (!nextConfig.enabled || !nextConfig.targets.length) return;
+      updoState.restartAttempts += 1;
+      if (updoState.restartAttempts > UPDO_MAX_RESTART_ATTEMPTS) {
+        updoState.lastError = "Too many updo restart attempts, monitor stopped";
+        return;
+      }
+      const restartDelayMs = Math.min(
+        UPDO_BASE_RESTART_DELAY_MS * Math.pow(2, updoState.restartAttempts - 1),
+        UPDO_MAX_RESTART_DELAY_MS
+      );
       if (updoState.restartTimer) clearTimeout(updoState.restartTimer);
       updoState.restartTimer = setTimeout(() => {
         updoState.restartTimer = null;
         ensureUpdoMonitor();
-      }, UPDO_RESTART_DELAY_MS);
+      }, restartDelayMs);
     });
   } catch (error) {
-    updoState.lastError = error?.message || "Could not start updo";
+    updoState.lastError = formatUpdoStartError(error);
     updoState.process = null;
   }
 }
