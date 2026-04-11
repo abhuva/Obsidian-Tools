@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -19,6 +19,10 @@ const OBSIDIAN_BIN = resolveObsidianBin();
 const ALLOW_MARKDOWN_FALLBACK = parseBoolean(process.env.ALLOW_MARKDOWN_FALLBACK || "");
 const EXCLUDE_DIRS = new Set([".obsidian", ".trash", "8. Emails", "Attachments", "Excalidraw"]);
 
+/**
+ * Get Obsidian Bin Candidates.
+ * @returns {*} Returns obsidian bin candidates.
+ */
 function getObsidianBinCandidates() {
   const candidates = [];
   const fromEnv = String(process.env.OBSIDIAN_BIN || "").trim();
@@ -38,6 +42,10 @@ function getObsidianBinCandidates() {
   return Array.from(new Set(candidates));
 }
 
+/**
+ * Resolve Obsidian Bin.
+ * @returns {*} Returns obsidian bin.
+ */
 function resolveObsidianBin() {
   for (const candidate of getObsidianBinCandidates()) {
     if (!candidate) continue;
@@ -50,6 +58,11 @@ function resolveObsidianBin() {
   return "obsidian";
 }
 
+/**
+ * Is Vault Targeting Error.
+ * @param {*}
+ * @returns {*} Returns whether the condition is met.
+ */
 function isVaultTargetingError(error) {
   const text = String(error?.stderr || error?.stdout || error?.message || "").toLowerCase();
   return (
@@ -59,14 +72,30 @@ function isVaultTargetingError(error) {
   );
 }
 
+/**
+ * Is Markdown File.
+ * @param {*}
+ * @returns {*} Returns whether the condition is met.
+ */
 function isMarkdownFile(filePath) {
   return filePath.toLowerCase().endsWith(".md");
 }
 
+/**
+ * Is Excluded Dir.
+ * @param {*}
+ * @returns {*} Returns whether the condition is met.
+ */
 function isExcludedDir(dirName) {
   return EXCLUDE_DIRS.has(dirName);
 }
 
+/**
+ * List Markdown Files.
+ * @param {*}
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function listMarkdownFiles(dirPath, results = []) {
   for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
     const fullPath = path.join(dirPath, entry.name);
@@ -83,6 +112,11 @@ function listMarkdownFiles(dirPath, results = []) {
   return results;
 }
 
+/**
+ * Extract Frontmatter.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function extractFrontmatter(content) {
   if (!content.startsWith("---\n") && !content.startsWith("---\r\n")) {
     return "";
@@ -92,10 +126,20 @@ function extractFrontmatter(content) {
   return content.slice(4, end);
 }
 
+/**
+ * Strip Wrapping Quotes.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function stripWrappingQuotes(value) {
   return String(value ?? "").trim().replace(/^["']|["']$/g, "");
 }
 
+/**
+ * Strip Yaml Inline Comment.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function stripYamlInlineComment(raw) {
   const value = String(raw ?? "");
   const singleQuoted = value.startsWith("'") && value.endsWith("'");
@@ -106,6 +150,11 @@ function stripYamlInlineComment(raw) {
   return value.slice(0, hashIndex).trimEnd();
 }
 
+/**
+ * Parse Inline Yaml Array.
+ * @param {*}
+ * @returns {*} Returns inline yaml array.
+ */
 function parseInlineYamlArray(raw) {
   return stripYamlInlineComment(raw)
     .trim()
@@ -115,6 +164,11 @@ function parseInlineYamlArray(raw) {
     .filter(Boolean);
 }
 
+/**
+ * Parse Frontmatter Data.
+ * @param {*}
+ * @returns {*} Returns frontmatter data.
+ */
 function parseFrontmatterData(frontmatter) {
   const out = Object.create(null);
   const lines = String(frontmatter || "").split(/\r?\n/);
@@ -152,11 +206,23 @@ function parseFrontmatterData(frontmatter) {
   return out;
 }
 
+/**
+ * Frontmatter Lookup.
+ * @param {*}
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function frontmatterLookup(frontmatterData, name) {
   if (!frontmatterData || typeof frontmatterData !== "object") return undefined;
   return frontmatterData[String(name || "").toLowerCase()];
 }
 
+/**
+ * Extract Field.
+ * @param {*}
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function extractField(frontmatterData, ...names) {
   for (const name of names) {
     const value = frontmatterLookup(frontmatterData, name);
@@ -168,6 +234,12 @@ function extractField(frontmatterData, ...names) {
   return "";
 }
 
+/**
+ * Extract List Field.
+ * @param {*}
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function extractListField(frontmatterData, ...names) {
   for (const name of names) {
     const value = frontmatterLookup(frontmatterData, name);
@@ -181,6 +253,11 @@ function extractListField(frontmatterData, ...names) {
   return [];
 }
 
+/**
+ * Parse Boolean.
+ * @param {*}
+ * @returns {*} Returns boolean.
+ */
 function parseBoolean(value) {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value !== 0;
@@ -189,11 +266,22 @@ function parseBoolean(value) {
   return normalized === "true" || normalized === "yes" || normalized === "1" || normalized === "on";
 }
 
+/**
+ * Parse Integer.
+ * @param {*}
+ * @param {*}
+ * @returns {*} Returns integer.
+ */
 function parseInteger(value, fallback = 0) {
   const num = Number.parseInt(String(value ?? "").trim(), 10);
   return Number.isInteger(num) ? num : fallback;
 }
 
+/**
+ * Normalize Coordinates Value.
+ * @param {*}
+ * @returns {*} Returns coordinates value.
+ */
 function normalizeCoordinatesValue(value) {
   if (value == null) return "";
 
@@ -222,6 +310,11 @@ function normalizeCoordinatesValue(value) {
   return `${lat}, ${lng}`;
 }
 
+/**
+ * Parse Iso Date List.
+ * @param {*}
+ * @returns {*} Returns iso date list.
+ */
 function parseIsoDateList(value) {
   const values = Array.isArray(value)
     ? value
@@ -237,6 +330,11 @@ function parseIsoDateList(value) {
     .filter((v) => isIsoDate(v));
 }
 
+/**
+ * Parse Days Of Week.
+ * @param {*}
+ * @returns {*} Returns days of week.
+ */
 function parseDaysOfWeek(value) {
   const weekdayMap = {
     su: 0,
@@ -287,6 +385,11 @@ function parseDaysOfWeek(value) {
   return [...new Set(days)].sort((a, b) => a - b);
 }
 
+/**
+ * To Rrule By Weekday.
+ * @param {*}
+ * @returns {*} Returns rrule by weekday.
+ */
 function toRruleByWeekday(days) {
   const map = ["su", "mo", "tu", "we", "th", "fr", "sa"];
   return days
@@ -294,6 +397,11 @@ function toRruleByWeekday(days) {
     .filter(Boolean);
 }
 
+/**
+ * Parse Json Field.
+ * @param {*}
+ * @returns {*} Returns json field.
+ */
 function parseJsonField(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
@@ -304,6 +412,11 @@ function parseJsonField(value) {
   }
 }
 
+/**
+ * Extract Tags.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function extractTags(frontmatterData) {
   const tags = extractListField(frontmatterData, "tags");
   if (!tags.length) {
@@ -319,24 +432,49 @@ function extractTags(frontmatterData) {
   return [...new Set(tags.map((tag) => String(tag).replace(/^#/, "").toLowerCase()).filter(Boolean))];
 }
 
+/**
+ * Has Inline Event Tag.
+ * @param {*}
+ * @returns {*} Returns whether the condition is met.
+ */
 function hasInlineEventTag(content) {
   return /(^|\s)#event(\s|$)/i.test(content);
 }
 
+/**
+ * Is Iso Date.
+ * @param {*}
+ * @returns {*} Returns whether the condition is met.
+ */
 function isIsoDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+/**
+ * Is Iso Date Time.
+ * @param {*}
+ * @returns {*} Returns whether the condition is met.
+ */
 function isIsoDateTime(value) {
   return /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/.test(
     String(value || "").trim()
   );
 }
 
+/**
+ * Is Date Or Date Time.
+ * @param {*}
+ * @returns {*} Returns whether the condition is met.
+ */
 function isDateOrDateTime(value) {
   return isIsoDate(value) || isIsoDateTime(value);
 }
 
+/**
+ * Date To Local Iso Date.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function dateToLocalIsoDate(value) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -346,6 +484,11 @@ function dateToLocalIsoDate(value) {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Parse Date Like To Iso Date.
+ * @param {*}
+ * @returns {*} Returns date like to iso date.
+ */
 function parseDateLikeToIsoDate(value) {
   if (value == null) return "";
   if (value instanceof Date) return dateToLocalIsoDate(value);
@@ -359,6 +502,11 @@ function parseDateLikeToIsoDate(value) {
   return dateToLocalIsoDate(new Date(timestamp));
 }
 
+/**
+ * Parse Date Like To Calendar Value.
+ * @param {*}
+ * @returns {*} Returns date like to calendar value.
+ */
 function parseDateLikeToCalendarValue(value) {
   if (value == null) return "";
   if (value instanceof Date) return dateToLocalIsoDate(value);
@@ -371,6 +519,11 @@ function parseDateLikeToCalendarValue(value) {
   return "";
 }
 
+/**
+ * Get Start Date From File Meta.
+ * @param {*}
+ * @returns {*} Returns start date from file meta.
+ */
 function getStartDateFromFileMeta(filePath) {
   try {
     const stats = fs.statSync(filePath);
@@ -382,6 +535,11 @@ function getStartDateFromFileMeta(filePath) {
   }
 }
 
+/**
+ * Add One Day.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function addOneDay(isoDate) {
   const [year, month, day] = isoDate.split("-").map(Number);
   const utcDate = new Date(Date.UTC(year, month - 1, day));
@@ -389,12 +547,23 @@ function addOneDay(isoDate) {
   return utcDate.toISOString().slice(0, 10);
 }
 
+/**
+ * Day Of Week From Iso Date.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function dayOfWeekFromIsoDate(isoDate) {
   const [year, month, day] = isoDate.split("-").map(Number);
   const utcDate = new Date(Date.UTC(year, month - 1, day));
   return utcDate.getUTCDay();
 }
 
+/**
+ * Inclusive Day Span.
+ * @param {*}
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function inclusiveDaySpan(startIso, endIso) {
   const [sy, sm, sd] = startIso.split("-").map(Number);
   const [ey, em, ed] = endIso.split("-").map(Number);
@@ -405,6 +574,12 @@ function inclusiveDaySpan(startIso, endIso) {
   return diff > 0 ? diff : 1;
 }
 
+/**
+ * Duration Ms From Date Like.
+ * @param {*}
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function durationMsFromDateLike(startValue, endValue) {
   const startTs = Date.parse(String(startValue || ""));
   const endTs = Date.parse(String(endValue || ""));
@@ -412,17 +587,33 @@ function durationMsFromDateLike(startValue, endValue) {
   return endTs - startTs;
 }
 
+/**
+ * Extract Time Portion.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function extractTimePortion(dateTimeValue) {
   const raw = String(dateTimeValue || "").trim();
   const match = raw.match(/^\d{4}-\d{2}-\d{2}T(.+)$/);
   return match && match[1] ? match[1] : "";
 }
 
+/**
+ * Merge Date With Time Portion.
+ * @param {*}
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function mergeDateWithTimePortion(isoDate, timePortion) {
   if (!isIsoDate(isoDate) || !timePortion) return isoDate;
   return `${isoDate}T${timePortion}`;
 }
 
+/**
+ * To Calendar Event.
+ * @param {*}
+ * @returns {*} Returns calendar event.
+ */
 function toCalendarEvent(filePath) {
   const content = fs.readFileSync(filePath, "utf8");
   const frontmatter = extractFrontmatter(content);
@@ -587,6 +778,10 @@ function toCalendarEvent(filePath) {
   return [event];
 }
 
+/**
+ * Query Base Rows.
+ * @returns {*} Returns the function result.
+ */
 function queryBaseRows() {
   const run = (useVault) => {
     const args = ["base:query"];
@@ -616,6 +811,11 @@ function queryBaseRows() {
   }
 }
 
+/**
+ * Base Row To Calendar Event.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function baseRowToCalendarEvent(row) {
   const sourcePath = String(row.path ?? "").trim();
   const sourceFilePath = sourcePath ? path.resolve(VAULT_ROOT, sourcePath) : "";
@@ -887,11 +1087,19 @@ function baseRowToCalendarEvent(row) {
   return [event];
 }
 
+/**
+ * Collect Events From Base.
+ * @returns {*} Returns the function result.
+ */
 function collectEventsFromBase() {
   const rows = queryBaseRows();
   return rows.flatMap(baseRowToCalendarEvent).filter(Boolean);
 }
 
+/**
+ * Collect Events From Markdown Scan.
+ * @returns {*} Returns the function result.
+ */
 function collectEventsFromMarkdownScan() {
   const allMarkdown = listMarkdownFiles(VAULT_ROOT);
   return allMarkdown.flatMap((filePath) => toCalendarEvent(filePath)).filter(Boolean);
@@ -916,6 +1124,11 @@ try {
   console.warn(`Base query failed, using fallback scan because ALLOW_MARKDOWN_FALLBACK=true.\n${error.message}`);
 }
 
+/**
+ * Event Sort Date.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function eventSortDate(event) {
   return String(event.start || event.startRecur || "");
 }
@@ -932,3 +1145,5 @@ fs.writeFileSync(OUTPUT_FILE, output, "utf8");
 console.log(
   `Generated ${events.length} events from ${sourceLabel} -> ${path.relative(VAULT_ROOT, OUTPUT_FILE)}`
 );
+
+

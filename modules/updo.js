@@ -1,6 +1,10 @@
-const ECHARTS_SRC = "https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js";
+﻿const ECHARTS_SRC = "https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js";
 let echartsLoaderPromise = null;
 
+/**
+ * Lazily loads ECharts from CDN and caches the loading promise.
+ * @returns {Promise<object>} ECharts module object.
+ */
 function loadEcharts() {
   if (window.echarts) return Promise.resolve(window.echarts);
   if (echartsLoaderPromise) return echartsLoaderPromise;
@@ -19,29 +23,54 @@ function loadEcharts() {
   return echartsLoaderPromise;
 }
 
+/**
+ * Formats numeric values as percentage strings with two decimals.
+ * @param {unknown} value - Value expected in percent units.
+ * @returns {string} Formatted percent string.
+ */
 function toPercentString(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "0.00%";
   return `${n.toFixed(2)}%`;
 }
 
+/**
+ * Formats a latency value as rounded milliseconds.
+ * @param {unknown} value - Raw latency value.
+ * @returns {string} Formatted latency string.
+ */
 function toMsString(value) {
   const n = Number(value);
   if (!Number.isFinite(n)) return "-";
   return `${Math.round(n)} ms`;
 }
 
+/**
+ * Formats an ISO timestamp for local-time display in `de-DE`.
+ * @param {unknown} value - Timestamp-like value.
+ * @returns {string} Localized time string or fallback marker.
+ */
 function toLocalTime(value) {
   const t = Date.parse(String(value || ""));
   if (!Number.isFinite(t)) return "-";
   return new Date(t).toLocaleTimeString("de-DE", { hour12: false });
 }
 
+/**
+ * Maps latest target status to a CSS severity class.
+ * @param {object} target - Monitoring target object.
+ * @returns {"ok"|"down"|"unknown"} Severity class name.
+ */
 function severityClass(target) {
   if (!target?.latest) return "unknown";
   return target.latest.success ? "ok" : "down";
 }
 
+/**
+ * Computes status label text from latest probe result.
+ * @param {object} latest - Latest probe object.
+ * @returns {"UP"|"SSL MISMATCH"|"CERT EXPIRED"|"DOWN"} Human-readable status label.
+ */
 function statusLabelForLatest(latest) {
   if (latest?.success) return "UP";
   const code = String(latest?.sslIssue?.code || "");
@@ -50,6 +79,11 @@ function statusLabelForLatest(latest) {
   return "DOWN";
 }
 
+/**
+ * Builds ECharts line-series payload for target latency over time.
+ * @param {Array<object>} targets - Monitoring target records.
+ * @returns {Array<object>} ECharts line-series configuration.
+ */
 function buildLatencySeries(targets) {
   return targets.map((target) => ({
     name: target.name,
@@ -64,6 +98,11 @@ function buildLatencySeries(targets) {
   }));
 }
 
+/**
+ * Builds ECharts scatter points for up/down status over time.
+ * @param {Array<object>} targets - Monitoring target records.
+ * @returns {Array<object>} ECharts scatter data points.
+ */
 function buildAvailabilityScatterData(targets) {
   const points = [];
   targets.forEach((target, idx) => {
@@ -79,6 +118,11 @@ function buildAvailabilityScatterData(targets) {
   return points;
 }
 
+/**
+ * Fetches the live monitoring snapshot from the backend.
+ * @param {number} windowMinutes - Sliding window size in minutes.
+ * @returns {Promise<object>} Snapshot payload.
+ */
 async function fetchSnapshot(windowMinutes) {
   const qs = Number.isFinite(windowMinutes) ? `?windowMinutes=${windowMinutes}` : "";
   const response = await fetch(`/api/updo/snapshot${qs}`);
@@ -89,6 +133,11 @@ async function fetchSnapshot(windowMinutes) {
   return response.json();
 }
 
+/**
+ * Fetches compressed long-term monitoring history.
+ * @param {number} rangeDays - History range in days.
+ * @returns {Promise<object>} History payload with summaries and incidents.
+ */
 async function fetchHistory(rangeDays) {
   const safeRange = Number.isFinite(rangeDays) ? rangeDays : 30;
   const response = await fetch(`/api/updo/history?rangeDays=${safeRange}`);
@@ -99,6 +148,12 @@ async function fetchHistory(rangeDays) {
   return response.json();
 }
 
+/**
+ * Maps long-term summaries to chart series keyed by target id.
+ * @param {Array<object>} summaries - Daily summary records from backend.
+ * @param {Array<object>} targets - Target definitions from live snapshot.
+ * @returns {Array<object>} ECharts line-series data.
+ */
 function buildLongtermSeries(summaries, targets) {
   const byTargetId = new Map();
   for (const summary of summaries || []) {
@@ -144,6 +199,12 @@ function buildLongtermSeries(summaries, targets) {
   return series;
 }
 
+/**
+ * Maps incident records into scatter points for the long-term chart.
+ * @param {Array<object>} incidents - Incident list from backend.
+ * @param {Array<object>} targets - Target definitions from live snapshot.
+ * @returns {Array<object>} ECharts scatter-series data.
+ */
 function buildIncidentScatter(incidents, targets) {
   const targetNameById = new Map(
     (targets || []).map((target) => [String(target?.id || ""), String(target?.name || target?.url || "-")])
@@ -168,6 +229,12 @@ function buildIncidentScatter(incidents, targets) {
     .filter(Boolean);
 }
 
+/**
+ * Renders the monitoring dashboard module and starts periodic refresh.
+ * @param {{body: HTMLElement}} shell - Module shell returned by homepage renderer.
+ * @param {object} moduleSettings - Module settings from effective config.
+ * @returns {Promise<() => void>} Cleanup callback to stop timers and release chart instances.
+ */
 export async function renderUpdoModule(shell, moduleSettings) {
   const refreshSec = Math.max(3, Number.parseInt(String(moduleSettings?.refreshSec || 5), 10) || 5);
   let windowMinutes = Math.max(
@@ -227,6 +294,10 @@ export async function renderUpdoModule(shell, moduleSettings) {
   const historyButtons = Array.from(controls.querySelectorAll(".updo-history-btn"));
   const refreshBtn = controls.querySelector("#updoRefreshBtn");
 
+  /**
+   * Syncs active CSS state for live-window selector buttons.
+   * @returns {void}
+   */
   function applyWindowButtonState() {
     for (const btn of windowButtons) {
       const isActive = Number.parseInt(String(btn.dataset.window || ""), 10) === windowMinutes;
@@ -234,6 +305,10 @@ export async function renderUpdoModule(shell, moduleSettings) {
     }
   }
 
+  /**
+   * Syncs active CSS state for long-term range selector buttons.
+   * @returns {void}
+   */
   function applyHistoryButtonState() {
     for (const btn of historyButtons) {
       const isActive = Number.parseInt(String(btn.dataset.range || ""), 10) === longtermDays;
@@ -241,6 +316,12 @@ export async function renderUpdoModule(shell, moduleSettings) {
     }
   }
 
+  /**
+   * Updates module meta status text and semantic state class.
+   * @param {string} text - Status text.
+   * @param {"ok"|"err"|""} [state] - Optional visual state class.
+   * @returns {void}
+   */
   function setMeta(text, state = "") {
     meta.textContent = text || "";
     meta.classList.remove("ok", "err");
@@ -248,6 +329,11 @@ export async function renderUpdoModule(shell, moduleSettings) {
     if (state === "err") meta.classList.add("err");
   }
 
+  /**
+   * Renders per-target status cards from latest snapshot data.
+   * @param {Array<object>} targets - Monitoring target objects.
+   * @returns {void}
+   */
   function renderCards(targets) {
     cards.innerHTML = "";
     if (!targets.length) {
@@ -304,6 +390,11 @@ export async function renderUpdoModule(shell, moduleSettings) {
     }
   }
 
+  /**
+   * Updates live latency and availability charts.
+   * @param {object} snapshot - Live snapshot payload from backend.
+   * @returns {void}
+   */
   function updateCharts(snapshot) {
     const targets = Array.isArray(snapshot?.targets) ? snapshot.targets : [];
     if (!latencyChart || !availabilityChart) return;
@@ -362,6 +453,12 @@ export async function renderUpdoModule(shell, moduleSettings) {
     );
   }
 
+  /**
+   * Updates the long-term chart with summary lines and incident markers.
+   * @param {object} snapshot - Live snapshot payload.
+   * @param {object|null} history - Long-term history payload, if available.
+   * @returns {void}
+   */
   function updateLongtermChart(snapshot, history) {
     if (!longtermChart) return;
     const targets = Array.isArray(snapshot?.targets) ? snapshot.targets : [];
@@ -416,6 +513,10 @@ export async function renderUpdoModule(shell, moduleSettings) {
     );
   }
 
+  /**
+   * Fetches current snapshot/history once and refreshes all module views.
+   * @returns {Promise<void>}
+   */
   async function refreshOnce() {
     const seq = ++refreshSeq;
     const historyPromise = fetchHistory(longtermDays).catch((error) => {
@@ -500,3 +601,5 @@ export async function renderUpdoModule(shell, moduleSettings) {
     longtermChart = null;
   };
 }
+
+

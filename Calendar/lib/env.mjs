@@ -1,5 +1,10 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 
+/**
+ * Load Dot Env File.
+ * @param {*}
+ * @returns {*} Returns dot env file.
+ */
 export function loadDotEnvFile(filePath) {
   if (!fs.existsSync(filePath)) return;
   const raw = fs.readFileSync(filePath, "utf8");
@@ -25,3 +30,5 @@ export function loadDotEnvFile(filePath) {
     }
   }
 }
+
+

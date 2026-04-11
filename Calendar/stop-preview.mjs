@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -8,6 +8,10 @@ const __dirname = path.dirname(__filename);
 const PID_FILE = path.resolve(__dirname, "calendar.preview.pid");
 const PORT = Number(process.env.CALENDAR_PORT || 4173);
 
+/**
+ * Read Pid From File.
+ * @returns {*} Returns pid from file.
+ */
 function readPidFromFile() {
   try {
     if (!fs.existsSync(PID_FILE)) return 0;
@@ -19,6 +23,11 @@ function readPidFromFile() {
   }
 }
 
+/**
+ * Kill Pid.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function killPid(pid) {
   try {
     process.kill(pid, "SIGTERM");
@@ -28,6 +37,10 @@ function killPid(pid) {
   }
 }
 
+/**
+ * Clear Pid File.
+ * @returns {*} Returns the function result.
+ */
 function clearPidFile() {
   try {
     if (fs.existsSync(PID_FILE)) {
@@ -38,6 +51,11 @@ function clearPidFile() {
   }
 }
 
+/**
+ * List Listener Processes On Port.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function listListenerProcessesOnPort(port) {
   try {
     const ps = [
@@ -68,6 +86,11 @@ function listListenerProcessesOnPort(port) {
   }
 }
 
+/**
+ * Looks Like Calendar Server Process.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function looksLikeCalendarServerProcess(proc) {
   const name = String(proc?.name || "").toLowerCase();
   const commandLine = String(proc?.commandLine || "").toLowerCase();
@@ -75,6 +98,10 @@ function looksLikeCalendarServerProcess(proc) {
   return commandLine.includes("tools\\calendar\\serve.mjs") || commandLine.includes("tools/calendar/serve.mjs");
 }
 
+/**
+ * Stop Legacy Calendar By Port.
+ * @returns {*} Returns the function result.
+ */
 function stopLegacyCalendarByPort() {
   const listeners = listListenerProcessesOnPort(PORT);
   const candidates = listeners.filter(looksLikeCalendarServerProcess);
@@ -108,3 +135,5 @@ if (killed) {
   clearPidFile();
   console.log(`Preview PID ${pid} was not running.`);
 }
+
+

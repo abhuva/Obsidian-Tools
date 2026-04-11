@@ -1,4 +1,4 @@
-import http from "node:http";
+﻿import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import tls from "node:tls";
@@ -139,6 +139,10 @@ const updoState = {
   lastCompressionCheckMs: 0
 };
 
+/**
+ * Builds candidate executable names/paths for the Obsidian CLI.
+ * @returns {string[]} Ordered candidate list, de-duplicated.
+ */
 function getObsidianBinCandidates() {
   const candidates = [];
   const fromEnv = String(process.env.OBSIDIAN_BIN || "").trim();
@@ -158,6 +162,10 @@ function getObsidianBinCandidates() {
   return Array.from(new Set(candidates));
 }
 
+/**
+ * Resolves the first usable Obsidian CLI binary candidate.
+ * @returns {string} Absolute binary path or command name.
+ */
 function resolveObsidianBin() {
   for (const candidate of getObsidianBinCandidates()) {
     if (!candidate) continue;
@@ -170,11 +178,21 @@ function resolveObsidianBin() {
   return "obsidian";
 }
 
+/**
+ * Injects explicit vault targeting into Obsidian CLI arguments when configured.
+ * @param {string[]} args - Obsidian CLI args to augment.
+ * @returns {string[]} Argument list with optional `vault=` parameter.
+ */
 function withVaultArgs(args) {
   if (!OBSIDIAN_VAULT_NAME) return args;
   return [args[0], `vault=${OBSIDIAN_VAULT_NAME}`, ...args.slice(1)];
 }
 
+/**
+ * Detects CLI errors caused by invalid or missing vault targeting.
+ * @param {unknown} error - Error thrown by Obsidian CLI execution.
+ * @returns {boolean} `true` when the error indicates vault lookup problems.
+ */
 function isVaultTargetingError(error) {
   const text = String(error?.stderr || error?.stdout || error?.message || "").toLowerCase();
   return (
@@ -184,6 +202,12 @@ function isVaultTargetingError(error) {
   );
 }
 
+/**
+ * Executes the Obsidian CLI and retries without explicit vault targeting on vault lookup errors.
+ * @param {string[]} args - CLI arguments passed to Obsidian.
+ * @param {object} options - `execFileSync` options.
+ * @returns {string} CLI stdout as UTF-8 text.
+ */
 function runObsidian(args, options = {}) {
   const execOptions = {
     cwd: VAULT_ROOT,
@@ -204,6 +228,11 @@ function runObsidian(args, options = {}) {
   }
 }
 
+/**
+ * Resolves a URL path to a local file path below `Tools/` and blocks path traversal.
+ * @param {string} urlPath - Request pathname from the HTTP request.
+ * @returns {string|null} Absolute path for static serving or `null` if rejected.
+ */
 function safeResolve(urlPath) {
   const decoded = decodeURIComponent(urlPath.split("?")[0]);
   const normalized = decoded === "/" ? "/home.html" : decoded;
@@ -212,6 +241,11 @@ function safeResolve(urlPath) {
   return resolved;
 }
 
+/**
+ * Reads a request body with a hard size limit of 1 MiB.
+ * @param {import("node:http").IncomingMessage} req - Incoming HTTP request.
+ * @returns {Promise<string>} Raw request body text.
+ */
 function readRequestBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -227,10 +261,21 @@ function readRequestBody(req) {
   });
 }
 
+/**
+ * Ensures the settings directory exists.
+ * @returns {void}
+ */
 function ensureSettingsDir() {
   fs.mkdirSync(SETTINGS_DIR, { recursive: true });
 }
 
+/**
+ * Reads a JSON file with graceful fallback for missing/invalid files.
+ * @template T
+ * @param {string} filePath - Absolute file path.
+ * @param {T} fallbackValue - Value returned when reading/parsing fails.
+ * @returns {T|object} Parsed JSON value or fallback.
+ */
 function readJsonFileSafe(filePath, fallbackValue) {
   try {
     if (!fs.existsSync(filePath)) return fallbackValue;
@@ -241,6 +286,12 @@ function readJsonFileSafe(filePath, fallbackValue) {
   }
 }
 
+/**
+ * Deep-merges plain objects while replacing arrays.
+ * @param {object} base - Base object.
+ * @param {object} patch - Overlay object.
+ * @returns {object} Merged result.
+ */
 function deepMerge(base, patch) {
   const baseObj = base && typeof base === "object" ? base : {};
   const patchObj = patch && typeof patch === "object" ? patch : {};
@@ -260,6 +311,12 @@ function deepMerge(base, patch) {
   return out;
 }
 
+/**
+ * Coerces common boolean-like values.
+ * @param {unknown} value - Raw value.
+ * @param {boolean} fallback - Fallback when conversion is ambiguous.
+ * @returns {boolean} Normalized boolean.
+ */
 function toBool(value, fallback = false) {
   if (typeof value === "boolean") return value;
   if (typeof value === "string") {
@@ -275,34 +332,75 @@ function toBool(value, fallback = false) {
   return fallback;
 }
 
+/**
+ * Returns a trimmed non-empty string or fallback.
+ * @param {unknown} value - Candidate string value.
+ * @param {string} fallback - Fallback for empty/non-string input.
+ * @returns {string} Sanitized text.
+ */
 function toCleanString(value, fallback) {
   if (typeof value !== "string") return fallback;
   const cleaned = value.trim();
   return cleaned || fallback;
 }
 
+/**
+ * Parses an integer and clamps it to a configured range.
+ * @param {unknown} value - Raw value.
+ * @param {number} fallback - Fallback for invalid input.
+ * @param {number} min - Inclusive lower bound.
+ * @param {number} max - Inclusive upper bound.
+ * @returns {number} Clamped integer.
+ */
 function toIntInRange(value, fallback, min, max) {
   const parsed = Number.parseInt(String(value), 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
 }
 
+/**
+ * Normalizes string values to one of the allowed lowercase tokens.
+ * @param {unknown} value - Raw value.
+ * @param {string[]} allowed - Allowed normalized values.
+ * @param {string} fallback - Fallback when value is not allowed.
+ * @returns {string} Allowed token.
+ */
 function oneOf(value, allowed, fallback) {
   const normalized = String(value || "").trim().toLowerCase();
   return allowed.includes(normalized) ? normalized : fallback;
 }
 
+/**
+ * Coerces a numeric value and falls back for non-finite values.
+ * @param {unknown} value - Raw numeric value.
+ * @param {number} [fallback=0] - Fallback for invalid input.
+ * @returns {number} Finite number.
+ */
 function toFiniteNumber(value, fallback = 0) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+/**
+ * Parses a number and clamps it to a configured range.
+ * @param {unknown} value - Raw value.
+ * @param {number} fallback - Fallback for invalid input.
+ * @param {number} min - Inclusive lower bound.
+ * @param {number} max - Inclusive upper bound.
+ * @returns {number} Clamped number.
+ */
 function toNumberInRange(value, fallback, min, max) {
   const parsed = Number(value);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(min, Math.min(max, parsed));
 }
 
+/**
+ * Resolves persisted data paths relative to `Tools/`.
+ * @param {unknown} relativePath - Configured relative path value.
+ * @param {string} fallbackAbsolutePath - Fallback absolute path.
+ * @returns {string} Absolute path for the data file.
+ */
 function resolveDataPath(relativePath, fallbackAbsolutePath) {
   const raw = String(relativePath || "").trim();
   if (!raw) return fallbackAbsolutePath;
@@ -310,15 +408,31 @@ function resolveDataPath(relativePath, fallbackAbsolutePath) {
   return path.resolve(ROOT, normalized);
 }
 
+/**
+ * Ensures the parent directory of a file path exists.
+ * @param {string} filePath - Target file path.
+ * @returns {void}
+ */
 function ensureParentDir(filePath) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
 }
 
+/**
+ * Appends one JSONL row to a file.
+ * @param {string} filePath - JSONL file path.
+ * @param {object} payload - JSON-serializable row payload.
+ * @returns {void}
+ */
 function appendJsonLine(filePath, payload) {
   ensureParentDir(filePath);
   fs.appendFileSync(filePath, `${JSON.stringify(payload)}\n`, "utf8");
 }
 
+/**
+ * Reads a JSONL file and skips malformed rows.
+ * @param {string} filePath - JSONL file path.
+ * @returns {Array<object>} Parsed JSON rows.
+ */
 function readJsonLines(filePath) {
   if (!fs.existsSync(filePath)) return [];
   const raw = fs.readFileSync(filePath, "utf8");
@@ -335,11 +449,22 @@ function readJsonLines(filePath) {
   return out;
 }
 
+/**
+ * Writes a formatted JSON file with trailing newline.
+ * @param {string} filePath - Target file path.
+ * @param {object} payload - JSON-serializable payload.
+ * @returns {void}
+ */
 function writeJson(filePath, payload) {
   ensureParentDir(filePath);
   fs.writeFileSync(filePath, `${JSON.stringify(payload, null, 2)}\n`, "utf8");
 }
 
+/**
+ * Validates and normalizes HTTP(S) URLs.
+ * @param {unknown} value - Raw URL string.
+ * @returns {string} Normalized URL or empty string when invalid.
+ */
 function toCleanUrl(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -352,6 +477,11 @@ function toCleanUrl(value) {
   }
 }
 
+/**
+ * Builds a safe identifier for monitoring targets.
+ * @param {unknown} value - Raw identifier seed.
+ * @returns {string} Slug-like target id.
+ */
 function toUpdoId(value) {
   const cleaned = String(value || "")
     .trim()
@@ -361,6 +491,11 @@ function toUpdoId(value) {
   return cleaned || "";
 }
 
+/**
+ * Normalizes and de-duplicates configured monitoring targets.
+ * @param {unknown} input - Raw targets array from settings.
+ * @returns {Array<{id: string, name: string, url: string}>} Sanitized target list.
+ */
 function normalizeUpdoTargets(input) {
   const source = Array.isArray(input) ? input : [];
   const out = [];
@@ -394,30 +529,65 @@ function normalizeUpdoTargets(input) {
   return out;
 }
 
+/**
+ * Normalizes project title input for naming.
+ * @param {unknown} value - Raw title value.
+ * @returns {string} Trimmed title with collapsed whitespace.
+ */
 function normalizeProjectTitle(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
 }
 
+/**
+ * Normalizes funding code input for naming.
+ * @param {unknown} value - Raw funding code.
+ * @returns {string} Trimmed code with collapsed whitespace.
+ */
 function normalizeFundingCode(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
 }
 
+/**
+ * Normalizes the selected society token.
+ * @param {unknown} value - Raw society value.
+ * @returns {"NICA"|"TOHU"} Uppercase society key.
+ */
 function normalizeSociety(value) {
   return oneOf(value, ["nica", "tohu"], "nica").toUpperCase();
 }
 
+/**
+ * Normalizes project type selection.
+ * @param {unknown} value - Raw project type value.
+ * @returns {"funding"|"hired"|"self financed"} Normalized project type.
+ */
 function normalizeProjectType(value) {
   return oneOf(value, ["funding", "hired", "self financed"], "funding");
 }
 
+/**
+ * Converts Windows separators to POSIX separators.
+ * @param {unknown} input - Path-like input.
+ * @returns {string} Normalized path string.
+ */
 function sanitizePathSeparators(input) {
   return String(input || "").replace(/\\/g, "/");
 }
 
+/**
+ * Checks whether a name contains Windows-invalid path characters.
+ * @param {unknown} value - Candidate file/folder name.
+ * @returns {boolean} `true` when disallowed characters are present.
+ */
 function hasInvalidWindowsPathChars(value) {
   return /[<>:"/\\|?*\u0000-\u001F]/.test(String(value || ""));
 }
 
+/**
+ * Escapes and formats a scalar for YAML frontmatter.
+ * @param {unknown} value - Scalar value.
+ * @returns {string} YAML-safe scalar representation.
+ */
 function toYamlScalar(value) {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
   const asString = String(value ?? "");
@@ -425,6 +595,13 @@ function toYamlScalar(value) {
   return `'${escaped}'`;
 }
 
+/**
+ * Inserts or updates a scalar key inside frontmatter.
+ * @param {unknown} content - Markdown content.
+ * @param {string} key - Frontmatter key.
+ * @param {unknown} value - Scalar value.
+ * @returns {string} Updated markdown content.
+ */
 function upsertFrontmatterScalar(content, key, value) {
   const normalizedContent = String(content || "");
   const yamlValue = toYamlScalar(value);
@@ -453,8 +630,14 @@ function upsertFrontmatterScalar(content, key, value) {
   return `---\n${nextFrontmatter}\n---\n${body}`;
 }
 
+/**
+ * Applies known project fields to markdown frontmatter in stable key order.
+ * @param {unknown} content - Markdown content.
+ * @param {Record<string, unknown>} fields - Frontmatter values to upsert.
+ * @returns {string} Updated markdown content.
+ */
 function applyProjectFrontmatter(content, fields) {
-  const orderedKeys = ["year", "antragsteller", "förderer", "title", "type", "category"];
+  const orderedKeys = ["year", "antragsteller", "f\u00F6rderer", "title", "type", "category"];
   let nextContent = String(content || "");
   for (const key of orderedKeys) {
     if (!(key in fields)) continue;
@@ -463,6 +646,12 @@ function applyProjectFrontmatter(content, fields) {
   return nextContent;
 }
 
+/**
+ * Applies a minimal fallback replacement for template placeholders.
+ * @param {unknown} templateRaw - Raw template markdown.
+ * @param {string} projectTitle - Final project title.
+ * @returns {string} Rendered markdown content.
+ */
 function renderTemplateFallback(templateRaw, projectTitle) {
   const now = new Date();
   const pad = (n) => String(n).padStart(2, "0");
@@ -472,6 +661,11 @@ function renderTemplateFallback(templateRaw, projectTitle) {
     .replace(/<%\s*tp\.file\.title\s*%>/g, String(projectTitle || ""));
 }
 
+/**
+ * Validates inputs and builds canonical project folder naming.
+ * @param {{year: unknown, society: unknown, fundingCode: unknown, projectTitle: unknown, projectType: unknown}} input - Raw naming inputs.
+ * @returns {{year: number, society: "NICA"|"TOHU", projectType: "funding"|"hired"|"self financed", fundingCode: string, title: string, folderName: string}} Naming payload.
+ */
 function buildProjectNaming({ year, society, fundingCode, projectTitle, projectType }) {
   const cleanTitle = normalizeProjectTitle(projectTitle);
   if (!cleanTitle) throw new Error("Projekt-Titel darf nicht leer sein");
@@ -516,6 +710,11 @@ function buildProjectNaming({ year, society, fundingCode, projectTitle, projectT
   };
 }
 
+/**
+ * Normalizes and clamps all settings to schema-safe values.
+ * @param {unknown} input - Raw settings payload.
+ * @returns {object} Normalized settings object.
+ */
 function normalizeSettings(input) {
   const merged = deepMerge(DEFAULT_SETTINGS_FALLBACK, input);
 
@@ -711,21 +910,38 @@ function normalizeSettings(input) {
   };
 }
 
+/**
+ * Reads and normalizes default settings.
+ * @returns {object} Normalized defaults.
+ */
 function readDefaultSettings() {
   const raw = readJsonFileSafe(DEFAULT_SETTINGS_FILE, DEFAULT_SETTINGS_FALLBACK);
   return normalizeSettings(raw);
 }
 
+/**
+ * Reads local settings override file.
+ * @returns {object} Local settings object (possibly empty).
+ */
 function readLocalSettings() {
   return readJsonFileSafe(LOCAL_SETTINGS_FILE, {});
 }
 
+/**
+ * Builds effective settings by merging defaults and local overrides.
+ * @returns {object} Normalized settings object used by frontend and APIs.
+ */
 function getEffectiveSettings() {
   const defaults = readDefaultSettings();
   const local = readLocalSettings();
   return normalizeSettings(deepMerge(defaults, local));
 }
 
+/**
+ * Persists local settings after schema normalization.
+ * @param {object} nextSettings - Candidate settings payload from the settings API.
+ * @returns {object} Persisted normalized settings.
+ */
 function writeLocalSettings(nextSettings) {
   ensureSettingsDir();
   const normalized = normalizeSettings(nextSettings);
@@ -733,6 +949,11 @@ function writeLocalSettings(nextSettings) {
   return normalized;
 }
 
+/**
+ * Derives runtime monitor configuration from effective settings.
+ * @param {object} settings - Effective settings object.
+ * @returns {object} Normalized updo runtime configuration.
+ */
 function getUpdoConfigFromSettings(settings) {
   const moduleCfg = settings?.modules?.updo || {};
   const targets = normalizeUpdoTargets(moduleCfg.targets);
@@ -818,6 +1039,10 @@ function getUpdoConfigFromSettings(settings) {
   };
 }
 
+/**
+ * Stops the running monitor process and cancels pending restarts.
+ * @returns {void}
+ */
 function stopUpdoMonitor() {
   updoState.stopRequested = true;
   if (updoState.restartTimer) {
@@ -830,6 +1055,11 @@ function stopUpdoMonitor() {
   updoState.process = null;
 }
 
+/**
+ * Returns (and lazily creates) the in-memory series list for a target URL.
+ * @param {string} url - Target URL.
+ * @returns {Array<object>} Mutable series array for the URL.
+ */
 function ensureUpdoSeriesForUrl(url) {
   if (!updoState.seriesByUrl.has(url)) {
     updoState.seriesByUrl.set(url, []);
@@ -837,6 +1067,11 @@ function ensureUpdoSeriesForUrl(url) {
   return updoState.seriesByUrl.get(url);
 }
 
+/**
+ * Trims in-memory series data to the configured maximum point count.
+ * @param {number} maxPoints - Max retained points per target.
+ * @returns {void}
+ */
 function trimUpdoSeries(maxPoints) {
   for (const [url, series] of updoState.seriesByUrl.entries()) {
     if (!Array.isArray(series)) continue;
@@ -846,6 +1081,11 @@ function trimUpdoSeries(maxPoints) {
   }
 }
 
+/**
+ * Removes stale monitor state entries for targets no longer configured.
+ * @param {Array<{url: string}>} targets - Current target configuration.
+ * @returns {void}
+ */
 function pruneUpdoStateForTargets(targets) {
   const keepUrls = new Set((Array.isArray(targets) ? targets : []).map((target) => target.url));
   const maps = [updoState.latestByUrl, updoState.seriesByUrl, updoState.sslProbeByUrl, updoState.persistedRawByUrl];
@@ -858,11 +1098,21 @@ function pruneUpdoStateForTargets(targets) {
   }
 }
 
+/**
+ * Extracts a point timestamp as epoch milliseconds.
+ * @param {object} point - Time-series point.
+ * @returns {number} Epoch milliseconds or `NaN`.
+ */
 function pointTimestampMs(point) {
   const t = Date.parse(String(point?.timestamp || point?.ts || ""));
   return Number.isFinite(t) ? t : NaN;
 }
 
+/**
+ * Returns (and lazily creates) persisted raw point storage for a URL.
+ * @param {string} url - Target URL.
+ * @returns {Array<object>} Mutable raw point array for URL.
+ */
 function ensurePersistedRawForUrl(url) {
   if (!updoState.persistedRawByUrl.has(url)) {
     updoState.persistedRawByUrl.set(url, []);
@@ -870,12 +1120,22 @@ function ensurePersistedRawForUrl(url) {
   return updoState.persistedRawByUrl.get(url);
 }
 
+/**
+ * Returns points sorted by valid timestamp ascending.
+ * @param {Array<object>} points - Point list.
+ * @returns {Array<object>} Sorted points.
+ */
 function sortPointsByTs(points) {
   return points
     .filter((point) => Number.isFinite(pointTimestampMs(point)))
     .sort((a, b) => pointTimestampMs(a) - pointTimestampMs(b));
 }
 
+/**
+ * Loads persisted monitoring raw/state data into in-memory state caches.
+ * @param {object} config - Updo runtime config with persistence paths.
+ * @returns {void}
+ */
 function loadUpdoPersistence(config) {
   if (!config.persistence.enabled) {
     updoState.persistedRawByUrl.clear();
@@ -918,6 +1178,11 @@ function loadUpdoPersistence(config) {
   updoState.persistenceLoaded = true;
 }
 
+/**
+ * Persists monitor compression cursor state to disk.
+ * @param {object} config - Updo runtime config.
+ * @returns {void}
+ */
 function writeUpdoStateFile(config) {
   if (!config.persistence.enabled) return;
   writeJson(config.persistence.stateFile, {
@@ -926,6 +1191,11 @@ function writeUpdoStateFile(config) {
   });
 }
 
+/**
+ * Rewrites the persisted raw JSONL file from in-memory per-target caches.
+ * @param {object} config - Updo runtime config.
+ * @returns {void}
+ */
 function rewriteUpdoRawFile(config) {
   if (!config.persistence.enabled) return;
   const allRows = [];
@@ -950,6 +1220,13 @@ function rewriteUpdoRawFile(config) {
   fs.writeFileSync(config.persistence.rawFile, content ? `${content}\n` : "", "utf8");
 }
 
+/**
+ * Appends one probe point to persistence and in-memory raw cache.
+ * @param {object} config - Updo runtime config.
+ * @param {{id: string, url: string}} target - Target metadata.
+ * @param {object} point - Probe point payload.
+ * @returns {void}
+ */
 function appendRawPoint(config, target, point) {
   if (!config.persistence.enabled) return;
   const rawRecord = {
@@ -980,6 +1257,12 @@ function appendRawPoint(config, target, point) {
   updoState.persistenceDirty = true;
 }
 
+/**
+ * Collects contiguous index ranges where predicate stays true.
+ * @param {Array<object>} points - Ordered points.
+ * @param {(point: object, index: number, points: Array<object>) => boolean} isInRun - Run predicate.
+ * @returns {Array<[number, number]>} Inclusive `[start,end]` ranges.
+ */
 function collectRuns(points, isInRun) {
   const runs = [];
   let start = -1;
@@ -997,6 +1280,12 @@ function collectRuns(points, isInRun) {
   return runs;
 }
 
+/**
+ * Persists generated incident rows to JSONL.
+ * @param {object} config - Updo runtime config.
+ * @param {Array<object>} incidents - Incident rows.
+ * @returns {void}
+ */
 function appendUpdoIncidents(config, incidents) {
   if (!config.persistence.enabled || !incidents.length) return;
   for (const incident of incidents) {
@@ -1004,11 +1293,23 @@ function appendUpdoIncidents(config, incidents) {
   }
 }
 
+/**
+ * Persists a long-term summary row to JSONL.
+ * @param {object} config - Updo runtime config.
+ * @param {object} summary - Summary row payload.
+ * @returns {void}
+ */
 function appendUpdoLongtermSummary(config, summary) {
   if (!config.persistence.enabled) return;
   appendJsonLine(config.persistence.longtermFile, summary);
 }
 
+/**
+ * Compresses eligible raw history into summary + incident records for one target.
+ * @param {object} config - Updo runtime config.
+ * @param {{id: string, url: string}} target - Target metadata.
+ * @returns {{summary: object, incidents: Array<object>, keepTail: Array<object>}|null} Compression result or `null`.
+ */
 function compressTargetHistory(config, target) {
   if (!config.persistence.enabled) return null;
 
@@ -1147,6 +1448,11 @@ function compressTargetHistory(config, target) {
   return { summary, incidentsCount: incidents.length };
 }
 
+/**
+ * Runs compression for all configured monitoring targets and persists updated state.
+ * @param {object} config - Normalized updo runtime configuration.
+ * @returns {Array<{targetId: string, summary: object, incidentsCount: number}>} Compression results by target.
+ */
 function maybeCompressUpdoHistory(config) {
   if (!config.persistence.enabled) return [];
   loadUpdoPersistence(config);
@@ -1162,6 +1468,12 @@ function maybeCompressUpdoHistory(config) {
   return compressed;
 }
 
+/**
+ * Reads persisted monitoring summaries/incidents for the requested history window.
+ * @param {object} config - Normalized updo runtime configuration.
+ * @param {number} [rangeDays=30] - History range in days (clamped to `1..365`).
+ * @returns {{summaries: Array<object>, incidents: Array<object>}} Filtered history payload.
+ */
 function buildUpdoHistory(config, rangeDays = 30) {
   if (!config.persistence.enabled) {
     return { summaries: [], incidents: [] };
@@ -1187,6 +1499,11 @@ function buildUpdoHistory(config, rangeDays = 30) {
   return { summaries, incidents };
 }
 
+/**
+ * Seeds in-memory live series from persisted raw points for each configured target.
+ * @param {object} config - Normalized updo runtime configuration.
+ * @returns {void}
+ */
 function syncLiveStateFromPersisted(config) {
   for (const target of config.targets) {
     const persisted = sortPointsByTs(updoState.persistedRawByUrl.get(target.url) || []);
@@ -1203,6 +1520,11 @@ function syncLiveStateFromPersisted(config) {
   }
 }
 
+/**
+ * Performs a direct TLS handshake and reports certificate/identity issues for an HTTPS URL.
+ * @param {string} url - Target URL.
+ * @returns {Promise<{type: string, code: string, message: string}|null>} TLS issue details, or `null` when healthy/not applicable.
+ */
 function probeSslIssue(url) {
   return new Promise((resolve) => {
     let parsed = null;
@@ -1287,6 +1609,11 @@ function probeSslIssue(url) {
   });
 }
 
+/**
+ * Schedules/caches an SSL probe for failed HTTPS checks and updates latest state when finished.
+ * @param {string} url - Target URL.
+ * @returns {void}
+ */
 function maybeProbeSslIssue(url) {
   let parsed = null;
   try {
@@ -1335,6 +1662,12 @@ function maybeProbeSslIssue(url) {
     });
 }
 
+/**
+ * Applies one parsed `updo` JSON event to in-memory and persisted monitoring state.
+ * @param {object} event - Parsed line event emitted by `updo`.
+ * @param {object} config - Normalized updo runtime configuration.
+ * @returns {void}
+ */
 function handleUpdoJsonEvent(event, config) {
   if (!event || typeof event !== "object") return;
   const url = toCleanUrl(event.url);
@@ -1380,6 +1713,12 @@ function handleUpdoJsonEvent(event, config) {
   }
 }
 
+/**
+ * Parses and handles one output line from the `updo` process.
+ * @param {unknown} line - Raw line text.
+ * @param {object} config - Normalized updo runtime configuration.
+ * @returns {void}
+ */
 function processUpdoLine(line, config) {
   const trimmed = String(line || "").trim();
   if (!trimmed) return;
@@ -1391,6 +1730,13 @@ function processUpdoLine(line, config) {
   }
 }
 
+/**
+ * Buffers streamed stdout/stderr chunks and dispatches complete lines for parsing.
+ * @param {"stdout"|"stderr"} kind - Source stream.
+ * @param {unknown} chunk - Raw stream chunk.
+ * @param {object} config - Normalized updo runtime configuration.
+ * @returns {void}
+ */
 function processUpdoChunk(kind, chunk, config) {
   if (!chunk) return;
   const key = kind === "stderr" ? "stderrBuffer" : "stdoutBuffer";
@@ -1402,6 +1748,11 @@ function processUpdoChunk(kind, chunk, config) {
   }
 }
 
+/**
+ * Normalizes spawn/startup errors into user-facing monitor messages.
+ * @param {unknown} error - Spawn error.
+ * @returns {string} Human-readable error message.
+ */
 function formatUpdoStartError(error) {
   if (error?.code === "ENOENT") {
     return "updo not found in PATH (ENOENT)";
@@ -1409,6 +1760,11 @@ function formatUpdoStartError(error) {
   return error?.message || "Could not start updo";
 }
 
+/**
+ * Starts the `updo` monitor process for current targets and wires restart handling.
+ * @param {object} config - Normalized monitoring configuration.
+ * @returns {void}
+ */
 function startUpdoMonitor(config) {
   if (!config.enabled || !config.targets.length) {
     stopUpdoMonitor();
@@ -1481,6 +1837,10 @@ function startUpdoMonitor(config) {
   }
 }
 
+/**
+ * Reconciles monitor process state with current settings and returns active runtime config.
+ * @returns {object} Normalized updo runtime configuration.
+ */
 function ensureUpdoMonitor() {
   const settings = getEffectiveSettings();
   const config = getUpdoConfigFromSettings(settings);
@@ -1515,6 +1875,12 @@ function ensureUpdoMonitor() {
   return config;
 }
 
+/**
+ * Computes a percentile from a sorted numeric list.
+ * @param {number[]} sortedValues - Ascending sorted values.
+ * @param {number} ratio - Percentile ratio in `[0,1]` (for example `0.95`).
+ * @returns {number|null} Percentile value, or `null` when input is empty.
+ */
 function computePercentile(sortedValues, ratio) {
   if (!sortedValues.length) return null;
   const idx = Math.ceil(sortedValues.length * ratio) - 1;
@@ -1522,6 +1888,11 @@ function computePercentile(sortedValues, ratio) {
   return sortedValues[safeIdx];
 }
 
+/**
+ * Builds the current monitoring snapshot for dashboard rendering.
+ * @param {number|null} requestedWindowMinutes - Optional override for the sliding time window.
+ * @returns {object} Snapshot payload with target stats and chart series.
+ */
 function buildUpdoSnapshot(requestedWindowMinutes = null) {
   const config = ensureUpdoMonitor();
   const nowMs = Date.now();
@@ -1580,6 +1951,10 @@ function buildUpdoSnapshot(requestedWindowMinutes = null) {
   };
 }
 
+/**
+ * Reads the root bookmark item array from `.obsidian/bookmarks.json`.
+ * @returns {Array<object>} Bookmark root items.
+ */
 function readBookmarksRootItems() {
   if (!fs.existsSync(BOOKMARKS_FILE)) {
     throw new Error("Bookmarks file not found");
@@ -1589,6 +1964,11 @@ function readBookmarksRootItems() {
   return Array.isArray(parsed.items) ? parsed.items : [];
 }
 
+/**
+ * Derives a readable fallback title for one bookmark item.
+ * @param {object} item - Raw bookmark item.
+ * @returns {string} Display title.
+ */
 function defaultTitleForItem(item) {
   if (!item || typeof item !== "object") return "Untitled";
   if (item.type === "group") return String(item.title || "Group");
@@ -1607,6 +1987,12 @@ function defaultTitleForItem(item) {
   return String(item.type || "Bookmark");
 }
 
+/**
+ * Maps a raw bookmark tree node into the API payload shape used by the homepage.
+ * @param {object} item - Raw bookmark node.
+ * @param {number[]} idPath - Numeric index path of the node.
+ * @returns {object} Client-facing bookmark node.
+ */
 function toClientItem(item, idPath) {
   const node = {
     id: idPath.join("."),
@@ -1625,12 +2011,21 @@ function toClientItem(item, idPath) {
   return node;
 }
 
+/**
+ * Builds a client-safe bookmark tree payload from local bookmark data.
+ * @returns {{items: Array<object>}} Bookmark payload.
+ */
 function buildClientBookmarksPayload() {
   const rootItems = readBookmarksRootItems();
   const items = rootItems.map((item, idx) => toClientItem(item, [idx]));
   return { items };
 }
 
+/**
+ * Parses a serialized bookmark id path (`"0.2.1"`) into numeric segments.
+ * @param {unknown} id - Incoming bookmark id.
+ * @returns {number[]|null} Parsed index path, or `null` when invalid.
+ */
 function parseBookmarkId(id) {
   const raw = String(id || "").trim();
   if (!/^\d+(?:\.\d+)*$/.test(raw)) return null;
@@ -1639,6 +2034,12 @@ function parseBookmarkId(id) {
   return segments;
 }
 
+/**
+ * Resolves a bookmark node by walking an index path through nested `items` arrays.
+ * @param {Array<object>} rootItems - Root bookmark array.
+ * @param {number[]} indexPath - Numeric path from root to target node.
+ * @returns {object|null} Resolved bookmark node or `null`.
+ */
 function getItemByIndexPath(rootItems, indexPath) {
   let current = rootItems[indexPath[0]];
   for (let i = 1; i < indexPath.length; i += 1) {
@@ -1648,6 +2049,12 @@ function getItemByIndexPath(rootItems, indexPath) {
   return current || null;
 }
 
+/**
+ * Opens a bookmark from `.obsidian/bookmarks.json` via Obsidian's bookmark plugin API.
+ * @param {string} id - Serialized bookmark id path (`idx-...`).
+ * @param {boolean} openInNewTab - Whether to open the bookmark in a new tab.
+ * @returns {{ok: boolean, id: string, openInNewTab: boolean, type: string, title: string}} Open result metadata.
+ */
 function openBookmarkById(id, openInNewTab = false) {
   const indexPath = parseBookmarkId(id);
   if (!indexPath) {
@@ -1688,6 +2095,10 @@ plugin.openBookmark(item, openTarget);
   };
 }
 
+/**
+ * Reads current Obsidian theme variables for mirror-theming in the homepage/settings UI.
+ * @returns {{mode: string, classes: string, cssTheme: string, baseTheme: string, vars: object}} Theme snapshot payload.
+ */
 function readObsidianThemeSnapshot() {
   const js = `
 const bodyClasses = String(document.body?.className || "");
@@ -1720,6 +2131,12 @@ JSON.stringify({
   return JSON.parse(clean);
 }
 
+/**
+ * Opens the configured search provider in Obsidian.
+ * @param {"omnisearch"|"obsidian-search"|"quick-file"} provider - Search provider id.
+ * @param {boolean} openInNewTab - Whether the action should target a new tab.
+ * @returns {{ok: boolean, provider: string, commandId: string}} Execution result.
+ */
 function openConfiguredSearch(provider = "omnisearch", openInNewTab = false) {
   const selected = oneOf(provider, ["omnisearch", "obsidian-search", "quick-file"], "omnisearch");
   const commandMap = {
@@ -1733,6 +2150,11 @@ const provider = ${JSON.stringify(selected)};
 const openInNewTab = ${JSON.stringify(Boolean(openInNewTab))};
 const commandId = ${JSON.stringify(commandId)};
 
+/**
+ * Safe Set Active Leaf.
+ * @param {any} leaf - Leaf candidate created by workspace.getLeaf(...).
+ * @returns {void}
+ */
 function safeSetActiveLeaf(leaf) {
   if (!leaf) return;
   try {
@@ -1775,6 +2197,10 @@ if (provider === "obsidian-search" && openInNewTab) {
   };
 }
 
+/**
+ * Aggregates historical project metadata to drive form suggestions.
+ * @returns {{societies: object, types: object, fundingCodes: object, years: object}} Counter maps by metadata field.
+ */
 function getProjectSuggestionData() {
   const js = `
 const out = {
@@ -1790,7 +2216,7 @@ for (const file of app.vault.getMarkdownFiles()) {
   if (String(fm.category || "") !== "project-moc") continue;
   const society = String(fm.antragsteller || "").trim();
   const type = String(fm.type || "").trim();
-  const funding = String(fm["förderer"] || "").trim();
+  const funding = String(fm["f\u00F6rderer"] || "").trim();
   const year = String(fm.year || "").trim();
   if (society) out.societies[society] = (out.societies[society] || 0) + 1;
   if (type) out.types[type] = (out.types[type] || 0) + 1;
@@ -1805,6 +2231,12 @@ JSON.stringify(out);
   return JSON.parse(clean);
 }
 
+/**
+ * Converts a `{value: count}` map into a sorted `{value,count}` list for UI dropdowns.
+ * @param {object} counterObject - Map of option values to occurrence counts.
+ * @param {{filter?: (value: string) => boolean}} [options={}] - Optional filter predicate.
+ * @returns {Array<{value: string, count: number}>} Sorted option list.
+ */
 function toSortedOptionList(counterObject, options = {}) {
   const entries = Object.entries(counterObject && typeof counterObject === "object" ? counterObject : {});
   if (options.filter) {
@@ -1818,6 +2250,10 @@ function toSortedOptionList(counterObject, options = {}) {
     .map(([value, count]) => ({ value, count }));
 }
 
+/**
+ * Builds dropdown options and defaults for the "new project" modal.
+ * @returns {object} Frontend-ready metadata payload for project creation.
+ */
 function buildProjectMetaPayload() {
   const currentYear = new Date().getFullYear();
   let rawSuggestions = null;
@@ -1861,6 +2297,11 @@ function buildProjectMetaPayload() {
   };
 }
 
+/**
+ * Ensures a vault-relative folder path exists by creating missing path segments in Obsidian.
+ * @param {string} relativeFolderPath - Vault-relative folder path.
+ * @returns {void}
+ */
 function ensureVaultFolderExists(relativeFolderPath) {
   const js = `
 (async () => {
@@ -1879,6 +2320,11 @@ for (const part of parts) {
   runObsidian(["eval", `code=${js}`]);
 }
 
+/**
+ * Creates a project note from the configured template via Templater (or plain fallback).
+ * @param {{projectFolderRel: string, projectFileRel: string, projectName: string}} payload - Target folder/file/title.
+ * @returns {{createdPath: string}} Created note path relative to vault root.
+ */
 function createProjectNoteFromTemplate({ projectFolderRel, projectFileRel, projectName }) {
   const js = `
 (async () => {
@@ -1931,10 +2377,21 @@ JSON.stringify({ ok: true, createdPath });
   };
 }
 
+/**
+ * Opens the given project note in Obsidian.
+ * @param {string} projectFileRel - Vault-relative markdown file path.
+ * @param {boolean} [openInNewTab=false] - Whether to open in a new tab.
+ * @returns {void}
+ */
 function openProjectFile(projectFileRel, openInNewTab = false) {
   runObsidian(["open", `path=${projectFileRel}`, openInNewTab ? "newtab" : ""].filter(Boolean));
 }
 
+/**
+ * Creates a new project folder and MOC note from template, then opens it in Obsidian.
+ * @param {object} payload - API payload from the "new project" UI.
+ * @returns {object} Creation result with paths and applied frontmatter fields.
+ */
 function createProject(payload) {
   if (!fs.existsSync(PROJECTS_ROOT) || !fs.statSync(PROJECTS_ROOT).isDirectory()) {
     throw new Error("Projektverwaltung-Ordner wurde nicht gefunden");
@@ -1992,7 +2449,7 @@ function createProject(payload) {
   const next = applyProjectFrontmatter(raw, {
     year: naming.year,
     antragsteller: naming.society,
-    förderer: naming.fundingCode,
+    "f\u00F6rderer": naming.fundingCode,
     title: naming.title,
     type: naming.projectType,
     category: "project-moc"
@@ -2011,18 +2468,32 @@ function createProject(payload) {
     frontmatter: {
       year: naming.year,
       antragsteller: naming.society,
-      förderer: naming.fundingCode,
+      "f\u00F6rderer": naming.fundingCode,
       title: naming.title,
       type: naming.projectType
     }
   };
 }
 
+/**
+ * Sends a JSON API response.
+ * @param {import("node:http").ServerResponse} res - HTTP response object.
+ * @param {number} statusCode - HTTP status code.
+ * @param {unknown} payload - JSON-serializable response body.
+ * @returns {void}
+ */
 function sendJson(res, statusCode, payload) {
   res.writeHead(statusCode, { "Content-Type": "application/json; charset=utf-8" });
   res.end(JSON.stringify(payload));
 }
 
+/**
+ * Sends a plain-text HTTP response.
+ * @param {import("node:http").ServerResponse} res - HTTP response object.
+ * @param {number} statusCode - HTTP status code.
+ * @param {string} text - Response body text.
+ * @returns {void}
+ */
 function sendText(res, statusCode, text) {
   res.writeHead(statusCode, { "Content-Type": "text/plain; charset=utf-8" });
   res.end(text);
@@ -2276,3 +2747,5 @@ process.on("SIGTERM", () => {
   stopUpdoMonitor();
   process.exit(0);
 });
+
+

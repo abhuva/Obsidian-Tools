@@ -1,7 +1,12 @@
-import { execSync } from "node:child_process";
+﻿import { execSync } from "node:child_process";
 
 const port = Number(process.env.HOMEPAGE_PORT || 4174);
 
+/**
+ * List Pids On Port.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function listPidsOnPort(targetPort) {
   try {
     const cmd = `powershell -NoProfile -Command "Get-NetTCPConnection -LocalPort ${targetPort} -State Listen | Select-Object -ExpandProperty OwningProcess"`;
@@ -13,6 +18,11 @@ function listPidsOnPort(targetPort) {
   }
 }
 
+/**
+ * Kill Pid.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function killPid(pid) {
   try {
     process.kill(pid, "SIGTERM");
@@ -35,3 +45,5 @@ for (const pid of pids) {
 }
 
 console.log(`Stopped ${killed}/${pids.length} process(es) on port ${port}.`);
+
+
