@@ -3,10 +3,10 @@ import { renderClockInElement } from "../modules/clock.js";
 import { renderNewProjectModule } from "../modules/new-project.js";
 import { renderUpdoModule } from "../modules/updo.js";
 
-const pageTitleEl = document.getElementById("pageTitle");
-const moduleGridEl = document.getElementById("moduleGrid");
-const headerClockEl = document.getElementById("headerClock");
-const openSearchBtnEl = document.getElementById("openSearchBtn");
+let pageTitleEl = null;
+let moduleGridEl = null;
+let headerClockEl = null;
+let openSearchBtnEl = null;
 
 const activeCleanups = [];
 const rootEl = document.documentElement;
@@ -374,20 +374,26 @@ async function applyUiTheme(themeConfig) {
  * @returns {Promise<void>}
  */
 async function renderPage() {
+  if (!moduleGridEl) {
+    console.error("Missing required #moduleGrid mount node.");
+    return;
+  }
   cleanupAllModules();
   moduleGridEl.innerHTML = "";
 
   try {
     const settings = await loadSettings();
     await applyUiTheme(settings?.ui?.theme);
-    pageTitleEl.textContent = settings?.ui?.title || "Workspace Homepage";
+    if (pageTitleEl) {
+      pageTitleEl.textContent = settings?.ui?.title || "Workspace Homepage";
+    }
     rootEl.style.setProperty("--hero-title-size", `${toTitleSize(settings?.ui?.titleSize, 38)}px`);
     searchConfig = {
       provider: cleanSearchProvider(settings?.ui?.search?.provider),
       openInNewTab: Boolean(settings?.ui?.search?.openInNewTab)
     };
 
-    if (settings?.modules?.clock?.enabled) {
+    if (settings?.modules?.clock?.enabled && headerClockEl) {
       addCleanup(renderClockInElement(headerClockEl, settings.modules.clock));
     } else if (headerClockEl) {
       headerClockEl.textContent = "";
@@ -439,15 +445,33 @@ async function renderPage() {
   }
 }
 
-window.addEventListener("beforeunload", cleanupAllModules);
-if (openSearchBtnEl) {
-  openSearchBtnEl.addEventListener("click", () => {
-    openConfiguredSearch().catch((error) => {
-      // Keep UI quiet, but visible in devtools.
-      console.error(error);
+/**
+ * Resolves required/optional DOM anchors and wires module bootstrap handlers.
+ * @returns {void}
+ */
+function initHomepage() {
+  pageTitleEl = document.getElementById("pageTitle");
+  moduleGridEl = document.getElementById("moduleGrid");
+  headerClockEl = document.getElementById("headerClock");
+  openSearchBtnEl = document.getElementById("openSearchBtn");
+
+  if (openSearchBtnEl) {
+    openSearchBtnEl.addEventListener("click", () => {
+      openConfiguredSearch().catch((error) => {
+        // Keep UI quiet, but visible in devtools.
+        console.error(error);
+      });
     });
-  });
+  }
+
+  void renderPage();
 }
-renderPage();
+
+window.addEventListener("beforeunload", cleanupAllModules);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initHomepage, { once: true });
+} else {
+  initHomepage();
+}
 
 

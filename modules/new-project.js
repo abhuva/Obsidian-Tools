@@ -132,7 +132,10 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     const head = document.createElement("div");
     head.className = "new-project-head";
     const title = document.createElement("h3");
+    const titleId = `new-project-modal-title-${Math.random().toString(36).slice(2, 10)}`;
+    title.id = titleId;
     title.textContent = "Neues Projekt erstellen";
+    dialog.setAttribute("aria-labelledby", titleId);
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
     closeBtn.className = "module-head-icon-btn";

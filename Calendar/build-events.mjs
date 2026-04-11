@@ -1,4 +1,4 @@
-﻿import fs from "node:fs";
+import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
@@ -222,10 +222,10 @@ function frontmatterLookup(frontmatterData, name) {
 }
 
 /**
- * Extract Field.
- * @param {*}
- * @param {*}
- * @returns {*} Returns the function result.
+ * Extracts the first non-empty scalar value from candidate frontmatter keys.
+ * @param {FrontmatterMap | null | undefined} frontmatterData - Parsed frontmatter map.
+ * @param {...string} names - Candidate field names in priority order.
+ * @returns {string} First non-empty scalar value.
  */
 function extractField(frontmatterData, ...names) {
   for (const name of names) {
@@ -239,10 +239,10 @@ function extractField(frontmatterData, ...names) {
 }
 
 /**
- * Extract List Field.
- * @param {*}
- * @param {*}
- * @returns {*} Returns the function result.
+ * Extracts the first list-like field from candidate frontmatter keys.
+ * @param {FrontmatterMap | null | undefined} frontmatterData - Parsed frontmatter map.
+ * @param {...string} names - Candidate field names in priority order.
+ * @returns {string[]} Parsed list values.
  */
 function extractListField(frontmatterData, ...names) {
   for (const name of names) {
@@ -258,9 +258,9 @@ function extractListField(frontmatterData, ...names) {
 }
 
 /**
- * Parse Boolean.
- * @param {*}
- * @returns {*} Returns boolean.
+ * Parses booleans from common YAML/string representations.
+ * @param {unknown} value - Raw value.
+ * @returns {boolean} Parsed boolean value.
  */
 function parseBoolean(value) {
   if (typeof value === "boolean") return value;
@@ -271,10 +271,10 @@ function parseBoolean(value) {
 }
 
 /**
- * Parse Integer.
- * @param {*}
- * @param {*}
- * @returns {*} Returns integer.
+ * Parses an integer with fallback.
+ * @param {unknown} value - Raw value.
+ * @param {number} [fallback=0] - Fallback when parsing fails.
+ * @returns {number} Parsed integer or fallback.
  */
 function parseInteger(value, fallback = 0) {
   const num = Number.parseInt(String(value ?? "").trim(), 10);
@@ -282,9 +282,9 @@ function parseInteger(value, fallback = 0) {
 }
 
 /**
- * Normalize Coordinates Value.
- * @param {*}
- * @returns {*} Returns coordinates value.
+ * Normalizes coordinates from array/object/string inputs to `lat, lng` format.
+ * @param {unknown} value - Raw coordinate payload.
+ * @returns {string} Normalized coordinate pair or empty string.
  */
 function normalizeCoordinatesValue(value) {
   if (value == null) return "";
@@ -315,9 +315,9 @@ function normalizeCoordinatesValue(value) {
 }
 
 /**
- * Parse Iso Date List.
- * @param {*}
- * @returns {*} Returns iso date list.
+ * Parses a list-like value into ISO dates.
+ * @param {unknown} value - Raw date list input.
+ * @returns {string[]} ISO date list.
  */
 function parseIsoDateList(value) {
   const values = Array.isArray(value)
@@ -335,9 +335,9 @@ function parseIsoDateList(value) {
 }
 
 /**
- * Parse Days Of Week.
- * @param {*}
- * @returns {*} Returns days of week.
+ * Parses weekday list values into unique sorted numeric weekdays (`0..6`).
+ * @param {unknown} value - Raw weekday list input.
+ * @returns {number[]} Parsed weekday indices.
  */
 function parseDaysOfWeek(value) {
   const weekdayMap = {
@@ -390,9 +390,9 @@ function parseDaysOfWeek(value) {
 }
 
 /**
- * To Rrule By Weekday.
- * @param {*}
- * @returns {*} Returns rrule by weekday.
+ * Converts numeric weekdays to rrule weekday tokens.
+ * @param {number[]} days - Numeric weekdays (`0..6`).
+ * @returns {string[]} RRule weekday tokens (`su..sa`).
  */
 function toRruleByWeekday(days) {
   const map = ["su", "mo", "tu", "we", "th", "fr", "sa"];
@@ -402,9 +402,9 @@ function toRruleByWeekday(days) {
 }
 
 /**
- * Parse Json Field.
- * @param {*}
- * @returns {*} Returns json field.
+ * Parses a JSON-encoded scalar field.
+ * @param {unknown} value - Raw JSON string.
+ * @returns {object | null} Parsed object or `null`.
  */
 function parseJsonField(value) {
   const raw = String(value ?? "").trim();
@@ -417,9 +417,9 @@ function parseJsonField(value) {
 }
 
 /**
- * Extract Tags.
- * @param {*}
- * @returns {*} Returns the function result.
+ * Extracts normalized tag tokens from parsed frontmatter.
+ * @param {FrontmatterMap | null | undefined} frontmatterData - Parsed frontmatter map.
+ * @returns {string[]} Normalized lowercase tag names without `#`.
  */
 function extractTags(frontmatterData) {
   const tags = extractListField(frontmatterData, "tags");
@@ -437,27 +437,27 @@ function extractTags(frontmatterData) {
 }
 
 /**
- * Has Inline Event Tag.
- * @param {*}
- * @returns {*} Returns whether the condition is met.
+ * Checks whether markdown body contains an inline `#event` tag.
+ * @param {string} content - Markdown content.
+ * @returns {boolean} `true` when inline event tag is present.
  */
 function hasInlineEventTag(content) {
   return /(^|\s)#event(\s|$)/i.test(content);
 }
 
 /**
- * Is Iso Date.
- * @param {*}
- * @returns {*} Returns whether the condition is met.
+ * Checks whether input matches `YYYY-MM-DD`.
+ * @param {string} value - Candidate date value.
+ * @returns {boolean} `true` when value is ISO date.
  */
 function isIsoDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
 /**
- * Is Iso Date Time.
- * @param {*}
- * @returns {*} Returns whether the condition is met.
+ * Checks whether input matches accepted ISO datetime format.
+ * @param {unknown} value - Candidate datetime value.
+ * @returns {boolean} `true` when value is ISO datetime.
  */
 function isIsoDateTime(value) {
   return /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/.test(
@@ -466,18 +466,18 @@ function isIsoDateTime(value) {
 }
 
 /**
- * Is Date Or Date Time.
- * @param {*}
- * @returns {*} Returns whether the condition is met.
+ * Checks whether value is ISO date or datetime.
+ * @param {unknown} value - Candidate date-like value.
+ * @returns {boolean} `true` when value is date/date-time.
  */
 function isDateOrDateTime(value) {
   return isIsoDate(value) || isIsoDateTime(value);
 }
 
 /**
- * Date To Local Iso Date.
- * @param {*}
- * @returns {*} Returns the function result.
+ * Converts a date-like input to local ISO date (`YYYY-MM-DD`).
+ * @param {unknown} value - Date-like input.
+ * @returns {string} ISO date or empty string when invalid.
  */
 function dateToLocalIsoDate(value) {
   const date = value instanceof Date ? value : new Date(value);
@@ -489,9 +489,9 @@ function dateToLocalIsoDate(value) {
 }
 
 /**
- * Parse Date Like To Iso Date.
- * @param {*}
- * @returns {*} Returns date like to iso date.
+ * Parses a date-like value into ISO date (`YYYY-MM-DD`).
+ * @param {unknown} value - Date-like value.
+ * @returns {string} ISO date or empty string.
  */
 function parseDateLikeToIsoDate(value) {
   if (value == null) return "";
@@ -507,9 +507,9 @@ function parseDateLikeToIsoDate(value) {
 }
 
 /**
- * Parse Date Like To Calendar Value.
- * @param {*}
- * @returns {*} Returns date like to calendar value.
+ * Parses a date-like value into calendar start/end value (date or datetime).
+ * @param {unknown} value - Date-like value.
+ * @returns {string} Calendar date/date-time value or empty string.
  */
 function parseDateLikeToCalendarValue(value) {
   if (value == null) return "";
@@ -524,9 +524,9 @@ function parseDateLikeToCalendarValue(value) {
 }
 
 /**
- * Get Start Date From File Meta.
- * @param {*}
- * @returns {*} Returns start date from file meta.
+ * Derives a fallback start date from file metadata timestamps.
+ * @param {string} filePath - Absolute file path.
+ * @returns {string} ISO date or empty string.
  */
 function getStartDateFromFileMeta(filePath) {
   try {
@@ -540,9 +540,9 @@ function getStartDateFromFileMeta(filePath) {
 }
 
 /**
- * Add One Day.
- * @param {*}
- * @returns {*} Returns the function result.
+ * Adds one day to an ISO date (`YYYY-MM-DD`) using UTC arithmetic.
+ * @param {string} isoDate - ISO date.
+ * @returns {string} Next day as ISO date.
  */
 function addOneDay(isoDate) {
   const [year, month, day] = isoDate.split("-").map(Number);
@@ -552,9 +552,9 @@ function addOneDay(isoDate) {
 }
 
 /**
- * Day Of Week From Iso Date.
- * @param {*}
- * @returns {*} Returns the function result.
+ * Calculates weekday index (`0..6`) for an ISO date.
+ * @param {string} isoDate - ISO date.
+ * @returns {number} Weekday index where `0` is Sunday.
  */
 function dayOfWeekFromIsoDate(isoDate) {
   const [year, month, day] = isoDate.split("-").map(Number);
@@ -563,10 +563,10 @@ function dayOfWeekFromIsoDate(isoDate) {
 }
 
 /**
- * Inclusive Day Span.
- * @param {*}
- * @param {*}
- * @returns {*} Returns the function result.
+ * Computes inclusive day span between two ISO dates.
+ * @param {string} startIso - Start ISO date.
+ * @param {string} endIso - End ISO date.
+ * @returns {number} Inclusive day count (minimum `1`).
  */
 function inclusiveDaySpan(startIso, endIso) {
   const [sy, sm, sd] = startIso.split("-").map(Number);
@@ -579,10 +579,10 @@ function inclusiveDaySpan(startIso, endIso) {
 }
 
 /**
- * Duration Ms From Date Like.
- * @param {*}
- * @param {*}
- * @returns {*} Returns the function result.
+ * Computes positive millisecond duration between two date-like values.
+ * @param {unknown} startValue - Start datetime value.
+ * @param {unknown} endValue - End datetime value.
+ * @returns {number} Duration in milliseconds, or `0`.
  */
 function durationMsFromDateLike(startValue, endValue) {
   const startTs = Date.parse(String(startValue || ""));
@@ -592,9 +592,9 @@ function durationMsFromDateLike(startValue, endValue) {
 }
 
 /**
- * Extract Time Portion.
- * @param {*}
- * @returns {*} Returns the function result.
+ * Extracts time/timezone portion from ISO datetime.
+ * @param {unknown} dateTimeValue - ISO datetime candidate.
+ * @returns {string} Time portion without date, or empty string.
  */
 function extractTimePortion(dateTimeValue) {
   const raw = String(dateTimeValue || "").trim();
@@ -603,10 +603,10 @@ function extractTimePortion(dateTimeValue) {
 }
 
 /**
- * Merge Date With Time Portion.
- * @param {*}
- * @param {*}
- * @returns {*} Returns the function result.
+ * Combines ISO date and time portion into an ISO datetime.
+ * @param {string} isoDate - ISO date.
+ * @param {string} timePortion - Time suffix.
+ * @returns {string} Combined datetime or original `isoDate`.
  */
 function mergeDateWithTimePortion(isoDate, timePortion) {
   if (!isIsoDate(isoDate) || !timePortion) return isoDate;
@@ -614,9 +614,9 @@ function mergeDateWithTimePortion(isoDate, timePortion) {
 }
 
 /**
- * To Calendar Event.
- * @param {*}
- * @returns {*} Returns calendar event.
+ * Converts one markdown event note into FullCalendar event objects.
+ * @param {string} filePath - Absolute markdown file path.
+ * @returns {Array<object> | null} Event array (including overrides) or `null` if not an event note.
  */
 function toCalendarEvent(filePath) {
   const content = fs.readFileSync(filePath, "utf8");
@@ -783,8 +783,8 @@ function toCalendarEvent(filePath) {
 }
 
 /**
- * Query Base Rows.
- * @returns {*} Returns the function result.
+ * Queries Obsidian Base view rows used for event generation.
+ * @returns {Array<Record<string, unknown>>} Base query row list.
  */
 function queryBaseRows() {
   const run = (useVault) => {
@@ -816,9 +816,9 @@ function queryBaseRows() {
 }
 
 /**
- * Base Row To Calendar Event.
- * @param {*}
- * @returns {*} Returns the function result.
+ * Converts one base row into FullCalendar event objects.
+ * @param {Record<string, unknown>} row - Base query row.
+ * @returns {Array<object> | null} Event array (including overrides) or `null`.
  */
 function baseRowToCalendarEvent(row) {
   const sourcePath = String(row.path ?? "").trim();
@@ -1092,8 +1092,8 @@ function baseRowToCalendarEvent(row) {
 }
 
 /**
- * Collect Events From Base.
- * @returns {*} Returns the function result.
+ * Collects all calendar events from Obsidian Base rows.
+ * @returns {object[]} Calendar events.
  */
 function collectEventsFromBase() {
   const rows = queryBaseRows();
@@ -1101,8 +1101,8 @@ function collectEventsFromBase() {
 }
 
 /**
- * Collect Events From Markdown Scan.
- * @returns {*} Returns the function result.
+ * Collects all calendar events from recursive markdown scan fallback.
+ * @returns {object[]} Calendar events.
  */
 function collectEventsFromMarkdownScan() {
   const allMarkdown = listMarkdownFiles(VAULT_ROOT);
@@ -1129,9 +1129,9 @@ try {
 }
 
 /**
- * Event Sort Date.
- * @param {*}
- * @returns {*} Returns the function result.
+ * Extracts sortable event date token from event object.
+ * @param {object} event - Calendar event.
+ * @returns {string} Sort key value.
  */
 function eventSortDate(event) {
   return String(event.start || event.startRecur || "");

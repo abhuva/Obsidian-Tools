@@ -14,13 +14,34 @@ function loadEcharts() {
     script.src = ECHARTS_SRC;
     script.async = true;
     script.onload = () => {
-      if (window.echarts) resolve(window.echarts);
-      else reject(new Error("ECharts loaded without global object"));
+      if (window.echarts) {
+        resolve(window.echarts);
+      } else {
+        echartsLoaderPromise = null;
+        reject(new Error("ECharts loaded without global object"));
+      }
     };
-    script.onerror = () => reject(new Error("Could not load ECharts"));
+    script.onerror = () => {
+      echartsLoaderPromise = null;
+      reject(new Error("Could not load ECharts"));
+    };
     document.head.appendChild(script);
   });
   return echartsLoaderPromise;
+}
+
+/**
+ * Escapes dynamic strings for safe HTML insertion inside chart tooltips.
+ * @param {unknown} value - Raw dynamic value.
+ * @returns {string} HTML-escaped string.
+ */
+function escapeHtml(value) {
+  return String(value ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 /**
@@ -165,7 +186,7 @@ function buildLongtermSeries(summaries, targets) {
 
   const series = [];
   for (const target of targets || []) {
-    const targetSummaries = (byTargetId.get(target.id) || [])
+    const targetSummaries = (byTargetId.get(String(target?.id ?? "")) || [])
       .slice()
       .sort((a, b) => Date.parse(String(a?.windowEnd || "")) - Date.parse(String(b?.windowEnd || "")));
     series.push({
@@ -425,7 +446,12 @@ export async function renderUpdoModule(shell, moduleSettings) {
             const raw = Array.isArray(data.value) ? data.value : [];
             const ok = Number(raw[2]) === 1;
             const ts = raw[0] ? new Date(raw[0]).toLocaleString("de-DE", { hour12: false }) : "-";
-            return `${data.targetName || "-"}<br/>${ts}<br/>${ok ? "UP" : "DOWN"}<br/>Code: ${data.statusCode ?? "-"}`;
+            return (
+              `${escapeHtml(data.targetName || "-")}<br/>` +
+              `${escapeHtml(ts)}<br/>` +
+              `${ok ? "UP" : "DOWN"}<br/>` +
+              `Code: ${escapeHtml(data.statusCode ?? "-")}`
+            );
           }
         },
         grid: { left: 100, right: 16, top: 8, bottom: 26 },
@@ -495,7 +521,12 @@ export async function renderUpdoModule(shell, moduleSettings) {
                 const ts = tsRaw ? new Date(tsRaw).toLocaleString("de-DE", { hour12: false }) : "-";
                 const incidentType = String(data.incidentType || "incident").toUpperCase();
                 const targetName = String(data.targetName || "-");
-                return `${incidentType}<br/>Site: ${targetName}<br/>${ts}<br/>Dauer: ${Math.round(Number(data.durationSec || 0))}s`;
+                return (
+                  `${escapeHtml(incidentType)}<br/>` +
+                  `Site: ${escapeHtml(targetName)}<br/>` +
+                  `${escapeHtml(ts)}<br/>` +
+                  `Dauer: ${Math.round(Number(data.durationSec || 0))}s`
+                );
               }
             },
             itemStyle: {
