@@ -19,6 +19,14 @@ const OBSIDIAN_BIN = resolveObsidianBin();
 const ALLOW_MARKDOWN_FALLBACK = parseBoolean(process.env.ALLOW_MARKDOWN_FALLBACK || "");
 const EXCLUDE_DIRS = new Set([".obsidian", ".trash", "8. Emails", "Attachments", "Excalidraw"]);
 
+/**
+ * @typedef {Record<string, string | string[] | undefined>} FrontmatterMap
+ */
+
+/**
+ * Builds a prioritized list of Obsidian CLI binary candidates.
+ * @returns {string[]} Ordered executable candidates without duplicates.
+ */
 function getObsidianBinCandidates() {
   const candidates = [];
   const fromEnv = String(process.env.OBSIDIAN_BIN || "").trim();
@@ -38,6 +46,10 @@ function getObsidianBinCandidates() {
   return Array.from(new Set(candidates));
 }
 
+/**
+ * Resolves the first existing absolute candidate or command name fallback.
+ * @returns {string} Absolute binary path or command name.
+ */
 function resolveObsidianBin() {
   for (const candidate of getObsidianBinCandidates()) {
     if (!candidate) continue;
@@ -50,6 +62,11 @@ function resolveObsidianBin() {
   return "obsidian";
 }
 
+/**
+ * Detects vault-targeting errors returned by Obsidian CLI.
+ * @param {unknown} error - Error from `execFileSync`.
+ * @returns {boolean} `true` when error indicates invalid/missing vault targeting.
+ */
 function isVaultTargetingError(error) {
   const text = String(error?.stderr || error?.stdout || error?.message || "").toLowerCase();
   return (
@@ -59,14 +76,30 @@ function isVaultTargetingError(error) {
   );
 }
 
+/**
+ * Checks whether a filename is a markdown file.
+ * @param {string} filePath - File path or filename.
+ * @returns {boolean} `true` when file ends with `.md`.
+ */
 function isMarkdownFile(filePath) {
   return filePath.toLowerCase().endsWith(".md");
 }
 
+/**
+ * Checks whether a directory is excluded from markdown fallback scanning.
+ * @param {string} dirName - Directory name.
+ * @returns {boolean} `true` when directory should be skipped.
+ */
 function isExcludedDir(dirName) {
   return EXCLUDE_DIRS.has(dirName);
 }
 
+/**
+ * Recursively collects markdown files under a directory.
+ * @param {string} dirPath - Start directory.
+ * @param {string[]} [results=[]] - Mutable accumulator.
+ * @returns {string[]} Collected absolute markdown file paths.
+ */
 function listMarkdownFiles(dirPath, results = []) {
   for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
     const fullPath = path.join(dirPath, entry.name);
@@ -83,6 +116,11 @@ function listMarkdownFiles(dirPath, results = []) {
   return results;
 }
 
+/**
+ * Extracts raw YAML frontmatter text from markdown content.
+ * @param {string} content - Markdown content.
+ * @returns {string} Raw frontmatter body without delimiters, or empty string.
+ */
 function extractFrontmatter(content) {
   if (!content.startsWith("---\n") && !content.startsWith("---\r\n")) {
     return "";
@@ -92,10 +130,20 @@ function extractFrontmatter(content) {
   return content.slice(4, end);
 }
 
+/**
+ * Removes one pair of wrapping single/double quotes and trims value.
+ * @param {unknown} value - Raw scalar value.
+ * @returns {string} Unquoted scalar text.
+ */
 function stripWrappingQuotes(value) {
   return String(value ?? "").trim().replace(/^["']|["']$/g, "");
 }
 
+/**
+ * Removes unquoted YAML inline comments from a scalar line.
+ * @param {unknown} raw - Raw YAML scalar text.
+ * @returns {string} Scalar value without trailing inline comment.
+ */
 function stripYamlInlineComment(raw) {
   const value = String(raw ?? "");
   const singleQuoted = value.startsWith("'") && value.endsWith("'");
@@ -106,6 +154,11 @@ function stripYamlInlineComment(raw) {
   return value.slice(0, hashIndex).trimEnd();
 }
 
+/**
+ * Parses an inline YAML list (for example `[a, "b"]`) into string values.
+ * @param {unknown} raw - Raw YAML list text.
+ * @returns {string[]} Parsed list entries.
+ */
 function parseInlineYamlArray(raw) {
   return stripYamlInlineComment(raw)
     .trim()
@@ -115,6 +168,11 @@ function parseInlineYamlArray(raw) {
     .filter(Boolean);
 }
 
+/**
+ * Parses selected scalar/list values from YAML frontmatter text.
+ * @param {unknown} frontmatter - Raw frontmatter text.
+ * @returns {FrontmatterMap} Parsed frontmatter map keyed by lowercase field name.
+ */
 function parseFrontmatterData(frontmatter) {
   const out = Object.create(null);
   const lines = String(frontmatter || "").split(/\r?\n/);
@@ -152,11 +210,23 @@ function parseFrontmatterData(frontmatter) {
   return out;
 }
 
+/**
+ * Looks up a frontmatter value by key (case-insensitive).
+ * @param {FrontmatterMap | null | undefined} frontmatterData - Parsed frontmatter map.
+ * @param {unknown} name - Field name.
+ * @returns {string | string[] | undefined} Matching value when present.
+ */
 function frontmatterLookup(frontmatterData, name) {
   if (!frontmatterData || typeof frontmatterData !== "object") return undefined;
   return frontmatterData[String(name || "").toLowerCase()];
 }
 
+/**
+ * Extracts the first non-empty scalar value from candidate frontmatter keys.
+ * @param {FrontmatterMap | null | undefined} frontmatterData - Parsed frontmatter map.
+ * @param {...string} names - Candidate field names in priority order.
+ * @returns {string} First non-empty scalar value.
+ */
 function extractField(frontmatterData, ...names) {
   for (const name of names) {
     const value = frontmatterLookup(frontmatterData, name);
@@ -168,6 +238,12 @@ function extractField(frontmatterData, ...names) {
   return "";
 }
 
+/**
+ * Extracts the first list-like field from candidate frontmatter keys.
+ * @param {FrontmatterMap | null | undefined} frontmatterData - Parsed frontmatter map.
+ * @param {...string} names - Candidate field names in priority order.
+ * @returns {string[]} Parsed list values.
+ */
 function extractListField(frontmatterData, ...names) {
   for (const name of names) {
     const value = frontmatterLookup(frontmatterData, name);
@@ -181,6 +257,11 @@ function extractListField(frontmatterData, ...names) {
   return [];
 }
 
+/**
+ * Parses booleans from common YAML/string representations.
+ * @param {unknown} value - Raw value.
+ * @returns {boolean} Parsed boolean value.
+ */
 function parseBoolean(value) {
   if (typeof value === "boolean") return value;
   if (typeof value === "number") return value !== 0;
@@ -189,11 +270,22 @@ function parseBoolean(value) {
   return normalized === "true" || normalized === "yes" || normalized === "1" || normalized === "on";
 }
 
+/**
+ * Parses an integer with fallback.
+ * @param {unknown} value - Raw value.
+ * @param {number} [fallback=0] - Fallback when parsing fails.
+ * @returns {number} Parsed integer or fallback.
+ */
 function parseInteger(value, fallback = 0) {
   const num = Number.parseInt(String(value ?? "").trim(), 10);
   return Number.isInteger(num) ? num : fallback;
 }
 
+/**
+ * Normalizes coordinates from array/object/string inputs to `lat, lng` format.
+ * @param {unknown} value - Raw coordinate payload.
+ * @returns {string} Normalized coordinate pair or empty string.
+ */
 function normalizeCoordinatesValue(value) {
   if (value == null) return "";
 
@@ -222,6 +314,11 @@ function normalizeCoordinatesValue(value) {
   return `${lat}, ${lng}`;
 }
 
+/**
+ * Parses a list-like value into ISO dates.
+ * @param {unknown} value - Raw date list input.
+ * @returns {string[]} ISO date list.
+ */
 function parseIsoDateList(value) {
   const values = Array.isArray(value)
     ? value
@@ -237,6 +334,11 @@ function parseIsoDateList(value) {
     .filter((v) => isIsoDate(v));
 }
 
+/**
+ * Parses weekday list values into unique sorted numeric weekdays (`0..6`).
+ * @param {unknown} value - Raw weekday list input.
+ * @returns {number[]} Parsed weekday indices.
+ */
 function parseDaysOfWeek(value) {
   const weekdayMap = {
     su: 0,
@@ -287,6 +389,11 @@ function parseDaysOfWeek(value) {
   return [...new Set(days)].sort((a, b) => a - b);
 }
 
+/**
+ * Converts numeric weekdays to rrule weekday tokens.
+ * @param {number[]} days - Numeric weekdays (`0..6`).
+ * @returns {string[]} RRule weekday tokens (`su..sa`).
+ */
 function toRruleByWeekday(days) {
   const map = ["su", "mo", "tu", "we", "th", "fr", "sa"];
   return days
@@ -294,6 +401,11 @@ function toRruleByWeekday(days) {
     .filter(Boolean);
 }
 
+/**
+ * Parses a JSON-encoded scalar field.
+ * @param {unknown} value - Raw JSON string.
+ * @returns {object | null} Parsed object or `null`.
+ */
 function parseJsonField(value) {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
@@ -304,6 +416,11 @@ function parseJsonField(value) {
   }
 }
 
+/**
+ * Extracts normalized tag tokens from parsed frontmatter.
+ * @param {FrontmatterMap | null | undefined} frontmatterData - Parsed frontmatter map.
+ * @returns {string[]} Normalized lowercase tag names without `#`.
+ */
 function extractTags(frontmatterData) {
   const tags = extractListField(frontmatterData, "tags");
   if (!tags.length) {
@@ -319,24 +436,49 @@ function extractTags(frontmatterData) {
   return [...new Set(tags.map((tag) => String(tag).replace(/^#/, "").toLowerCase()).filter(Boolean))];
 }
 
+/**
+ * Checks whether markdown body contains an inline `#event` tag.
+ * @param {string} content - Markdown content.
+ * @returns {boolean} `true` when inline event tag is present.
+ */
 function hasInlineEventTag(content) {
   return /(^|\s)#event(\s|$)/i.test(content);
 }
 
+/**
+ * Checks whether input matches `YYYY-MM-DD`.
+ * @param {string} value - Candidate date value.
+ * @returns {boolean} `true` when value is ISO date.
+ */
 function isIsoDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value);
 }
 
+/**
+ * Checks whether input matches accepted ISO datetime format.
+ * @param {unknown} value - Candidate datetime value.
+ * @returns {boolean} `true` when value is ISO datetime.
+ */
 function isIsoDateTime(value) {
   return /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/.test(
     String(value || "").trim()
   );
 }
 
+/**
+ * Checks whether value is ISO date or datetime.
+ * @param {unknown} value - Candidate date-like value.
+ * @returns {boolean} `true` when value is date/date-time.
+ */
 function isDateOrDateTime(value) {
   return isIsoDate(value) || isIsoDateTime(value);
 }
 
+/**
+ * Converts a date-like input to local ISO date (`YYYY-MM-DD`).
+ * @param {unknown} value - Date-like input.
+ * @returns {string} ISO date or empty string when invalid.
+ */
 function dateToLocalIsoDate(value) {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "";
@@ -346,6 +488,11 @@ function dateToLocalIsoDate(value) {
   return `${year}-${month}-${day}`;
 }
 
+/**
+ * Parses a date-like value into ISO date (`YYYY-MM-DD`).
+ * @param {unknown} value - Date-like value.
+ * @returns {string} ISO date or empty string.
+ */
 function parseDateLikeToIsoDate(value) {
   if (value == null) return "";
   if (value instanceof Date) return dateToLocalIsoDate(value);
@@ -359,6 +506,11 @@ function parseDateLikeToIsoDate(value) {
   return dateToLocalIsoDate(new Date(timestamp));
 }
 
+/**
+ * Parses a date-like value into calendar start/end value (date or datetime).
+ * @param {unknown} value - Date-like value.
+ * @returns {string} Calendar date/date-time value or empty string.
+ */
 function parseDateLikeToCalendarValue(value) {
   if (value == null) return "";
   if (value instanceof Date) return dateToLocalIsoDate(value);
@@ -371,6 +523,11 @@ function parseDateLikeToCalendarValue(value) {
   return "";
 }
 
+/**
+ * Derives a fallback start date from file metadata timestamps.
+ * @param {string} filePath - Absolute file path.
+ * @returns {string} ISO date or empty string.
+ */
 function getStartDateFromFileMeta(filePath) {
   try {
     const stats = fs.statSync(filePath);
@@ -382,6 +539,11 @@ function getStartDateFromFileMeta(filePath) {
   }
 }
 
+/**
+ * Adds one day to an ISO date (`YYYY-MM-DD`) using UTC arithmetic.
+ * @param {string} isoDate - ISO date.
+ * @returns {string} Next day as ISO date.
+ */
 function addOneDay(isoDate) {
   const [year, month, day] = isoDate.split("-").map(Number);
   const utcDate = new Date(Date.UTC(year, month - 1, day));
@@ -389,12 +551,23 @@ function addOneDay(isoDate) {
   return utcDate.toISOString().slice(0, 10);
 }
 
+/**
+ * Calculates weekday index (`0..6`) for an ISO date.
+ * @param {string} isoDate - ISO date.
+ * @returns {number} Weekday index where `0` is Sunday.
+ */
 function dayOfWeekFromIsoDate(isoDate) {
   const [year, month, day] = isoDate.split("-").map(Number);
   const utcDate = new Date(Date.UTC(year, month - 1, day));
   return utcDate.getUTCDay();
 }
 
+/**
+ * Computes inclusive day span between two ISO dates.
+ * @param {string} startIso - Start ISO date.
+ * @param {string} endIso - End ISO date.
+ * @returns {number} Inclusive day count (minimum `1`).
+ */
 function inclusiveDaySpan(startIso, endIso) {
   const [sy, sm, sd] = startIso.split("-").map(Number);
   const [ey, em, ed] = endIso.split("-").map(Number);
@@ -405,6 +578,12 @@ function inclusiveDaySpan(startIso, endIso) {
   return diff > 0 ? diff : 1;
 }
 
+/**
+ * Computes positive millisecond duration between two date-like values.
+ * @param {unknown} startValue - Start datetime value.
+ * @param {unknown} endValue - End datetime value.
+ * @returns {number} Duration in milliseconds, or `0`.
+ */
 function durationMsFromDateLike(startValue, endValue) {
   const startTs = Date.parse(String(startValue || ""));
   const endTs = Date.parse(String(endValue || ""));
@@ -412,17 +591,33 @@ function durationMsFromDateLike(startValue, endValue) {
   return endTs - startTs;
 }
 
+/**
+ * Extracts time/timezone portion from ISO datetime.
+ * @param {unknown} dateTimeValue - ISO datetime candidate.
+ * @returns {string} Time portion without date, or empty string.
+ */
 function extractTimePortion(dateTimeValue) {
   const raw = String(dateTimeValue || "").trim();
   const match = raw.match(/^\d{4}-\d{2}-\d{2}T(.+)$/);
   return match && match[1] ? match[1] : "";
 }
 
+/**
+ * Combines ISO date and time portion into an ISO datetime.
+ * @param {string} isoDate - ISO date.
+ * @param {string} timePortion - Time suffix.
+ * @returns {string} Combined datetime or original `isoDate`.
+ */
 function mergeDateWithTimePortion(isoDate, timePortion) {
   if (!isIsoDate(isoDate) || !timePortion) return isoDate;
   return `${isoDate}T${timePortion}`;
 }
 
+/**
+ * Converts one markdown event note into FullCalendar event objects.
+ * @param {string} filePath - Absolute markdown file path.
+ * @returns {Array<object> | null} Event array (including overrides) or `null` if not an event note.
+ */
 function toCalendarEvent(filePath) {
   const content = fs.readFileSync(filePath, "utf8");
   const frontmatter = extractFrontmatter(content);
@@ -587,6 +782,10 @@ function toCalendarEvent(filePath) {
   return [event];
 }
 
+/**
+ * Queries Obsidian Base view rows used for event generation.
+ * @returns {Array<Record<string, unknown>>} Base query row list.
+ */
 function queryBaseRows() {
   const run = (useVault) => {
     const args = ["base:query"];
@@ -616,6 +815,11 @@ function queryBaseRows() {
   }
 }
 
+/**
+ * Converts one base row into FullCalendar event objects.
+ * @param {Record<string, unknown>} row - Base query row.
+ * @returns {Array<object> | null} Event array (including overrides) or `null`.
+ */
 function baseRowToCalendarEvent(row) {
   const sourcePath = String(row.path ?? "").trim();
   const sourceFilePath = sourcePath ? path.resolve(VAULT_ROOT, sourcePath) : "";
@@ -887,11 +1091,19 @@ function baseRowToCalendarEvent(row) {
   return [event];
 }
 
+/**
+ * Collects all calendar events from Obsidian Base rows.
+ * @returns {object[]} Calendar events.
+ */
 function collectEventsFromBase() {
   const rows = queryBaseRows();
   return rows.flatMap(baseRowToCalendarEvent).filter(Boolean);
 }
 
+/**
+ * Collects all calendar events from recursive markdown scan fallback.
+ * @returns {object[]} Calendar events.
+ */
 function collectEventsFromMarkdownScan() {
   const allMarkdown = listMarkdownFiles(VAULT_ROOT);
   return allMarkdown.flatMap((filePath) => toCalendarEvent(filePath)).filter(Boolean);
@@ -916,6 +1128,11 @@ try {
   console.warn(`Base query failed, using fallback scan because ALLOW_MARKDOWN_FALLBACK=true.\n${error.message}`);
 }
 
+/**
+ * Extracts sortable event date token from event object.
+ * @param {object} event - Calendar event.
+ * @returns {string} Sort key value.
+ */
 function eventSortDate(event) {
   return String(event.start || event.startRecur || "");
 }
@@ -932,3 +1149,5 @@ fs.writeFileSync(OUTPUT_FILE, output, "utf8");
 console.log(
   `Generated ${events.length} events from ${sourceLabel} -> ${path.relative(VAULT_ROOT, OUTPUT_FILE)}`
 );
+
+

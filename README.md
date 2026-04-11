@@ -38,6 +38,17 @@ Stoppen:
 npm.cmd --prefix .\Tools run stop:preview
 ```
 
+## Quality Checks (JS/MJS)
+
+Von Repository-Root:
+
+```powershell
+npm.cmd --prefix .\Tools run lint
+npm.cmd --prefix .\Tools run lint:jsdoc
+```
+
+Hinweis: JSDoc-Regeln sind als Fehler geschaltet. Fehlende oder unvollstaendige JSDoc-Kommentare lassen `lint` fehlschlagen.
+
 Direkt im Obsidian Webviewer oeffnen:
 
 ```powershell

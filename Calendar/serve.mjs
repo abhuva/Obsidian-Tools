@@ -1,4 +1,4 @@
-import http from "node:http";
+﻿import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
@@ -72,6 +72,10 @@ const MIME_TYPES = {
   ".ico": "image/x-icon"
 };
 
+/**
+ * Builds candidate executable names/paths for the Obsidian CLI.
+ * @returns {string[]} Ordered candidate list, de-duplicated.
+ */
 function getObsidianBinCandidates() {
   const candidates = [];
   const fromEnv = String(process.env.OBSIDIAN_BIN || "").trim();
@@ -91,6 +95,10 @@ function getObsidianBinCandidates() {
   return Array.from(new Set(candidates));
 }
 
+/**
+ * Resolves the first usable Obsidian CLI binary candidate.
+ * @returns {string} Absolute binary path or command name.
+ */
 function resolveObsidianBin() {
   for (const candidate of getObsidianBinCandidates()) {
     if (!candidate) continue;
@@ -103,15 +111,30 @@ function resolveObsidianBin() {
   return "obsidian";
 }
 
+/**
+ * Normalizes a vault-relative path to slash-separated form without leading slash.
+ * @param {unknown} value - Raw path-like value.
+ * @returns {string} Normalized vault-relative path.
+ */
 function normalizeVaultRelativePath(value) {
   return String(value || "").replace(/\\/g, "/").replace(/^\/+/, "").trim();
 }
 
+/**
+ * Parses a coordinate value and returns finite numbers only.
+ * @param {unknown} value - Raw coordinate value.
+ * @returns {number|null} Parsed coordinate or `null`.
+ */
 function normalizeCoordinateNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Parses coordinates from array/object/string input variants.
+ * @param {unknown} value - Candidate coordinate payload.
+ * @returns {{lat: number, lng: number}|null} Normalized coordinates or `null`.
+ */
 function parseCoordinatesInput(value) {
   if (value == null) return null;
 
@@ -140,6 +163,13 @@ function parseCoordinatesInput(value) {
   return { lat, lng };
 }
 
+/**
+ * Sanitizes a Base filter object to valid path/view/title values.
+ * @param {unknown} basePath - Base file path.
+ * @param {unknown} baseView - Base view name.
+ * @param {unknown} [title=""] - Display title.
+ * @returns {{path: string, view: string, title: string}} Sanitized filter object.
+ */
 function sanitizeBaseFilter(basePath, baseView, title = "") {
   const pathValue = normalizeVaultRelativePath(basePath);
   return {
@@ -149,11 +179,21 @@ function sanitizeBaseFilter(basePath, baseView, title = "") {
   };
 }
 
+/**
+ * Validates a `.base` file path.
+ * @param {unknown} basePath - Candidate base path.
+ * @returns {boolean} `true` when path points to a base file.
+ */
 function isValidBasePath(basePath) {
   const normalized = normalizeVaultRelativePath(basePath).toLowerCase();
   return normalized.endsWith(".base");
 }
 
+/**
+ * Checks whether a base file exists inside the vault.
+ * @param {unknown} basePath - Candidate base path.
+ * @returns {boolean} `true` when file exists and is within vault root.
+ */
 function basePathExists(basePath) {
   const normalized = normalizeVaultRelativePath(basePath);
   if (!normalized || !isValidBasePath(normalized)) return false;
@@ -162,6 +202,10 @@ function basePathExists(basePath) {
   return fs.existsSync(resolved) && fs.statSync(resolved).isFile();
 }
 
+/**
+ * Loads persisted base filter state from disk.
+ * @returns {{path: string, view: string, title: string}|null} Saved filter or `null`.
+ */
 function loadSavedFilterState() {
   try {
     if (!fs.existsSync(FILTER_STATE_FILE)) return null;
@@ -174,11 +218,22 @@ function loadSavedFilterState() {
   }
 }
 
+/**
+ * Persists the active base filter state.
+ * @param {{path: string, view: string, title: string}} filter - Filter to persist.
+ * @returns {void}
+ */
 function saveFilterState(filter) {
   const safeFilter = sanitizeBaseFilter(filter.path, filter.view, filter.title);
   fs.writeFileSync(FILTER_STATE_FILE, JSON.stringify(safeFilter, null, 2), "utf8");
 }
 
+/**
+ * Recursively extracts bookmarked base files from the configured bookmark group.
+ * @param {Array<object>} items - Bookmark tree nodes.
+ * @param {boolean} [inKalendarBasesGroup=false] - Whether traversal is inside target group.
+ * @returns {Array<{path: string, view: string, title: string}>} Collected base filters.
+ */
 function collectBaseBookmarks(items, inKalendarBasesGroup = false) {
   const results = [];
   for (const item of items || []) {
@@ -200,6 +255,10 @@ function collectBaseBookmarks(items, inKalendarBasesGroup = false) {
   return results;
 }
 
+/**
+ * Reads available base filters from defaults and bookmarks.
+ * @returns {Array<{path: string, view: string, title: string}>} Available base filters.
+ */
 function readAvailableBaseFilters() {
   const defaultFilter = sanitizeBaseFilter(DEFAULT_BASE_PATH, DEFAULT_BASE_VIEW, "Kalender");
   const byPath = new Map();
@@ -222,6 +281,11 @@ function readAvailableBaseFilters() {
   return [...byPath.values()];
 }
 
+/**
+ * Selects current base filter using saved state, env defaults, and fallbacks.
+ * @param {Array<{path: string, view: string, title: string}>} availableFilters - Available filters.
+ * @returns {{path: string, view: string, title: string}} Selected base filter.
+ */
 function selectCurrentBaseFilter(availableFilters) {
   const saved = loadSavedFilterState();
   if (saved) {
@@ -236,6 +300,11 @@ function selectCurrentBaseFilter(availableFilters) {
   return availableFilters[0] || envDefault;
 }
 
+/**
+ * Resolves static asset request paths and blocks path traversal.
+ * @param {unknown} urlPath - Requested URL path.
+ * @returns {string|null} Absolute file path or `null` when invalid.
+ */
 function safeResolve(urlPath) {
   let decoded = "";
   try {
@@ -249,6 +318,11 @@ function safeResolve(urlPath) {
   return resolved;
 }
 
+/**
+ * Parses and normalizes an Origin/Referer header to origin-only form.
+ * @param {unknown} value - Header value.
+ * @returns {string} Normalized origin or empty string.
+ */
 function parseOriginHeader(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -259,6 +333,10 @@ function parseOriginHeader(value) {
   }
 }
 
+/**
+ * Returns host header values accepted for mutating API requests.
+ * @returns {Set<string>} Allowed host header values.
+ */
 function allowedHostHeaders() {
   return new Set(
     [
@@ -270,6 +348,10 @@ function allowedHostHeaders() {
   );
 }
 
+/**
+ * Returns allowed request origins for mutating API requests.
+ * @returns {Set<string>} Allowed origins.
+ */
 function allowedOrigins() {
   return new Set(
     [
@@ -281,11 +363,21 @@ function allowedOrigins() {
   );
 }
 
+/**
+ * Checks whether request content type is JSON.
+ * @param {import("node:http").IncomingMessage} req - Incoming request.
+ * @returns {boolean} `true` when content type starts with `application/json`.
+ */
 function hasJsonContentType(req) {
   const value = String(req.headers["content-type"] || "").toLowerCase();
   return value.startsWith("application/json");
 }
 
+/**
+ * Verifies API token using timing-safe comparison.
+ * @param {unknown} value - Token candidate.
+ * @returns {boolean} `true` when token matches configured API token.
+ */
 function isValidApiToken(value) {
   const provided = String(value || "").trim();
   if (!provided) return false;
@@ -295,6 +387,11 @@ function isValidApiToken(value) {
   return crypto.timingSafeEqual(expectedBuffer, providedBuffer);
 }
 
+/**
+ * Validates host/origin/token constraints for state-changing API calls.
+ * @param {import("node:http").IncomingMessage} req - Incoming request.
+ * @returns {string} Empty string when valid, otherwise rejection reason.
+ */
 function validateMutationRequest(req) {
   const requestHost = String(req.headers.host || "").trim().toLowerCase();
   if (!requestHost || !allowedHostHeaders().has(requestHost)) {
@@ -315,6 +412,11 @@ function validateMutationRequest(req) {
   return "";
 }
 
+/**
+ * Resolves a vault-relative markdown path safely and tolerates common encoding issues.
+ * @param {unknown} relativePath - User-supplied vault path.
+ * @returns {string|null} Absolute markdown path or `null` when unresolved.
+ */
 function safeResolveVaultPath(relativePath) {
   const raw = String(relativePath || "").trim();
   if (!raw) return null;
@@ -335,7 +437,7 @@ function safeResolveVaultPath(relativePath) {
     // ignore invalid URI encoding
   }
 
-  // Recover common mojibake: UTF-8 bytes interpreted as latin1 (e.g. KrÃ¶llwitz -> Kröllwitz)
+  // Recover common mojibake: UTF-8 bytes interpreted as latin1 (e.g. KrÃƒÂ¶llwitz -> KrÃ¶llwitz)
   addCandidate(Buffer.from(raw, "latin1").toString("utf8"));
 
   for (const candidate of candidates) {
@@ -349,20 +451,40 @@ function safeResolveVaultPath(relativePath) {
   return null;
 }
 
+/**
+ * Checks whether a value is an ISO calendar date (`YYYY-MM-DD`).
+ * @param {unknown} value - Candidate date value.
+ * @returns {boolean} `true` when value matches ISO date format.
+ */
 function isIsoDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(String(value || "").trim());
 }
 
+/**
+ * Checks whether a value is an ISO datetime accepted by calendar APIs.
+ * @param {unknown} value - Candidate datetime value.
+ * @returns {boolean} `true` when value matches supported ISO datetime format.
+ */
 function isIsoDateTime(value) {
   return /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:\d{2})?$/.test(
     String(value || "").trim()
   );
 }
 
+/**
+ * Checks whether value is either ISO date or ISO datetime.
+ * @param {unknown} value - Candidate date-like value.
+ * @returns {boolean} `true` when value is accepted as date/date-time.
+ */
 function isDateOrDateTime(value) {
   return isIsoDate(value) || isIsoDateTime(value);
 }
 
+/**
+ * Normalizes date-like input into canonical `YYYY-MM-DD` or `YYYY-MM-DDTHH:mm...`.
+ * @param {unknown} value - Raw date-like input.
+ * @returns {string} Normalized date/date-time string, or empty string when invalid.
+ */
 function normalizeCalendarDateLike(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -371,12 +493,22 @@ function normalizeCalendarDateLike(value) {
   return "";
 }
 
+/**
+ * Extracts the `YYYY-MM-DD` portion from a date/datetime input.
+ * @param {unknown} value - Candidate date-like input.
+ * @returns {string} ISO date part, or empty string.
+ */
 function toIsoDatePart(value) {
   const raw = String(value || "").trim();
   const match = raw.match(/^(\d{4}-\d{2}-\d{2})/);
   return match && match[1] ? match[1] : "";
 }
 
+/**
+ * Splits a date/datetime into date and optional time suffix.
+ * @param {unknown} value - Candidate date-like input.
+ * @returns {{datePart: string, timePart: string}|null} Parsed parts, or `null` for unsupported input.
+ */
 function extractDateAndTime(value) {
   const raw = String(value || "").trim();
   const match = raw.match(/^(\d{4}-\d{2}-\d{2})(?:[T ](.+))?$/);
@@ -386,6 +518,12 @@ function extractDateAndTime(value) {
   return { datePart, timePart };
 }
 
+/**
+ * Keeps the existing date part and replaces its time part with incoming time part.
+ * @param {unknown} existingValue - Existing date/datetime value to preserve date from.
+ * @param {unknown} incomingValue - Incoming date/datetime value to read time from.
+ * @returns {unknown|string} Merged datetime when both parts are available, otherwise `incomingValue`.
+ */
 function mergeDateWithIncomingTime(existingValue, incomingValue) {
   const existing = extractDateAndTime(existingValue);
   const incoming = extractDateAndTime(incomingValue);
@@ -393,6 +531,11 @@ function mergeDateWithIncomingTime(existingValue, incomingValue) {
   return `${existing.datePart}${incoming.timePart}`;
 }
 
+/**
+ * Splits markdown into YAML frontmatter lines and body.
+ * @param {string} content - Raw markdown file content.
+ * @returns {{lineBreak: string, frontmatterLines: string[], rest: string}} Parsed frontmatter/body parts.
+ */
 function splitFrontmatter(content) {
   const normalizedContent = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
   const lineBreak = normalizedContent.includes("\r\n") ? "\r\n" : "\n";
@@ -417,6 +560,11 @@ function splitFrontmatter(content) {
   return { lineBreak, frontmatterLines, rest };
 }
 
+/**
+ * Removes YAML frontmatter block from markdown content when present.
+ * @param {string} content - Raw markdown file content.
+ * @returns {string} Markdown body without frontmatter.
+ */
 function stripFrontmatter(content) {
   const normalizedContent = content.charCodeAt(0) === 0xfeff ? content.slice(1) : content;
   const lines = normalizedContent.split(/\r?\n/);
@@ -433,12 +581,23 @@ function stripFrontmatter(content) {
   return normalizedContent;
 }
 
+/**
+ * Parses one top-level YAML scalar line (`key: value`).
+ * @param {unknown} line - Frontmatter line text.
+ * @returns {{key: string, rawValue: string}|null} Parsed key/value or `null` when not scalar line.
+ */
 function topLevelKeyAndValue(line) {
   const match = String(line || "").match(/^([A-Za-z0-9_-]+)\s*:\s*(.*)$/);
   if (!match) return null;
   return { key: String(match[1]).toLowerCase(), rawValue: String(match[2] || "").trim() };
 }
 
+/**
+ * Returns raw scalar value for first matching top-level frontmatter key.
+ * @param {string[]} lines - Frontmatter lines.
+ * @param {unknown} fieldName - Target field name.
+ * @returns {string} Raw scalar field value, or empty string.
+ */
 function frontmatterFieldValue(lines, fieldName) {
   const target = String(fieldName || "").toLowerCase();
   for (const line of lines) {
@@ -450,6 +609,11 @@ function frontmatterFieldValue(lines, fieldName) {
   return "";
 }
 
+/**
+ * Parses scalar frontmatter text and strips matching wrapping quotes.
+ * @param {unknown} rawValue - Raw scalar value text.
+ * @returns {string} Parsed scalar value.
+ */
 function parseFrontmatterScalar(rawValue) {
   const raw = String(rawValue || "").trim();
   if (!raw) return "";
@@ -459,6 +623,12 @@ function parseFrontmatterScalar(rawValue) {
   return raw;
 }
 
+/**
+ * Returns first non-empty parsed frontmatter value among given candidate keys.
+ * @param {string} content - Markdown content with optional YAML frontmatter.
+ * @param {...string} keys - Candidate keys in priority order.
+ * @returns {string} First matching parsed value, or empty string.
+ */
 function firstFrontmatterValue(content, ...keys) {
   if (!Array.isArray(keys) || keys.length === 0) return "";
   try {
@@ -474,6 +644,11 @@ function firstFrontmatterValue(content, ...keys) {
   return "";
 }
 
+/**
+ * Extracts first visible content block (paragraph/blockquote block) from markdown body.
+ * @param {string} content - Markdown content.
+ * @returns {string} First content block as markdown, trimmed.
+ */
 function extractFirstMarkdownBlock(content) {
   const body = stripFrontmatter(content);
   const lines = String(body || "").split(/\r?\n/);
@@ -501,6 +676,11 @@ function extractFirstMarkdownBlock(content) {
   return block.join("\n").trim();
 }
 
+/**
+ * Reads preview metadata/content for an event markdown note.
+ * @param {unknown} sourcePath - Vault-relative event note path.
+ * @returns {{sourcePath: string, title: string, start: string, end: string, previewMarkdown: string}} Event preview payload.
+ */
 function readEventPreview(sourcePath) {
   const markdownPath = safeResolveVaultPath(sourcePath);
   if (!markdownPath || !fs.existsSync(markdownPath)) {
@@ -524,6 +704,13 @@ function readEventPreview(sourcePath) {
   };
 }
 
+/**
+ * Rewrites/creates top-level YAML scalar keys while optionally removing others.
+ * @param {string[]} lines - Existing frontmatter lines.
+ * @param {Record<string,string>} replacements - Key/value pairs to write.
+ * @param {string[]} [removeKeys=[]] - Keys to remove.
+ * @returns {string[]} Rewritten frontmatter lines.
+ */
 function rewriteTopLevelScalarFields(lines, replacements, removeKeys = []) {
   const removeSet = new Set(removeKeys.map((key) => String(key || "").toLowerCase()));
   const replacementEntries = Object.entries(replacements || {}).filter(([key]) => String(key || "").trim());
@@ -567,6 +754,11 @@ function rewriteTopLevelScalarFields(lines, replacements, removeKeys = []) {
   return out;
 }
 
+/**
+ * Adds one day to an ISO date (`YYYY-MM-DD`) in UTC.
+ * @param {unknown} isoDate - ISO date input.
+ * @returns {string} Next day as ISO date.
+ */
 function addOneDay(isoDate) {
   const [year, month, day] = String(isoDate).split("-").map(Number);
   const utcDate = new Date(Date.UTC(year, month - 1, day));
@@ -574,10 +766,20 @@ function addOneDay(isoDate) {
   return utcDate.toISOString().slice(0, 10);
 }
 
+/**
+ * Quotes/escapes a scalar value for YAML frontmatter output.
+ * @param {unknown} value - Raw value.
+ * @returns {string} Double-quoted YAML-safe scalar.
+ */
 function yamlQuote(value) {
   return `"${String(value || "").replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 }
 
+/**
+ * Sanitizes an event title into a Windows-safe markdown filename base.
+ * @param {unknown} title - Raw event title.
+ * @returns {string} Filename-safe base name.
+ */
 function normalizeTitleToFileBase(title) {
   const normalized = String(title || "")
     .trim()
@@ -589,6 +791,10 @@ function normalizeTitleToFileBase(title) {
   return normalized || "Neues Event";
 }
 
+/**
+ * Resolves and creates the configured inbox directory inside the vault.
+ * @returns {string} Absolute inbox directory path.
+ */
 function resolveInboxDirectory() {
   const normalized = INBOX_PATH.replace(/\\/g, "/").replace(/^\/+/, "");
   const resolved = path.resolve(VAULT_ROOT, normalized);
@@ -599,6 +805,12 @@ function resolveInboxDirectory() {
   return resolved;
 }
 
+/**
+ * Chooses a non-existing markdown file path in a directory using `name (n)` suffixes.
+ * @param {string} dirPath - Target directory path.
+ * @param {unknown} fileBaseName - Desired file base name.
+ * @returns {string} Unique absolute file path.
+ */
 function pickUniqueFilePath(dirPath, fileBaseName) {
   const baseName = normalizeTitleToFileBase(fileBaseName);
   let counter = 1;
@@ -610,6 +822,11 @@ function pickUniqueFilePath(dirPath, fileBaseName) {
   }
 }
 
+/**
+ * Creates a new markdown event note in the inbox and returns its event payload.
+ * @param {{title: unknown, start: string, end: string, allDay: boolean}} payload - Event creation data.
+ * @returns {{sourcePath: string, event: object}} Created note path and FullCalendar event payload.
+ */
 function createEventMarkdownFile({ title, start, end, allDay }) {
   const safeTitle = String(title || "").trim();
   if (!safeTitle) throw new Error("Missing title");
@@ -658,6 +875,12 @@ function createEventMarkdownFile({ title, start, end, allDay }) {
   };
 }
 
+/**
+ * Updates schedule-related frontmatter fields while preserving unrelated metadata.
+ * @param {string} content - Existing markdown content.
+ * @param {{start: string, end: string, allDay: boolean, recurringSeriesEdit?: boolean}} payload - New schedule values.
+ * @returns {string} Updated markdown content.
+ */
 function updateFrontmatterSchedule(content, { start, end, allDay, recurringSeriesEdit = false }) {
   const { lineBreak, frontmatterLines, rest } = splitFrontmatter(content);
   const isTimed = allDay === false;
@@ -682,6 +905,11 @@ function updateFrontmatterSchedule(content, { start, end, allDay, recurringSerie
   return `---${lineBreak}${newFrontmatter}${lineBreak}---${lineBreak}${rest}`;
 }
 
+/**
+ * Reads request body with a hard 1 MiB limit.
+ * @param {import("node:http").IncomingMessage} req - Incoming request.
+ * @returns {Promise<string>} Raw body string.
+ */
 function readRequestBody(req) {
   return new Promise((resolve, reject) => {
     let body = "";
@@ -697,11 +925,21 @@ function readRequestBody(req) {
   });
 }
 
+/**
+ * Injects explicit vault targeting into Obsidian CLI arguments when configured.
+ * @param {string[]} args - Obsidian CLI args to augment.
+ * @returns {string[]} Argument list with optional `vault=` parameter.
+ */
 function withVaultArgs(args) {
   if (!OBSIDIAN_VAULT_NAME) return args;
   return [args[0], `vault=${OBSIDIAN_VAULT_NAME}`, ...args.slice(1)];
 }
 
+/**
+ * Detects CLI errors caused by invalid or missing vault targeting.
+ * @param {unknown} error - Error thrown by Obsidian CLI execution.
+ * @returns {boolean} `true` when the error indicates vault lookup problems.
+ */
 function isVaultTargetingError(error) {
   const text = String(error?.stderr || error?.stdout || error?.message || "").toLowerCase();
   return (
@@ -711,6 +949,12 @@ function isVaultTargetingError(error) {
   );
 }
 
+/**
+ * Executes Obsidian CLI and retries without vault targeting on vault lookup errors.
+ * @param {string[]} args - CLI arguments.
+ * @param {object} [options={}] - `execFileSync` options.
+ * @returns {string} CLI stdout as UTF-8 text.
+ */
 function runObsidian(args, options = {}) {
   const execOptions = {
     cwd: VAULT_ROOT,
@@ -731,6 +975,11 @@ function runObsidian(args, options = {}) {
   }
 }
 
+/**
+ * Opens a markdown file in Obsidian in a new tab.
+ * @param {unknown} sourcePath - Vault-relative markdown path.
+ * @returns {string} Normalized vault-relative path that was opened.
+ */
 function openMarkdownInObsidianNewTab(sourcePath) {
   const markdownPath = safeResolveVaultPath(sourcePath);
   if (!markdownPath) {
@@ -742,6 +991,11 @@ function openMarkdownInObsidianNewTab(sourcePath) {
   return vaultRelativePath;
 }
 
+/**
+ * Opens the kalender base map view and optionally focuses map coordinates.
+ * @param {{lat: number, lng: number}|null} [coordinates=null] - Optional map focus coordinates.
+ * @returns {{basePath: string, view: string, centered: boolean}} Obsidian map-open response.
+ */
 function openKalenderBaseMapInObsidianNewTab(coordinates = null) {
   const basePath = normalizeVaultRelativePath(KALENDER_MAP_BASE_PATH);
   if (!basePath || !basePathExists(basePath)) {
@@ -828,6 +1082,11 @@ JSON.stringify({ basePath, view: "Map", centered: Boolean(coords) });
   }
 }
 
+/**
+ * Rebuilds `events.generated.js` for the selected base filter.
+ * @param {{path: unknown, view: unknown, title?: unknown}} baseFilter - Base filter payload.
+ * @returns {void}
+ */
 function rebuildEventsFile(baseFilter) {
   const filter = sanitizeBaseFilter(baseFilter.path, baseFilter.view, baseFilter.title);
   if (!isValidBasePath(filter.path) || !basePathExists(filter.path)) {
@@ -845,10 +1104,18 @@ function rebuildEventsFile(baseFilter) {
   });
 }
 
+/**
+ * Writes current preview server PID to the runtime PID file.
+ * @returns {void}
+ */
 function writePidFile() {
   fs.writeFileSync(PID_FILE, `${process.pid}\n`, "utf8");
 }
 
+/**
+ * Deletes the runtime PID file when it belongs to this process.
+ * @returns {void}
+ */
 function clearPidFile() {
   try {
     if (!fs.existsSync(PID_FILE)) return;
@@ -860,6 +1127,10 @@ function clearPidFile() {
   }
 }
 
+/**
+ * Reads current Obsidian theme tokens for frontend mirror mode.
+ * @returns {{mode: string, classes: string, cssTheme: string, baseTheme: string, vars: object}} Theme snapshot.
+ */
 function readObsidianThemeSnapshot() {
   const js = `
 const bodyClasses = String(document.body?.className || "");
@@ -891,10 +1162,18 @@ JSON.stringify({
   return JSON.parse(clean);
 }
 
+/**
+ * Checks whether Google OAuth client credentials are configured.
+ * @returns {boolean} `true` when OAuth client id/secret/redirect are all present.
+ */
 function hasGoogleOAuthConfig() {
   return Boolean(GOOGLE_OAUTH_CLIENT_ID && GOOGLE_OAUTH_CLIENT_SECRET && GOOGLE_OAUTH_REDIRECT_URI);
 }
 
+/**
+ * Loads persisted Google OAuth token data from disk.
+ * @returns {object|null} Token payload, or `null` when unavailable/invalid.
+ */
 function loadGoogleOAuthToken() {
   try {
     if (!fs.existsSync(GOOGLE_OAUTH_TOKEN_FILE)) return null;
@@ -906,10 +1185,19 @@ function loadGoogleOAuthToken() {
   }
 }
 
+/**
+ * Persists Google OAuth token data to the configured token file.
+ * @param {object} token - Token payload returned by Google OAuth endpoints.
+ * @returns {void}
+ */
 function saveGoogleOAuthToken(token) {
   fs.writeFileSync(GOOGLE_OAUTH_TOKEN_FILE, JSON.stringify(token, null, 2), "utf8");
 }
 
+/**
+ * Deletes persisted Google OAuth token data from disk.
+ * @returns {void}
+ */
 function clearGoogleOAuthToken() {
   try {
     if (fs.existsSync(GOOGLE_OAUTH_TOKEN_FILE)) {
@@ -920,6 +1208,11 @@ function clearGoogleOAuthToken() {
   }
 }
 
+/**
+ * Splits a Google OAuth scope string into normalized individual scopes.
+ * @param {unknown} scopeValue - Raw space-separated scope string.
+ * @returns {string[]} Parsed scope list.
+ */
 function parseGoogleScopes(scopeValue) {
   return String(scopeValue || "")
     .split(/\s+/)
@@ -927,6 +1220,11 @@ function parseGoogleScopes(scopeValue) {
     .filter(Boolean);
 }
 
+/**
+ * Checks whether a scope set allows Google Calendar write operations.
+ * @param {unknown} scopeValue - Raw OAuth scope string.
+ * @returns {boolean} `true` when one of the write-capable calendar scopes is present.
+ */
 function isGoogleScopeWritable(scopeValue) {
   const scopes = new Set(parseGoogleScopes(scopeValue));
   return (
@@ -936,6 +1234,10 @@ function isGoogleScopeWritable(scopeValue) {
   );
 }
 
+/**
+ * Builds OAuth status flags used by the calendar settings UI and API responses.
+ * @returns {{configured: boolean, connected: boolean, writable: boolean, scope: string, hasRefreshToken: boolean}} OAuth status snapshot.
+ */
 function googleOAuthStatusSnapshot() {
   const token = loadGoogleOAuthToken();
   const connected = Boolean(token && (token.access_token || token.refresh_token));
@@ -949,6 +1251,11 @@ function googleOAuthStatusSnapshot() {
   };
 }
 
+/**
+ * Exchanges an OAuth authorization code for tokens and stores merged token data.
+ * @param {string} code - Authorization code from Google OAuth callback.
+ * @returns {Promise<object>} Persisted merged token payload.
+ */
 async function exchangeGoogleAuthCode(code) {
   const body = new URLSearchParams();
   body.set("code", code);
@@ -980,6 +1287,11 @@ async function exchangeGoogleAuthCode(code) {
   return merged;
 }
 
+/**
+ * Refreshes the Google access token using a refresh token and persists the result.
+ * @param {object} existingToken - Current persisted token payload.
+ * @returns {Promise<object>} Refreshed merged token payload.
+ */
 async function refreshGoogleAccessToken(existingToken) {
   const refreshToken = String(existingToken && existingToken.refresh_token || "").trim();
   if (!refreshToken) {
@@ -1013,6 +1325,10 @@ async function refreshGoogleAccessToken(existingToken) {
   return merged;
 }
 
+/**
+ * Returns a valid Google OAuth access token, refreshing when needed.
+ * @returns {Promise<string>} Access token, or empty string when OAuth is not available.
+ */
 async function getGoogleAccessToken() {
   if (!hasGoogleOAuthConfig()) return "";
   const token = loadGoogleOAuthToken();
@@ -1027,6 +1343,10 @@ async function getGoogleAccessToken() {
   return String(refreshed.access_token || "").trim();
 }
 
+/**
+ * Builds Google calendar source configuration for frontend/API use.
+ * @returns {{enabled: boolean, calendars: Array<{id: string}>, oauth: object, defaultCreateCalendarId: string}} Google calendar config.
+ */
 function getGoogleCalendarConfig() {
   const oauthStatus = googleOAuthStatusSnapshot();
   return {
@@ -1037,6 +1357,12 @@ function getGoogleCalendarConfig() {
   };
 }
 
+/**
+ * Sends an authenticated Google Calendar API request (OAuth preferred, API key fallback for read).
+ * @param {string} url - Absolute Google API endpoint URL.
+ * @param {{method?: string, body?: object|null, requireOAuth?: boolean}} [options={}] - Request options.
+ * @returns {Promise<object|null>} Parsed JSON response, or `null` for `204 No Content`.
+ */
 async function googleCalendarApiFetch(url, { method = "GET", body = null, requireOAuth = false } = {}) {
   const accessToken = await getGoogleAccessToken();
   const hasOAuth = Boolean(accessToken);
@@ -1069,6 +1395,11 @@ async function googleCalendarApiFetch(url, { method = "GET", body = null, requir
   return response.json();
 }
 
+/**
+ * Normalizes an input datetime into UTC ISO string for Google range queries.
+ * @param {unknown} value - Candidate datetime value.
+ * @returns {string} ISO datetime string, or empty string when invalid.
+ */
 function normalizeGoogleRangeDateTime(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
@@ -1081,6 +1412,10 @@ const GOOGLE_FALLBACK_EVENT_BG = "#a4bdfc";
 const GOOGLE_FALLBACK_EVENT_TEXT = "#1d1d1d";
 const GOOGLE_FALLBACK_COLOR_ID = "1";
 
+/**
+ * Loads Google event/calendar color palette metadata.
+ * @returns {Promise<{event: object, calendar: object}>} Palette dictionaries keyed by color id.
+ */
 async function fetchGoogleCalendarColorPalette() {
   const payload = await googleCalendarApiFetch("https://www.googleapis.com/calendar/v3/colors", { method: "GET" });
   return {
@@ -1089,6 +1424,12 @@ async function fetchGoogleCalendarColorPalette() {
   };
 }
 
+/**
+ * Reads metadata for one Google calendar (title + effective colors).
+ * @param {string} calendarId - Google calendar id.
+ * @param {{event: object, calendar: object}} colorPalette - Palette maps from Google colors endpoint.
+ * @returns {Promise<{id: string, summary: string, colorId: string, backgroundColor: string, foregroundColor: string}>} Calendar metadata.
+ */
 async function fetchGoogleCalendarMetadata(calendarId, colorPalette) {
   const payload = await googleCalendarApiFetch(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}`,
@@ -1105,6 +1446,13 @@ async function fetchGoogleCalendarMetadata(calendarId, colorPalette) {
   };
 }
 
+/**
+ * Resolves final event colors using explicit event colors, calendar colors, and fallback palette.
+ * @param {object} item - Raw Google Calendar event payload.
+ * @param {object} calendarMeta - Calendar metadata including default colors.
+ * @param {{event: object, calendar: object}} colorPalette - Palette dictionaries keyed by color id.
+ * @returns {{eventColorId: string, backgroundColor: string, textColor: string}} Effective color metadata.
+ */
 function resolveGoogleEventColors(item, calendarMeta, colorPalette) {
   const eventColorId = String(item?.colorId || "").trim();
   const calendarColorId = String(calendarMeta?.colorId || "").trim();
@@ -1130,6 +1478,15 @@ function resolveGoogleEventColors(item, calendarMeta, colorPalette) {
   return { eventColorId: effectiveColorId, backgroundColor, textColor };
 }
 
+/**
+ * Fetches events for one Google calendar and maps them to FullCalendar event objects.
+ * @param {string} calendarId - Google calendar id.
+ * @param {string} timeMin - ISO range start.
+ * @param {string} timeMax - ISO range end.
+ * @param {{event: object, calendar: object}} colorPalette - Palette dictionaries keyed by color id.
+ * @param {object} calendarMeta - Metadata for the calendar.
+ * @returns {Promise<Array<object>>} FullCalendar-compatible event list.
+ */
 async function fetchGoogleCalendarEventsForCalendar(calendarId, timeMin, timeMax, colorPalette, calendarMeta) {
   const endpoint = new URL(
     `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}/events`
@@ -1178,6 +1535,12 @@ async function fetchGoogleCalendarEventsForCalendar(calendarId, timeMin, timeMax
     .filter(Boolean);
 }
 
+/**
+ * Fetches and merges Google events across all configured calendars for a time range.
+ * @param {unknown} start - Range start datetime.
+ * @param {unknown} end - Range end datetime.
+ * @returns {Promise<Array<object>>} Merged and sorted FullCalendar events.
+ */
 async function fetchGoogleCalendarEventsInRange(start, end) {
   const config = getGoogleCalendarConfig();
   if (!config.enabled) {
@@ -1224,6 +1587,13 @@ async function fetchGoogleCalendarEventsInRange(start, end) {
   return merged;
 }
 
+/**
+ * Builds Google event date payload (`date` or `dateTime`) from normalized inputs.
+ * @param {unknown} start - Event start value.
+ * @param {unknown} end - Event end value.
+ * @param {boolean} allDay - Whether event is all-day.
+ * @returns {{start: object, end: object}} Google Calendar API date payload.
+ */
 function toGoogleEventDatePayload(start, end, allDay) {
   const safeStart = normalizeCalendarDateLike(start);
   const safeEnd = normalizeCalendarDateLike(end) || safeStart;
@@ -1249,6 +1619,11 @@ function toGoogleEventDatePayload(start, end, allDay) {
   };
 }
 
+/**
+ * Creates a Google calendar event in the selected/default target calendar.
+ * @param {{calendarId?: string, title: unknown, start: unknown, end: unknown, allDay: boolean, colorId?: unknown}} payload - Create payload.
+ * @returns {Promise<object>} Created Google event object.
+ */
 async function createGoogleCalendarEvent({ calendarId, title, start, end, allDay, colorId }) {
   const targetCalendarId = String(calendarId || GOOGLE_DEFAULT_CREATE_CALENDAR_ID || "").trim();
   if (!targetCalendarId) {
@@ -1267,6 +1642,11 @@ async function createGoogleCalendarEvent({ calendarId, title, start, end, allDay
   return created;
 }
 
+/**
+ * Updates an existing Google calendar event by id.
+ * @param {{calendarId: unknown, eventId: unknown, title?: unknown, start: unknown, end: unknown, allDay: boolean}} payload - Update payload.
+ * @returns {Promise<object>} Updated Google event object.
+ */
 async function updateGoogleCalendarEvent({ calendarId, eventId, title, start, end, allDay }) {
   const targetCalendarId = String(calendarId || "").trim();
   const targetEventId = String(eventId || "").trim();
@@ -1285,6 +1665,11 @@ async function updateGoogleCalendarEvent({ calendarId, eventId, title, start, en
   return updated;
 }
 
+/**
+ * Deletes a Google calendar event by id.
+ * @param {{calendarId: unknown, eventId: unknown}} payload - Delete payload.
+ * @returns {Promise<void>}
+ */
 async function deleteGoogleCalendarEvent({ calendarId, eventId }) {
   const targetCalendarId = String(calendarId || "").trim();
   const targetEventId = String(eventId || "").trim();
@@ -1297,6 +1682,10 @@ async function deleteGoogleCalendarEvent({ calendarId, eventId }) {
   );
 }
 
+/**
+ * Checks whether all required Nextcloud CalDAV configuration values are present.
+ * @returns {boolean} `true` when base URL, credentials, and at least one calendar are configured.
+ */
 function hasNextcloudCalDavConfig() {
   return Boolean(
     NEXTCLOUD_CALDAV_BASE_URL &&
@@ -1306,12 +1695,22 @@ function hasNextcloudCalDavConfig() {
   );
 }
 
+/**
+ * Ensures a URL/path string ends with a trailing slash.
+ * @param {unknown} value - Candidate input value.
+ * @returns {string} Normalized value with trailing slash (or empty string).
+ */
 function ensureTrailingSlash(value) {
   const raw = String(value || "").trim();
   if (!raw) return "";
   return raw.endsWith("/") ? raw : `${raw}/`;
 }
 
+/**
+ * Escapes XML special characters for safe embedding in XML documents.
+ * @param {unknown} value - Raw text value.
+ * @returns {string} Escaped XML text.
+ */
 function xmlEscape(value) {
   return String(value || "")
     .replace(/&/g, "&amp;")
@@ -1321,6 +1720,11 @@ function xmlEscape(value) {
     .replace(/'/g, "&apos;");
 }
 
+/**
+ * Unescapes XML entities into plain text.
+ * @param {unknown} value - Escaped XML text.
+ * @returns {string} Unescaped text.
+ */
 function xmlUnescape(value) {
   return String(value || "")
     .replace(/&apos;/g, "'")
@@ -1330,6 +1734,11 @@ function xmlUnescape(value) {
     .replace(/&amp;/g, "&");
 }
 
+/**
+ * Escapes text for ICS property values.
+ * @param {unknown} value - Raw text.
+ * @returns {string} ICS-escaped text.
+ */
 function icsEscapeText(value) {
   return String(value || "")
     .replace(/\\/g, "\\\\")
@@ -1338,6 +1747,11 @@ function icsEscapeText(value) {
     .replace(/;/g, "\\;");
 }
 
+/**
+ * Unescapes ICS text property encoding.
+ * @param {unknown} value - ICS-escaped text.
+ * @returns {string} Decoded text.
+ */
 function icsUnescapeText(value) {
   return String(value || "")
     .replace(/\\\\/g, "\\")
@@ -1346,10 +1760,20 @@ function icsUnescapeText(value) {
     .replace(/\\;/g, ";");
 }
 
+/**
+ * Normalizes a Nextcloud calendar id/slug value.
+ * @param {unknown} value - Candidate calendar id.
+ * @returns {string} Lowercased normalized calendar id.
+ */
 function normalizeNextcloudCalendarId(value) {
   return String(value || "").trim().replace(/\/+$/, "");
 }
 
+/**
+ * Parses a Nextcloud calendar reference (slug or URL) into stable calendar metadata.
+ * @param {unknown} ref - Configured calendar reference.
+ * @returns {{id: string, slug: string, href: string, url: string}|null} Parsed calendar metadata, or `null` when invalid.
+ */
 function parseNextcloudCalendarRef(ref) {
   const raw = String(ref || "").trim();
   if (!raw) return null;
@@ -1383,6 +1807,10 @@ function parseNextcloudCalendarRef(ref) {
   };
 }
 
+/**
+ * Builds normalized calendar metadata for all configured Nextcloud calendars.
+ * @returns {Array<{id: string, slug: string, href: string, url: string}>} Parsed calendar list.
+ */
 function buildNextcloudCalendars() {
   const byId = new Map();
   for (const ref of NEXTCLOUD_CALDAV_CALENDARS) {
@@ -1393,6 +1821,11 @@ function buildNextcloudCalendars() {
   return [...byId.values()];
 }
 
+/**
+ * Resolves one Nextcloud calendar by id/slug.
+ * @param {unknown} calendarId - Calendar id/slug candidate.
+ * @returns {{id: string, slug: string, href: string, url: string}|null} Matching calendar metadata, or `null`.
+ */
 function resolveNextcloudCalendar(calendarId) {
   const targetId = normalizeNextcloudCalendarId(calendarId);
   const calendars = buildNextcloudCalendars();
@@ -1405,6 +1838,10 @@ function resolveNextcloudCalendar(calendarId) {
   );
 }
 
+/**
+ * Builds Nextcloud source configuration for frontend/API use.
+ * @returns {{enabled: boolean, calendars: Array<object>, defaultCreateCalendarId: string}} Nextcloud calendar config.
+ */
 function getNextcloudCalendarConfig() {
   const calendars = buildNextcloudCalendars();
   const enabled = hasNextcloudCalDavConfig() && calendars.length > 0;
@@ -1416,6 +1853,12 @@ function getNextcloudCalendarConfig() {
   };
 }
 
+/**
+ * Sends a CalDAV request with Nextcloud basic auth and validates response status.
+ * @param {string} url - Target CalDAV URL.
+ * @param {{method?: string, headers?: object, body?: string|null, expectedStatus?: number[]}} [options={}] - Fetch options.
+ * @returns {Promise<Response>} Raw fetch response.
+ */
 async function nextcloudCalDavFetch(url, { method = "GET", headers = {}, body = null, expectedStatus = [] } = {}) {
   if (!hasNextcloudCalDavConfig()) {
     throw new Error("Nextcloud CalDAV not configured. Set NEXTCLOUD_CALDAV_* vars in .env.local.");
@@ -1442,6 +1885,11 @@ async function nextcloudCalDavFetch(url, { method = "GET", headers = {}, body = 
   return response;
 }
 
+/**
+ * Converts a datetime-like input into basic UTC iCalendar format (`YYYYMMDDTHHmmssZ`).
+ * @param {unknown} value - Candidate datetime.
+ * @returns {string} Basic UTC datetime, or empty string when invalid.
+ */
 function toCalDavUtcBasicDateTime(value) {
   const raw = String(value || "").trim();
   const timestamp = Date.parse(raw);
@@ -1456,6 +1904,11 @@ function toCalDavUtcBasicDateTime(value) {
   return `${y}${m}${d}T${hh}${mm}${ss}Z`;
 }
 
+/**
+ * Parses one unfolded ICS property line into name/params/value.
+ * @param {unknown} line - ICS property line.
+ * @returns {{name: string, params: Record<string,string>, value: string}|null} Parsed property, or `null` when invalid.
+ */
 function parseIcsPropertyLine(line) {
   const raw = String(line || "");
   const separatorIndex = raw.indexOf(":");
@@ -1479,6 +1932,12 @@ function parseIcsPropertyLine(line) {
   return { name, params, value };
 }
 
+/**
+ * Parses ICS date/datetime values and returns normalized ISO output.
+ * @param {unknown} rawValue - ICS date/datetime text.
+ * @param {Record<string,string>} [params={}] - ICS parameter map.
+ * @returns {{value: string, allDay: boolean}} Normalized value and all-day flag.
+ */
 function parseIcsDateValue(rawValue, params = {}) {
   const raw = String(rawValue || "").trim();
   if (!raw) return { value: "", allDay: false };
@@ -1510,10 +1969,21 @@ function parseIcsDateValue(rawValue, params = {}) {
   return { value: raw, allDay: false };
 }
 
+/**
+ * Returns a de-duplicated list of non-empty strings preserving first occurrence order.
+ * @param {unknown} values - Candidate list.
+ * @returns {string[]} De-duplicated string array.
+ */
 function dedupeStringList(values) {
   return [...new Set((Array.isArray(values) ? values : []).map((value) => String(value || "").trim()).filter(Boolean))];
 }
 
+/**
+ * Combines an ISO date with the time/timezone portion from a reference datetime.
+ * @param {unknown} dateValue - Date input (`YYYY-MM-DD`).
+ * @param {unknown} startValue - Reference datetime carrying time/timezone.
+ * @returns {string} Combined ISO datetime, or empty string when impossible.
+ */
 function mergeIsoDateWithStartTimePortion(dateValue, startValue) {
   const day = toIsoDatePart(dateValue);
   if (!day || !isIsoDate(day)) return String(dateValue || "").trim();
@@ -1522,6 +1992,11 @@ function mergeIsoDateWithStartTimePortion(dateValue, startValue) {
   return `${day}${match[1]}`;
 }
 
+/**
+ * Parses an ICS RRULE string into FullCalendar-compatible rrule fields.
+ * @param {unknown} rawValue - ICS RRULE value.
+ * @returns {object|null} Parsed recurrence rule object, or `null`.
+ */
 function parseIcsRrule(rawValue) {
   const raw = String(rawValue || "").trim();
   if (!raw) return null;
@@ -1584,6 +2059,13 @@ function parseIcsRrule(rawValue) {
   return out;
 }
 
+/**
+ * Parses and normalizes EXDATE lines for recurring events.
+ * @param {Array<{value: string, params?: Record<string,string>}>} exdateProps - EXDATE properties.
+ * @param {string} startValue - Series start value.
+ * @param {boolean} allDay - Whether recurrence is all-day.
+ * @returns {string[]} Normalized exclusion list.
+ */
 function parseIcsExdateList(exdateProps, startValue, allDay) {
   const values = [];
   const props = Array.isArray(exdateProps) ? exdateProps : [];
@@ -1606,6 +2088,13 @@ function parseIcsExdateList(exdateProps, startValue, allDay) {
   return unique.map((value) => (isIsoDate(value) ? mergeIsoDateWithStartTimePortion(value, startValue) : value));
 }
 
+/**
+ * Derives an ISO-8601 duration for recurring events from start/end values.
+ * @param {string} startValue - Start datetime/date.
+ * @param {string} endValue - End datetime/date.
+ * @param {boolean} allDay - Whether event is all-day.
+ * @returns {string} Duration token suitable for FullCalendar recurrence, or empty string.
+ */
 function deriveRecurringDuration(startValue, endValue, allDay) {
   if (allDay) {
     const startDate = toIsoDatePart(startValue);
@@ -1624,6 +2113,11 @@ function deriveRecurringDuration(startValue, endValue, allDay) {
   return { milliseconds: endMs - startMs };
 }
 
+/**
+ * Parses VEVENT blocks from ICS text into normalized event data objects.
+ * @param {unknown} calendarData - Raw ICS file content.
+ * @returns {Array<object>} Parsed event list.
+ */
 function parseIcsEvents(calendarData) {
   const unfolded = String(calendarData || "").replace(/\r?\n[ \t]/g, "");
   const lines = unfolded.split(/\r?\n/);
@@ -1687,6 +2181,12 @@ function parseIcsEvents(calendarData) {
   }).filter((event) => Boolean(event.start));
 }
 
+/**
+ * Extracts first text content for an XML tag by local name.
+ * @param {unknown} xml - XML text.
+ * @param {string} localName - Tag local name (namespace ignored).
+ * @returns {string} Unescaped tag text, or empty string.
+ */
 function extractXmlTagText(xml, localName) {
   const pattern = new RegExp(`<(?:[^:>]+:)?${localName}[^>]*>([\\s\\S]*?)</(?:[^:>]+:)?${localName}>`, "i");
   const match = String(xml || "").match(pattern);
@@ -1694,6 +2194,12 @@ function extractXmlTagText(xml, localName) {
   return xmlUnescape(match[1].trim());
 }
 
+/**
+ * Extracts all XML inner blocks for a tag by local name.
+ * @param {unknown} xml - XML text.
+ * @param {string} localName - Tag local name (namespace ignored).
+ * @returns {string[]} Matched inner XML blocks.
+ */
 function extractXmlBlocks(xml, localName) {
   const pattern = new RegExp(`<(?:[^:>]+:)?${localName}\\b[^>]*>([\\s\\S]*?)</(?:[^:>]+:)?${localName}>`, "gi");
   const blocks = [];
@@ -1705,6 +2211,14 @@ function extractXmlBlocks(xml, localName) {
   return blocks;
 }
 
+/**
+ * Maps parsed Nextcloud/ICS event data into FullCalendar event format.
+ * @param {object} eventData - Parsed ICS event.
+ * @param {{id: string, slug: string}} calendarMeta - Source calendar metadata.
+ * @param {string} href - Event object href.
+ * @param {string} etag - Current ETag value.
+ * @returns {object} FullCalendar-compatible event object.
+ */
 function mapNextcloudEventToFullCalendar(eventData, calendarMeta, href, etag) {
   const uid = String(eventData.uid || "").trim();
   const eventId = uid || String(href || "").trim();
@@ -1755,6 +2269,13 @@ function mapNextcloudEventToFullCalendar(eventData, calendarMeta, href, etag) {
   return mapped;
 }
 
+/**
+ * Fetches and parses Nextcloud events for one calendar in a time range.
+ * @param {{id: string, slug: string, url: string}} calendarMeta - Calendar metadata.
+ * @param {unknown} timeStart - Range start datetime.
+ * @param {unknown} timeEnd - Range end datetime.
+ * @returns {Promise<Array<object>>} FullCalendar-compatible event list.
+ */
 async function fetchNextcloudCalendarEventsForCalendar(calendarMeta, timeStart, timeEnd) {
   const rangeStart = toCalDavUtcBasicDateTime(timeStart);
   const rangeEnd = toCalDavUtcBasicDateTime(timeEnd);
@@ -1815,6 +2336,12 @@ async function fetchNextcloudCalendarEventsForCalendar(calendarMeta, timeStart, 
   return events;
 }
 
+/**
+ * Fetches and merges Nextcloud events from all configured calendars for a time range.
+ * @param {unknown} start - Range start datetime.
+ * @param {unknown} end - Range end datetime.
+ * @returns {Promise<Array<object>>} Merged/sorted FullCalendar events.
+ */
 async function fetchNextcloudCalendarEventsInRange(start, end) {
   const config = getNextcloudCalendarConfig();
   if (!config.enabled) return [];
@@ -1829,16 +2356,31 @@ async function fetchNextcloudCalendarEventsInRange(start, end) {
   return merged;
 }
 
+/**
+ * Formats a date-like input into ICS all-day date format (`YYYYMMDD`).
+ * @param {unknown} value - Candidate date value.
+ * @returns {string} ICS date value, or empty string when invalid.
+ */
 function formatIcsDateValue(value) {
   const iso = toIsoDatePart(value);
   if (!iso) return "";
   return iso.replace(/-/g, "");
 }
 
+/**
+ * Formats a datetime-like input into ICS UTC datetime format.
+ * @param {unknown} value - Candidate datetime value.
+ * @returns {string} ICS UTC datetime, or empty string when invalid.
+ */
 function formatIcsDateTimeUtc(value) {
   return toCalDavUtcBasicDateTime(value);
 }
 
+/**
+ * Builds a full ICS payload string for create/update operations in Nextcloud.
+ * @param {{uid?: unknown, title?: unknown, start: unknown, end: unknown, allDay: boolean, description?: unknown, location?: unknown, url?: unknown}} payload - Event fields.
+ * @returns {string} Serialized ICS content.
+ */
 function buildIcsEventPayload({ uid, title, start, end, allDay, description = "", location = "", url = "" }) {
   const safeUid = String(uid || "").trim() || crypto.randomUUID();
   const safeTitle = String(title || "").trim() || "(No title)";
@@ -1883,6 +2425,12 @@ function buildIcsEventPayload({ uid, title, start, end, allDay, description = ""
   return `${lines.join("\r\n")}\r\n`;
 }
 
+/**
+ * Resolves a Nextcloud object href or URL to an absolute object URL.
+ * @param {object} calendarMeta - Calendar metadata (unused fallback context).
+ * @param {unknown} hrefOrUrl - Relative href or absolute URL.
+ * @returns {string} Absolute object URL, or empty string.
+ */
 function resolveNextcloudObjectUrl(calendarMeta, hrefOrUrl) {
   const raw = String(hrefOrUrl || "").trim();
   if (!raw) return "";
@@ -1890,6 +2438,12 @@ function resolveNextcloudObjectUrl(calendarMeta, hrefOrUrl) {
   return new URL(raw, ensureTrailingSlash(NEXTCLOUD_CALDAV_BASE_URL)).toString();
 }
 
+/**
+ * Fetches one Nextcloud event object by href and maps it to FullCalendar format.
+ * @param {{id: string, slug: string, url: string}} calendarMeta - Calendar metadata.
+ * @param {unknown} href - Event href or URL.
+ * @returns {Promise<object>} FullCalendar-compatible event object.
+ */
 async function fetchNextcloudEventByHref(calendarMeta, href) {
   const objectUrl = resolveNextcloudObjectUrl(calendarMeta, href);
   if (!objectUrl) throw new Error("Missing Nextcloud event href");
@@ -1907,6 +2461,11 @@ async function fetchNextcloudEventByHref(calendarMeta, href) {
   return mapNextcloudEventToFullCalendar(first, calendarMeta, href, etag);
 }
 
+/**
+ * Creates a Nextcloud calendar event via CalDAV PUT and returns the mapped created event.
+ * @param {{calendarId?: unknown, title?: unknown, start: unknown, end: unknown, allDay: boolean}} payload - Create payload.
+ * @returns {Promise<object>} Created event mapped for FullCalendar.
+ */
 async function createNextcloudCalendarEvent({ calendarId, title, start, end, allDay }) {
   const calendarMeta = resolveNextcloudCalendar(calendarId || NEXTCLOUD_DEFAULT_CREATE_CALENDAR_ID);
   if (!calendarMeta) throw new Error("Missing or invalid Nextcloud target calendar");
@@ -1932,6 +2491,11 @@ async function createNextcloudCalendarEvent({ calendarId, title, start, end, all
   return fetchNextcloudEventByHref(calendarMeta, objectHref);
 }
 
+/**
+ * Updates an existing Nextcloud event by replacing ICS payload at its href.
+ * @param {{calendarId: unknown, href: unknown, etag?: unknown, title?: unknown, start: unknown, end: unknown, allDay: boolean}} payload - Update payload.
+ * @returns {Promise<object>} Updated event mapped for FullCalendar.
+ */
 async function updateNextcloudCalendarEvent({ calendarId, href, etag, title, start, end, allDay }) {
   const calendarMeta = resolveNextcloudCalendar(calendarId);
   if (!calendarMeta) throw new Error("Missing or invalid Nextcloud calendar");
@@ -1962,6 +2526,11 @@ async function updateNextcloudCalendarEvent({ calendarId, href, etag, title, sta
   return fetchNextcloudEventByHref(calendarMeta, href);
 }
 
+/**
+ * Deletes an existing Nextcloud event by href.
+ * @param {{calendarId: unknown, href: unknown, etag?: unknown}} payload - Delete payload.
+ * @returns {Promise<void>}
+ */
 async function deleteNextcloudCalendarEvent({ calendarId, href, etag }) {
   const calendarMeta = resolveNextcloudCalendar(calendarId);
   if (!calendarMeta) throw new Error("Missing or invalid Nextcloud calendar");
@@ -2668,3 +3237,5 @@ process.on("SIGTERM", () => {
 process.on("exit", () => {
   clearPidFile();
 });
+
+

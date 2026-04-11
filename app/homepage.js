@@ -1,12 +1,12 @@
-import { renderBookmarksModule } from "../modules/bookmarks.js";
+﻿import { renderBookmarksModule } from "../modules/bookmarks.js";
 import { renderClockInElement } from "../modules/clock.js";
 import { renderNewProjectModule } from "../modules/new-project.js";
 import { renderUpdoModule } from "../modules/updo.js";
 
-const pageTitleEl = document.getElementById("pageTitle");
-const moduleGridEl = document.getElementById("moduleGrid");
-const headerClockEl = document.getElementById("headerClock");
-const openSearchBtnEl = document.getElementById("openSearchBtn");
+let pageTitleEl = null;
+let moduleGridEl = null;
+let headerClockEl = null;
+let openSearchBtnEl = null;
 
 const activeCleanups = [];
 const rootEl = document.documentElement;
@@ -16,10 +16,19 @@ let searchConfig = {
   openInNewTab: false
 };
 
+/**
+ * Registers a module cleanup callback to run before the next render.
+ * @param {Function} fn - Cleanup function returned by a module renderer.
+ * @returns {void}
+ */
 function addCleanup(fn) {
   if (typeof fn === "function") activeCleanups.push(fn);
 }
 
+/**
+ * Executes and clears all registered cleanup callbacks.
+ * @returns {void}
+ */
 function cleanupAllModules() {
   while (activeCleanups.length) {
     const fn = activeCleanups.pop();
@@ -31,6 +40,11 @@ function cleanupAllModules() {
   }
 }
 
+/**
+ * Creates the standard homepage module container elements.
+ * @param {string} title - Module title shown in the header row.
+ * @returns {{root: HTMLElement, head: HTMLElement, body: HTMLElement}} Shell DOM nodes.
+ */
 function createModuleShell(title) {
   const root = document.createElement("section");
   root.className = "module";
@@ -50,6 +64,12 @@ function createModuleShell(title) {
   return { root, head, body };
 }
 
+/**
+ * Adds expand/collapse behavior to a module shell header and returns a listener cleanup.
+ * @param {{root: HTMLElement, head: HTMLElement, body: HTMLElement}} shell - Module shell DOM nodes.
+ * @param {boolean} startCollapsed - Initial collapsed state.
+ * @returns {() => void} Cleanup callback that removes all registered listeners.
+ */
 function makeShellCollapsible(shell, startCollapsed = false) {
   if (!shell?.root || !shell?.head || !shell?.body) return () => {};
 
@@ -97,6 +117,10 @@ const moduleRegistry = {
   }
 };
 
+/**
+ * Loads effective settings from the backend API.
+ * @returns {Promise<object>} Effective settings payload.
+ */
 async function loadSettings() {
   const response = await fetch("/api/settings");
   if (!response.ok) {
@@ -107,12 +131,23 @@ async function loadSettings() {
   return payload.settings || {};
 }
 
+/**
+ * Parses and clamps the homepage title size token.
+ * @param {unknown} value - Raw numeric input from settings.
+ * @param {number} fallback - Fallback value used for invalid input.
+ * @returns {number} Clamped title size in pixels.
+ */
 function toTitleSize(value, fallback = 38) {
   const parsed = Number.parseInt(String(value), 10);
   if (!Number.isFinite(parsed)) return fallback;
   return Math.max(18, Math.min(72, parsed));
 }
 
+/**
+ * Normalizes the configured search provider to supported backend values.
+ * @param {unknown} value - Raw provider value from settings.
+ * @returns {"omnisearch"|"obsidian-search"|"quick-file"} Supported provider key.
+ */
 function cleanSearchProvider(value) {
   const raw = String(value || "").trim().toLowerCase();
   if (raw === "omnisearch") return "omnisearch";
@@ -121,6 +156,10 @@ function cleanSearchProvider(value) {
   return "omnisearch";
 }
 
+/**
+ * Triggers the configured search provider via backend endpoint.
+ * @returns {Promise<void>}
+ */
 async function openConfiguredSearch() {
   const response = await fetch("/api/search/open", {
     method: "POST",
@@ -136,11 +175,22 @@ async function openConfiguredSearch() {
   }
 }
 
+/**
+ * Normalizes a theme option against an allow-list.
+ * @param {unknown} value - Raw setting value.
+ * @param {string[]} allowed - Allowed normalized values.
+ * @param {string} fallback - Value used when `value` is not allowed.
+ * @returns {string} Sanitized theme token.
+ */
 function cleanThemeValue(value, allowed, fallback) {
   const normalized = String(value || "").trim().toLowerCase();
   return allowed.includes(normalized) ? normalized : fallback;
 }
 
+/**
+ * Removes inline CSS variables that were previously mirrored from Obsidian.
+ * @returns {void}
+ */
 function clearMirroredThemeVars() {
   const vars = [
     "--bg-a",
@@ -166,6 +216,11 @@ function clearMirroredThemeVars() {
   }
 }
 
+/**
+ * Maps Obsidian theme values to homepage CSS custom properties.
+ * @param {object|null|undefined} themeVars - Theme variable payload from `/api/obsidian/theme`.
+ * @returns {boolean} `true` when required values were present and applied.
+ */
 function applyMirroredThemeVars(themeVars) {
   const accent = String(themeVars?.accent || "").trim();
   const bgPrimary = String(themeVars?.bgPrimary || "").trim();
@@ -202,6 +257,10 @@ function applyMirroredThemeVars(themeVars) {
   return true;
 }
 
+/**
+ * Captures currently applied inline theme CSS variables for first-paint caching.
+ * @returns {Record<string, string>} CSS variable/value map.
+ */
 function currentThemeCssVarSnapshot() {
   const names = [
     "--bg-a",
@@ -230,6 +289,11 @@ function currentThemeCssVarSnapshot() {
   return out;
 }
 
+/**
+ * Stores a minimal theme snapshot in localStorage for flash-free first paint.
+ * @param {{mode: string, preset: string, shape: string, vars?: Record<string, string>|null}} cachePayload - Cache payload.
+ * @returns {void}
+ */
 function persistThemeBootstrapCache({ mode, preset, shape, vars }) {
   try {
     localStorage.setItem(
@@ -246,6 +310,10 @@ function persistThemeBootstrapCache({ mode, preset, shape, vars }) {
   }
 }
 
+/**
+ * Fetches theme variables mirrored from Obsidian.
+ * @returns {Promise<object|null>} Theme payload or `null` if fetch fails.
+ */
 async function fetchObsidianThemeSnapshot() {
   const response = await fetch("/api/obsidian/theme");
   if (!response.ok) {
@@ -256,6 +324,11 @@ async function fetchObsidianThemeSnapshot() {
   return payload?.theme || null;
 }
 
+/**
+ * Applies either preset theming or mirrored Obsidian theme values to the page.
+ * @param {object} themeConfig - Theme config from effective settings.
+ * @returns {Promise<void>}
+ */
 async function applyUiTheme(themeConfig) {
   const mode = cleanThemeValue(themeConfig?.mode, ["preset", "mirror-obsidian"], "preset");
   const preset = cleanThemeValue(themeConfig?.preset, ["soft", "flat", "high-contrast"], "soft");
@@ -266,14 +339,21 @@ async function applyUiTheme(themeConfig) {
 
   clearMirroredThemeVars();
   if (mode === "mirror-obsidian") {
+    delete rootEl.dataset.obsidianMode;
     let mirrored = false;
     try {
       const theme = await fetchObsidianThemeSnapshot();
       mirrored = applyMirroredThemeVars(theme?.vars);
-      if (theme?.mode === "dark") rootEl.dataset.obsidianMode = "dark";
-      if (theme?.mode === "light") rootEl.dataset.obsidianMode = "light";
+      if (theme?.mode === "dark") {
+        rootEl.dataset.obsidianMode = "dark";
+      } else if (theme?.mode === "light") {
+        rootEl.dataset.obsidianMode = "light";
+      } else {
+        delete rootEl.dataset.obsidianMode;
+      }
     } catch {
       mirrored = false;
+      delete rootEl.dataset.obsidianMode;
     }
     rootEl.dataset.themeMode = mirrored ? "mirror-obsidian" : "preset";
     persistThemeBootstrapCache({
@@ -289,21 +369,31 @@ async function applyUiTheme(themeConfig) {
   }
 }
 
+/**
+ * Renders homepage modules from effective settings and wires module cleanup lifecycle.
+ * @returns {Promise<void>}
+ */
 async function renderPage() {
+  if (!moduleGridEl) {
+    console.error("Missing required #moduleGrid mount node.");
+    return;
+  }
   cleanupAllModules();
   moduleGridEl.innerHTML = "";
 
   try {
     const settings = await loadSettings();
     await applyUiTheme(settings?.ui?.theme);
-    pageTitleEl.textContent = settings?.ui?.title || "Workspace Homepage";
+    if (pageTitleEl) {
+      pageTitleEl.textContent = settings?.ui?.title || "Workspace Homepage";
+    }
     rootEl.style.setProperty("--hero-title-size", `${toTitleSize(settings?.ui?.titleSize, 38)}px`);
     searchConfig = {
       provider: cleanSearchProvider(settings?.ui?.search?.provider),
       openInNewTab: Boolean(settings?.ui?.search?.openInNewTab)
     };
 
-    if (settings?.modules?.clock?.enabled) {
+    if (settings?.modules?.clock?.enabled && headerClockEl) {
       addCleanup(renderClockInElement(headerClockEl, settings.modules.clock));
     } else if (headerClockEl) {
       headerClockEl.textContent = "";
@@ -335,22 +425,53 @@ async function renderPage() {
         const cleanup = await definition.render(shell, moduleCfg);
         addCleanup(cleanup);
       } catch (error) {
-        shell.body.innerHTML = `<div class="empty">Modulfehler: ${error.message || error}</div>`;
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = `Modulfehler: ${error?.message || String(error)}`;
+        shell.body.replaceChildren(empty);
       }
     }
   } catch (error) {
-    moduleGridEl.innerHTML =
-      `<section class="module"><div class="module-body"><div class="empty">Fehler beim Laden der Einstellungen: ${error.message || error}</div></div></section>`;
+    const section = document.createElement("section");
+    section.className = "module";
+    const body = document.createElement("div");
+    body.className = "module-body";
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = `Fehler beim Laden der Einstellungen: ${error?.message || String(error)}`;
+    body.appendChild(empty);
+    section.appendChild(body);
+    moduleGridEl.replaceChildren(section);
   }
 }
 
-window.addEventListener("beforeunload", cleanupAllModules);
-if (openSearchBtnEl) {
-  openSearchBtnEl.addEventListener("click", () => {
-    openConfiguredSearch().catch((error) => {
-      // Keep UI quiet, but visible in devtools.
-      console.error(error);
+/**
+ * Resolves required/optional DOM anchors and wires module bootstrap handlers.
+ * @returns {void}
+ */
+function initHomepage() {
+  pageTitleEl = document.getElementById("pageTitle");
+  moduleGridEl = document.getElementById("moduleGrid");
+  headerClockEl = document.getElementById("headerClock");
+  openSearchBtnEl = document.getElementById("openSearchBtn");
+
+  if (openSearchBtnEl) {
+    openSearchBtnEl.addEventListener("click", () => {
+      openConfiguredSearch().catch((error) => {
+        // Keep UI quiet, but visible in devtools.
+        console.error(error);
+      });
     });
-  });
+  }
+
+  void renderPage();
 }
-renderPage();
+
+window.addEventListener("beforeunload", cleanupAllModules);
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", initHomepage, { once: true });
+} else {
+  initHomepage();
+}
+
+

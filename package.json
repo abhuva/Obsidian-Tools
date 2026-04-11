@@ -5,6 +5,12 @@
   "scripts": {
     "preview": "node ./serve.mjs",
     "stop:preview": "node ./stop-preview.mjs",
-    "restart:preview": "npm run stop:preview && npm run preview"
+    "restart:preview": "npm run stop:preview && npm run preview",
+    "lint": "eslint .",
+    "lint:jsdoc": "eslint \"**/*.{js,mjs}\""
+  },
+  "devDependencies": {
+    "eslint": "^9.24.0",
+    "eslint-plugin-jsdoc": "^51.2.0"
   }
 }

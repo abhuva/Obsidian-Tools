@@ -1,4 +1,4 @@
-      var CALENDAR_API_BASE = window.CALENDAR_API_BASE || window.location.origin;
+﻿      var CALENDAR_API_BASE = window.CALENDAR_API_BASE || window.location.origin;
       var THEME_CACHE_KEY = 'calendar-theme-bootstrap-v1';
       var CALENDAR_UI_SETTINGS_KEY = 'calendar-ui-settings-v1';
       var CALENDAR_FOCUS_DATE_KEY = 'calendar-focus-date-v1';
@@ -17,10 +17,18 @@
       applyGlobalRoundness(calendarUiSettings.roundness);
       applyTimeGridRowHeight(calendarUiSettings.timeGridRowHeight);
 
+      /**
+       * Is Http Context.
+       * @returns {*} Returns whether the condition is met.
+       */
       function isHttpContext() {
         return window.location.protocol === 'http:' || window.location.protocol === 'https:';
       }
 
+      /**
+       * Load Calendar Ui Settings.
+       * @returns {*} Returns calendar ui settings.
+       */
       function loadCalendarUiSettings() {
         var defaults = {
           showSocietyBadges: true,
@@ -80,6 +88,10 @@
         }
       }
 
+      /**
+       * Load Focused Date.
+       * @returns {*} Returns focused date.
+       */
       function loadFocusedDate() {
         var raw = '';
         try {
@@ -90,6 +102,11 @@
         return normalizeIsoDate(raw);
       }
 
+      /**
+       * Persist Focused Date.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function persistFocusedDate(value) {
         try {
           if (!value) {
@@ -102,6 +119,11 @@
         }
       }
 
+      /**
+       * Apply Global Roundness.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function applyGlobalRoundness(roundness) {
         var parsed = Number(roundness);
         var safe = Number.isFinite(parsed) ? Math.round(parsed) : 8;
@@ -110,6 +132,11 @@
         document.documentElement.style.setProperty('--cal-radius', String(safe) + 'px');
       }
 
+      /**
+       * Apply Time Grid Row Height.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function applyTimeGridRowHeight(rowHeightPx) {
         var parsed = Number(rowHeightPx);
         var safe = Number.isFinite(parsed) ? Math.round(parsed) : 26;
@@ -124,6 +151,11 @@
         }
       }
 
+      /**
+       * Derive Time Grid Event Heights.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function deriveTimeGridEventHeights(rowHeightPx) {
         var parsed = Number(rowHeightPx);
         var safe = Number.isFinite(parsed) ? Math.round(parsed) : 26;
@@ -137,6 +169,10 @@
         };
       }
 
+      /**
+       * Persist Calendar Ui Settings.
+       * @returns {*} Returns the function result.
+       */
       function persistCalendarUiSettings() {
         try {
           localStorage.setItem(CALENDAR_UI_SETTINGS_KEY, JSON.stringify(calendarUiSettings));
@@ -145,6 +181,10 @@
         }
       }
 
+      /**
+       * Current Theme Css Var Snapshot.
+       * @returns {*} Returns the function result.
+       */
       function currentThemeCssVarSnapshot() {
         var names = [
           '--cal-bg-a',
@@ -185,6 +225,11 @@
         return out;
       }
 
+      /**
+       * Persist Theme Bootstrap Cache.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function persistThemeBootstrapCache(vars) {
         try {
           localStorage.setItem(THEME_CACHE_KEY, JSON.stringify({ vars: vars || {} }));
@@ -193,6 +238,11 @@
         }
       }
 
+      /**
+       * Apply Mirrored Theme Vars.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function applyMirroredThemeVars(themeVars) {
         var accent = String(themeVars && themeVars.accent || '').trim();
         var accentHover = String(themeVars && themeVars.accentHover || '').trim();
@@ -240,6 +290,10 @@
         return true;
       }
 
+      /**
+       * Fetch Obsidian Theme Snapshot.
+       * @returns {*} Returns obsidian theme snapshot.
+       */
       async function fetchObsidianThemeSnapshot() {
         var themeUrl = new URL('/api/obsidian/theme', CALENDAR_API_BASE).toString();
         var response = await fetch(themeUrl, { method: 'GET' });
@@ -251,6 +305,10 @@
         return payload && payload.theme ? payload.theme : null;
       }
 
+      /**
+       * Apply Calendar Theme.
+       * @returns {*} Returns the function result.
+       */
       async function applyCalendarTheme() {
         if (!isHttpContext()) return;
         try {
@@ -264,6 +322,11 @@
         }
       }
 
+      /**
+       * Escape Html.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function escapeHtml(value) {
         return String(value || '')
           .replace(/&/g, '&amp;')
@@ -273,6 +336,11 @@
           .replace(/'/g, '&#039;');
       }
 
+      /**
+       * Get Event Society.
+       * @param {*}
+       * @returns {*} Returns event society.
+       */
       function getEventSociety(event) {
         var sourcePath = String(event && event.extendedProps && event.extendedProps.sourcePath || '').toUpperCase();
         if (sourcePath.indexOf(' TOHU ') >= 0 || sourcePath.indexOf('/TOHU ') >= 0) return 'tohu';
@@ -280,6 +348,11 @@
         return '';
       }
 
+      /**
+       * Normalize Iso Date.
+       * @param {*}
+       * @returns {*} Returns iso date.
+       */
       function normalizeIsoDate(input) {
         if (!input) return '';
         var asString = String(input);
@@ -288,6 +361,11 @@
         return match && match[1] ? match[1] : '';
       }
 
+      /**
+       * Is Nextcloud Calendar Enabled.
+       * @param {*}
+       * @returns {*} Returns whether the condition is met.
+       */
       function isNextcloudCalendarEnabled(calendarId) {
         var id = String(calendarId || '').trim();
         if (!id) return true;
@@ -296,6 +374,11 @@
         return disabled[id] !== true;
       }
 
+      /**
+       * Filter Nextcloud Events By Visibility.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function filterNextcloudEventsByVisibility(events) {
         var input = Array.isArray(events) ? events : [];
         return input.filter(function(event) {
@@ -305,10 +388,21 @@
         });
       }
 
+      /**
+       * Apply Vacation Texture Setting.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function applyVacationTextureSetting(enabled) {
         document.body.setAttribute('data-vacation-texture', enabled ? 'on' : 'off');
       }
 
+      /**
+       * Month Width Percent To Px.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function monthWidthPercentToPx(percent, calendarEl) {
         var parsed = Number(percent);
         var safe = Number.isFinite(parsed) ? Math.round(parsed) : 30;
@@ -320,6 +414,11 @@
         return px;
       }
 
+      /**
+       * Parse Coordinates Value.
+       * @param {*}
+       * @returns {*} Returns coordinates value.
+       */
       function parseCoordinatesValue(value) {
         if (value == null) return null;
 
@@ -348,11 +447,21 @@
         return { lat: lat, lng: lng };
       }
 
+      /**
+       * Get Event Coordinates.
+       * @param {*}
+       * @returns {*} Returns event coordinates.
+       */
       function getEventCoordinates(event) {
         var value = event && event.extendedProps ? event.extendedProps.coordinates : null;
         return parseCoordinatesValue(value);
       }
 
+      /**
+       * To Local Iso Date.
+       * @param {*}
+       * @returns {*} Returns local iso date.
+       */
       function toLocalIsoDate(date) {
         if (!(date instanceof Date)) return '';
         var year = date.getFullYear();
@@ -361,12 +470,23 @@
         return String(year) + '-' + month + '-' + day;
       }
 
+      /**
+       * Shift Iso Date Safe.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function shiftIsoDateSafe(isoDate, deltaDays) {
         var normalized = normalizeIsoDate(isoDate);
         if (!normalized) return '';
         return shiftIsoDate(normalized, deltaDays);
       }
 
+      /**
+       * Build Vacation Day Set.
+       * @param {*}
+       * @returns {*} Returns vacation day set.
+       */
       function buildVacationDaySet(events) {
         var result = new Set();
         (events || []).forEach(function(evt) {
@@ -387,6 +507,11 @@
         return result;
       }
 
+      /**
+       * Event Class Names Hook.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function eventClassNamesHook(arg) {
         var classes = [];
         var event = arg && arg.event;
@@ -410,6 +535,11 @@
         return classes;
       }
 
+      /**
+       * Event Content Hook.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function eventContentHook(arg) {
         var event = arg && arg.event;
         if (!event || event.display === 'background') return;
@@ -431,6 +561,11 @@
         };
       }
 
+      /**
+       * Event Did Mount Hook.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function eventDidMountHook(arg) {
         var event = arg && arg.event;
         var el = arg && arg.el;
@@ -451,6 +586,12 @@
         }
       }
 
+      /**
+       * Day Cell Class Names Hook.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function dayCellClassNamesHook(vacationDays, arg) {
         var classes = [];
         var date = arg && arg.date;
@@ -463,6 +604,11 @@
         return classes;
       }
 
+      /**
+       * Day Header Class Names Hook.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function dayHeaderClassNamesHook(arg) {
         var classes = [];
         var date = arg && arg.date;
@@ -472,6 +618,11 @@
         return classes;
       }
 
+      /**
+       * Update Focused Date Decorations.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function updateFocusedDateDecorations(calendarEl) {
         if (!calendarEl) return;
         var nodes = calendarEl.querySelectorAll('.fc-daygrid-day[data-date], .fc-col-header-cell[data-date]');
@@ -485,6 +636,14 @@
         });
       }
 
+      /**
+       * Set Focused Date.
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function setFocusedDate(calendar, calendarEl, nextDate, options) {
         var normalized = normalizeIsoDate(nextDate);
         if (!normalized) return;
@@ -497,6 +656,12 @@
         }
       }
 
+      /**
+       * Focus Calendar On Today.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function focusCalendarOnToday(calendar, calendarEl) {
         if (!calendar) return;
         var todayIso = toLocalIsoDate(new Date());
@@ -511,6 +676,12 @@
         updateFocusedDateDecorations(calendarEl);
       }
 
+      /**
+       * Mount Calendar Settings Popover.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function mountCalendarSettingsPopover(calendarEl, calendar) {
         var panel = document.getElementById('calendar-label-settings');
         var societyToggle = document.getElementById('toggle-society-badges');
@@ -533,6 +704,10 @@
         var rowHeightValue = document.getElementById('setting-timegrid-row-height-value');
         if (!panel || !societyToggle || !recurringToggle || !googleCreateToggle || !nextcloudCreateToggle || !googleOauthConnect || !googleOauthDisconnect || !eventPreviewToggle || !vacationTextureToggle || !googleStatus || !nextcloudStatus || !nextcloudCalendarsWrap || !nextcloudCalendarsList || !monthWidthSlider || !monthWidthValue || !roundnessSlider || !roundnessValue || !rowHeightSlider || !rowHeightValue) return;
 
+        /**
+         * Update Google Status Text.
+         * @returns {*} Returns the function result.
+         */
         function updateGoogleStatusText() {
           if (window.googleCalendarState && window.googleCalendarState.lastError) {
             googleStatus.textContent = 'Google load error: ' + window.googleCalendarState.lastError;
@@ -562,6 +737,10 @@
           googleStatus.classList.remove('is-error');
         }
 
+        /**
+         * Update Nextcloud Status Text.
+         * @returns {*} Returns the function result.
+         */
         function updateNextcloudStatusText() {
           if (window.nextcloudCalendarState && window.nextcloudCalendarState.lastError) {
             nextcloudStatus.textContent = 'Nextcloud load error: ' + window.nextcloudCalendarState.lastError;
@@ -581,6 +760,10 @@
           nextcloudStatus.classList.remove('is-error');
         }
 
+        /**
+         * Render Nextcloud Calendar Checks.
+         * @returns {*} Returns nextcloud calendar checks.
+         */
         function renderNextcloudCalendarChecks() {
           var calendars = window.nextcloudCalendarState && Array.isArray(window.nextcloudCalendarState.calendars)
             ? window.nextcloudCalendarState.calendars
@@ -622,6 +805,10 @@
           });
         }
 
+        /**
+         * Sync Inputs.
+         * @returns {*} Returns the function result.
+         */
         function syncInputs() {
           societyToggle.checked = calendarUiSettings.showSocietyBadges !== false;
           recurringToggle.checked = calendarUiSettings.showRecurringBadge !== false;
@@ -644,11 +831,19 @@
           updateSourceToggleButtons(calendarEl);
         }
 
+        /**
+         * Close Panel.
+         * @returns {*} Returns the function result.
+         */
         function closePanel() {
           panel.classList.remove('is-open');
           panel.setAttribute('aria-hidden', 'true');
         }
 
+        /**
+         * Open Panel.
+         * @returns {*} Returns panel.
+         */
         function openPanel() {
           syncInputs();
           panel.classList.add('is-open');
@@ -664,6 +859,10 @@
           }
         }
 
+        /**
+         * Toggle Panel.
+         * @returns {*} Returns ggle panel.
+         */
         function togglePanel() {
           if (panel.classList.contains('is-open')) {
             closePanel();
@@ -806,6 +1005,11 @@
         });
       }
 
+      /**
+       * Collect Google Color Options.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function collectGoogleColorOptions(calendar) {
         var colorById = {};
         if (!calendar || typeof calendar.getEvents !== 'function') return [];
@@ -831,6 +1035,11 @@
           .map(function(id) { return colorById[id]; });
       }
 
+      /**
+       * Render Nextcloud Create Calendar Radios.
+       * @param {*}
+       * @returns {*} Returns nextcloud create calendar radios.
+       */
       function renderNextcloudCreateCalendarRadios(container) {
         var wrap = container;
         if (!wrap) return '';
@@ -874,6 +1083,11 @@
         return selectedId;
       }
 
+      /**
+       * Show Create Event Dialog.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function showCreateEventDialog(calendar) {
         return new Promise(function(resolve) {
           var modal = document.getElementById('create-event-modal');
@@ -903,13 +1117,26 @@
           var activeTabs = ['md'];
           var nextcloudSelectedId = '';
 
+          /**
+           * Read Selected Nextcloud Calendar Id.
+           * @returns {*} Returns selected nextcloud calendar id.
+           */
           function readSelectedNextcloudCalendarId() {
             var selected = modal.querySelector('input[name="create-event-nextcloud-calendar"]:checked');
             return String(selected && selected.value || nextcloudSelectedId || '').trim();
           }
+          /**
+           * Get Selected Google Color Id.
+           * @returns {*} Returns selected google color id.
+           */
           function getSelectedGoogleColorId() {
             return String(googleColorSelect.value || '').trim();
           }
+          /**
+           * Set Active Tab.
+           * @param {*}
+           * @returns {*} Returns the function result.
+           */
           function setActiveTab(target) {
             var targetTab = String(target || '').trim().toLowerCase();
             if (activeTabs.indexOf(targetTab) < 0) return;
@@ -928,6 +1155,10 @@
             });
           }
 
+          /**
+           * Cleanup.
+           * @returns {*} Returns the function result.
+           */
           function cleanup() {
             modal.classList.remove('is-open');
             mdTab.removeEventListener('click', onTabMd);
@@ -940,12 +1171,21 @@
             input.removeEventListener('keydown', onKeyDown);
             modal.removeEventListener('mousedown', onBackdropPointer);
           }
+          /**
+           * Finish.
+           * @param {*}
+           * @returns {*} Returns the function result.
+           */
           function finish(value) {
             if (done) return;
             done = true;
             cleanup();
             resolve(value);
           }
+          /**
+           * On Create Google.
+           * @returns {*} Returns the function result.
+           */
           function onCreateGoogle() {
             var title = input.value.trim();
             if (!title) {
@@ -954,6 +1194,10 @@
             }
             finish({ title: title, target: 'google', googleColorId: getSelectedGoogleColorId() });
           }
+          /**
+           * On Create Md.
+           * @returns {*} Returns the function result.
+           */
           function onCreateMd() {
             var title = input.value.trim();
             if (!title) {
@@ -962,6 +1206,10 @@
             }
             finish({ title: title, target: 'md' });
           }
+          /**
+           * On Create Nextcloud.
+           * @returns {*} Returns the function result.
+           */
           function onCreateNextcloud() {
             var title = input.value.trim();
             if (!title) {
@@ -970,23 +1218,49 @@
             }
             finish({ title: title, target: 'nextcloud', nextcloudCalendarId: readSelectedNextcloudCalendarId() });
           }
+          /**
+           * On Tab Md.
+           * @returns {*} Returns the function result.
+           */
           function onTabMd() {
             setActiveTab('md');
           }
+          /**
+           * On Tab Google.
+           * @returns {*} Returns the function result.
+           */
           function onTabGoogle() {
             setActiveTab('google');
           }
+          /**
+           * On Tab Nextcloud.
+           * @returns {*} Returns the function result.
+           */
           function onTabNextcloud() {
             setActiveTab('nextcloud');
           }
+          /**
+           * On Cancel.
+           * @returns {*} Returns the function result.
+           */
           function onCancel() {
             finish(null);
           }
+          /**
+           * On Backdrop Pointer.
+           * @param {*}
+           * @returns {*} Returns the function result.
+           */
           function onBackdropPointer(event) {
             if (event.target === modal) {
               finish(null);
             }
           }
+          /**
+           * On Key Down.
+           * @param {*}
+           * @returns {*} Returns the function result.
+           */
           function onKeyDown(event) {
             if (event.key === 'Enter') {
               event.preventDefault();
@@ -1078,6 +1352,11 @@
         });
       }
 
+      /**
+       * Get Anchor Point From Native Event.
+       * @param {*}
+       * @returns {*} Returns anchor point from native event.
+       */
       function getAnchorPointFromNativeEvent(nativeEvent) {
         if (!nativeEvent) return null;
         var clientX = Number(nativeEvent.clientX);
@@ -1096,6 +1375,12 @@
         return null;
       }
 
+      /**
+       * Place Day Action Menu.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function placeDayActionMenu(menu, anchorPoint) {
         if (!menu) return;
         var margin = 10;
@@ -1119,12 +1404,22 @@
         menu.style.top = String(top) + 'px';
       }
 
+      /**
+       * Close Event Preview Popover.
+       * @returns {*} Returns the function result.
+       */
       function closeEventPreviewPopover() {
         if (typeof closeActiveEventPreview === 'function') {
           closeActiveEventPreview();
         }
       }
 
+      /**
+       * Place Event Preview Popover.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function placeEventPreviewPopover(popover, anchorPoint) {
         if (!popover) return;
         var margin = 10;
@@ -1148,6 +1443,11 @@
         popover.style.top = String(top) + 'px';
       }
 
+      /**
+       * Format Iso Date For Preview.
+       * @param {*}
+       * @returns {*} Returns iso date for preview.
+       */
       function formatIsoDateForPreview(isoDate) {
         var normalized = normalizeIsoDate(isoDate);
         if (!normalized) return '';
@@ -1162,6 +1462,11 @@
         }).format(localDate);
       }
 
+      /**
+       * Format Time For Preview.
+       * @param {*}
+       * @returns {*} Returns time for preview.
+       */
       function formatTimeForPreview(date) {
         if (!(date instanceof Date)) return '';
         return new Intl.DateTimeFormat(undefined, {
@@ -1170,6 +1475,11 @@
         }).format(date);
       }
 
+      /**
+       * Format Event Date For Preview.
+       * @param {*}
+       * @returns {*} Returns event date for preview.
+       */
       function formatEventDateForPreview(event) {
         if (!event) return '';
         if (event.allDay) {
@@ -1204,6 +1514,11 @@
         );
       }
 
+      /**
+       * Render Simple Markdown Text.
+       * @param {*}
+       * @returns {*} Returns simple markdown text.
+       */
       function renderSimpleMarkdownText(markdownText) {
         var escaped = escapeHtml(markdownText || '');
         escaped = escaped.replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -1212,6 +1527,11 @@
         return escaped;
       }
 
+      /**
+       * Render Preview Markdown Block.
+       * @param {*}
+       * @returns {*} Returns preview markdown block.
+       */
       function renderPreviewMarkdownBlock(markdownBlock) {
         var raw = String(markdownBlock || '').trim();
         if (!raw) {
@@ -1252,6 +1572,11 @@
         );
       }
 
+      /**
+       * Render Google Event Preview Block.
+       * @param {*}
+       * @returns {*} Returns google event preview block.
+       */
       function renderGoogleEventPreviewBlock(event) {
         var props = event && event.extendedProps ? event.extendedProps : {};
         var description = String(props.googleDescription || '').trim();
@@ -1276,6 +1601,11 @@
         return parts.join('');
       }
 
+      /**
+       * Render Nextcloud Event Preview Block.
+       * @param {*}
+       * @returns {*} Returns nextcloud event preview block.
+       */
       function renderNextcloudEventPreviewBlock(event) {
         var props = event && event.extendedProps ? event.extendedProps : {};
         var description = String(props.nextcloudDescription || '').trim();
@@ -1300,6 +1630,11 @@
         return parts.join('');
       }
 
+      /**
+       * Fetch Event Preview.
+       * @param {*}
+       * @returns {*} Returns event preview.
+       */
       async function fetchEventPreview(sourcePath) {
         if (!isHttpContext()) {
           throw new Error('Calendar is not running on http(s). Open the preview server URL.');
@@ -1314,6 +1649,12 @@
         return response.json();
       }
 
+      /**
+       * Show Event Preview Popover.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function showEventPreviewPopover(event, anchorPoint) {
         var popover = document.getElementById('event-preview-popover');
         var closeButton = document.getElementById('event-preview-close');
@@ -1332,6 +1673,10 @@
 
         closeEventPreviewPopover();
         var closed = false;
+        /**
+         * Cleanup.
+         * @returns {*} Returns the function result.
+         */
         function cleanup() {
           if (closed) return;
           closed = true;
@@ -1359,19 +1704,37 @@
             closeActiveEventPreview = null;
           }
         }
+        /**
+         * On Close.
+         * @returns {*} Returns the function result.
+         */
         function onClose() {
           cleanup();
         }
+        /**
+         * On Outside Pointer.
+         * @param {*}
+         * @returns {*} Returns the function result.
+         */
         function onOutsidePointer(pointerEvent) {
           if (popover.contains(pointerEvent.target)) return;
           cleanup();
         }
+        /**
+         * On Key Down.
+         * @param {*}
+         * @returns {*} Returns the function result.
+         */
         function onKeyDown(keyEvent) {
           if (keyEvent.key === 'Escape') {
             keyEvent.preventDefault();
             cleanup();
           }
         }
+        /**
+         * On Open External Link.
+         * @returns {*} Returns the function result.
+         */
         async function onOpenExternalLink() {
           var props = event && event.extendedProps ? event.extendedProps : {};
           var externalLink = String(props.googleHtmlLink || props.nextcloudUrl || '').trim();
@@ -1379,6 +1742,10 @@
           window.open(externalLink, '_blank', 'noopener,noreferrer');
           cleanup();
         }
+        /**
+         * On Open Note.
+         * @returns {*} Returns the function result.
+         */
         async function onOpenNote() {
           try {
             await openEventNote(event);
@@ -1387,6 +1754,10 @@
             alert('Open note failed: ' + error.message);
           }
         }
+        /**
+         * On Open Map.
+         * @returns {*} Returns the function result.
+         */
         async function onOpenMap() {
           cleanup();
           try {
@@ -1395,6 +1766,10 @@
             alert('Open map failed: ' + error.message);
           }
         }
+        /**
+         * On Edit Google Title.
+         * @returns {*} Returns the function result.
+         */
         async function onEditGoogleTitle() {
           var currentTitle = String(event && event.title || '').trim();
           var nextTitle = window.prompt('New title', currentTitle);
@@ -1418,6 +1793,10 @@
             alert('Google rename failed: ' + error.message);
           }
         }
+        /**
+         * On Delete Google Event.
+         * @returns {*} Returns the function result.
+         */
         async function onDeleteGoogleEvent() {
           var okay = window.confirm('Delete this Google event?');
           if (!okay) return;
@@ -1429,6 +1808,10 @@
             alert('Google delete failed: ' + error.message);
           }
         }
+        /**
+         * On Edit Nextcloud Title.
+         * @returns {*} Returns the function result.
+         */
         async function onEditNextcloudTitle() {
           var currentTitle = String(event && event.title || '').trim();
           var nextTitle = window.prompt('New title', currentTitle);
@@ -1450,6 +1833,10 @@
             alert('Nextcloud rename failed: ' + error.message);
           }
         }
+        /**
+         * On Delete Nextcloud Event.
+         * @returns {*} Returns the function result.
+         */
         async function onDeleteNextcloudEvent() {
           var okay = window.confirm('Delete this Nextcloud event?');
           if (!okay) return;
@@ -1556,6 +1943,11 @@
         }
       }
 
+      /**
+       * Show Day Action Dialog.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function showDayActionDialog(anchorPoint) {
         return new Promise(function(resolve) {
           var modal = document.getElementById('day-action-modal');
@@ -1568,6 +1960,10 @@
 
           var done = false;
 
+          /**
+           * Cleanup.
+           * @returns {*} Returns the function result.
+           */
           function cleanup() {
             modal.classList.remove('is-open');
             modal.setAttribute('aria-hidden', 'true');
@@ -1579,6 +1975,11 @@
             document.removeEventListener('keydown', onKeyDown);
           }
 
+          /**
+           * Finish.
+           * @param {*}
+           * @returns {*} Returns the function result.
+           */
           function finish(value) {
             if (done) return;
             done = true;
@@ -1586,12 +1987,30 @@
             resolve(value);
           }
 
+          /**
+           * On Focus.
+           * @returns {*} Returns the function result.
+           */
           function onFocus() { finish('focus'); }
+          /**
+           * On Create.
+           * @returns {*} Returns the function result.
+           */
           function onCreate() { finish('create'); }
+          /**
+           * On Outside Pointer.
+           * @param {*}
+           * @returns {*} Returns the function result.
+           */
           function onOutsidePointer(event) {
             if (modal.contains(event.target)) return;
             finish(null);
           }
+          /**
+           * On Key Down.
+           * @param {*}
+           * @returns {*} Returns the function result.
+           */
           function onKeyDown(event) {
             if (event.key === 'Escape') {
               event.preventDefault();
@@ -1610,6 +2029,12 @@
         });
       }
 
+      /**
+       * Shift Iso Date.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function shiftIsoDate(isoDate, deltaDays) {
         if (!isoDate) return null;
         var parts = isoDate.split('-').map(Number);
@@ -1618,20 +2043,40 @@
         return utcDate.toISOString().slice(0, 10);
       }
 
+      /**
+       * To Inclusive End Date.
+       * @param {*}
+       * @returns {*} Returns inclusive end date.
+       */
       function toInclusiveEndDate(exclusiveEndDate) {
         return shiftIsoDate(exclusiveEndDate, -1);
       }
 
+      /**
+       * Is Iso Date Only.
+       * @param {*}
+       * @returns {*} Returns whether the condition is met.
+       */
       function isIsoDateOnly(value) {
         return /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim());
       }
 
+      /**
+       * Normalize Calendar Date Like.
+       * @param {*}
+       * @returns {*} Returns calendar date like.
+       */
       function normalizeCalendarDateLike(value) {
         var raw = String(value || '').trim();
         if (!raw) return '';
         return raw.replace(' ', 'T');
       }
 
+      /**
+       * Local Iso Date Key.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function localIsoDateKey(date) {
         if (!(date instanceof Date)) return '';
         var y = date.getFullYear();
@@ -1640,6 +2085,12 @@
         return y + '-' + m + '-' + d;
       }
 
+      /**
+       * Allow Recurring Timed Edit.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function allowRecurringTimedEdit(dropInfo, draggedEvent) {
         if (!draggedEvent || draggedEvent.allDay) return true;
         var props = draggedEvent.extendedProps || {};
@@ -1656,6 +2107,11 @@
         return true;
       }
 
+      /**
+       * To Event Persist Payload.
+       * @param {*}
+       * @returns {*} Returns event persist payload.
+       */
       function toEventPersistPayload(event) {
         if (event && event.allDay) {
           var startDate = normalizeCalendarDateLike(event.startStr);
@@ -1668,6 +2124,13 @@
         return { start: start, end: end, allDay: false };
       }
 
+      /**
+       * To Create Payload.
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns create payload.
+       */
       function toCreatePayload(start, end, allDay) {
         var normalizedStart = normalizeCalendarDateLike(start);
         var normalizedEnd = normalizeCalendarDateLike(end) || normalizedStart;
@@ -1679,6 +2142,11 @@
         return { start: normalizedStart, end: normalizedEnd, allDay: false };
       }
 
+      /**
+       * Save Event Dates.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function saveEventDates(event) {
         var sourcePath = event.extendedProps && event.extendedProps.sourcePath;
         if (!sourcePath) throw new Error('Missing sourcePath for event');
@@ -1708,6 +2176,11 @@
         }
       }
 
+      /**
+       * Open Event Note.
+       * @param {*}
+       * @returns {*} Returns event note.
+       */
       async function openEventNote(event) {
         var sourcePath = event.extendedProps && event.extendedProps.sourcePath;
         if (!sourcePath) throw new Error('Missing sourcePath for event');
@@ -1728,6 +2201,12 @@
         }
       }
 
+      /**
+       * Open Event Map.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns event map.
+       */
       async function openEventMap(event, coordinates) {
         if (!isHttpContext()) {
           throw new Error('Calendar is not running on http(s). Open the preview server URL.');
@@ -1772,6 +2251,14 @@
         }
       }
 
+      /**
+       * Create Event.
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns event.
+       */
       async function createEvent(title, start, end, allDay) {
         if (!isHttpContext()) {
           throw new Error('Calendar is not running on http(s). Open the preview server URL.');
@@ -1798,6 +2285,11 @@
         return response.json();
       }
 
+      /**
+       * Rebuild Events And Reload.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function rebuildEventsAndReload(payload) {
         if (!isHttpContext()) {
           throw new Error('Calendar is not running on http(s). Open the preview server URL.');
@@ -1816,6 +2308,10 @@
         window.location.reload();
       }
 
+      /**
+       * Fetch Calendar Filters.
+       * @returns {*} Returns calendar filters.
+       */
       async function fetchCalendarFilters() {
         var filtersUrl = new URL('/api/calendar/filters', CALENDAR_API_BASE).toString();
         var response = await fetch(filtersUrl, { method: 'GET' });
@@ -1826,6 +2322,10 @@
         return response.json();
       }
 
+      /**
+       * Fetch Google Calendar Config.
+       * @returns {*} Returns google calendar config.
+       */
       async function fetchGoogleCalendarConfig() {
         var configUrl = new URL('/api/google-calendar/config', CALENDAR_API_BASE).toString();
         var response = await fetch(configUrl, { method: 'GET' });
@@ -1836,6 +2336,10 @@
         return response.json();
       }
 
+      /**
+       * Fetch Nextcloud Calendar Config.
+       * @returns {*} Returns nextcloud calendar config.
+       */
       async function fetchNextcloudCalendarConfig() {
         var configUrl = new URL('/api/nextcloud-calendar/config', CALENDAR_API_BASE).toString();
         var response = await fetch(configUrl, { method: 'GET' });
@@ -1846,6 +2350,10 @@
         return response.json();
       }
 
+      /**
+       * Fetch Google OAuth Status.
+       * @returns {*} Returns google oauth status.
+       */
       async function fetchGoogleOAuthStatus() {
         var statusUrl = new URL('/api/google-oauth/status', CALENDAR_API_BASE).toString();
         var response = await fetch(statusUrl, { method: 'GET' });
@@ -1856,6 +2364,12 @@
         return response.json();
       }
 
+      /**
+       * Fetch Google Calendar Events.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns google calendar events.
+       */
       async function fetchGoogleCalendarEvents(start, end) {
         var eventsUrl = new URL('/api/google-calendar/events', CALENDAR_API_BASE);
         eventsUrl.searchParams.set('start', String(start || ''));
@@ -1869,6 +2383,12 @@
         return payload && Array.isArray(payload.events) ? payload.events : [];
       }
 
+      /**
+       * Fetch Nextcloud Calendar Events.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns nextcloud calendar events.
+       */
       async function fetchNextcloudCalendarEvents(start, end) {
         var eventsUrl = new URL('/api/nextcloud-calendar/events', CALENDAR_API_BASE);
         eventsUrl.searchParams.set('start', String(start || ''));
@@ -1882,6 +2402,16 @@
         return payload && Array.isArray(payload.events) ? payload.events : [];
       }
 
+      /**
+       * To Google Calendar Event Payload.
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns google calendar event payload.
+       */
       function toGoogleCalendarEventPayload(title, start, end, allDay, calendarId, colorId) {
         var schedule = toCreatePayload(start, end, allDay);
         return {
@@ -1894,6 +2424,15 @@
         };
       }
 
+      /**
+       * To Nextcloud Calendar Event Payload.
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns nextcloud calendar event payload.
+       */
       function toNextcloudCalendarEventPayload(title, start, end, allDay, calendarId) {
         var schedule = toCreatePayload(start, end, allDay);
         return {
@@ -1905,6 +2444,12 @@
         };
       }
 
+      /**
+       * To Full Calendar Google Event.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns full calendar google event.
+       */
       function toFullCalendarGoogleEvent(rawEvent, fallbackCalendarId) {
         if (!rawEvent || typeof rawEvent !== 'object') return null;
         var start = String(rawEvent.start && (rawEvent.start.dateTime || rawEvent.start.date) || '').trim();
@@ -1938,6 +2483,15 @@
         };
       }
 
+      /**
+       * Create Google Calendar Event.
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns google calendar event.
+       */
       async function createGoogleCalendarEvent(title, start, end, allDay, colorId) {
         if (!isHttpContext()) {
           throw new Error('Calendar is not running on http(s). Open the preview server URL.');
@@ -1958,6 +2512,12 @@
         return { event: toFullCalendarGoogleEvent(out && out.event, payload.calendarId) };
       }
 
+      /**
+       * Update Google Calendar Event.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function updateGoogleCalendarEvent(event, payload) {
         var props = event && event.extendedProps ? event.extendedProps : {};
         var calendarId = String(props.googleCalendarId || '').trim();
@@ -1984,6 +2544,11 @@
         return toFullCalendarGoogleEvent(out && out.event, calendarId);
       }
 
+      /**
+       * Delete Google Calendar Event.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function deleteGoogleCalendarEvent(event) {
         var props = event && event.extendedProps ? event.extendedProps : {};
         var calendarId = String(props.googleCalendarId || '').trim();
@@ -2001,6 +2566,15 @@
         }
       }
 
+      /**
+       * Create Nextcloud Calendar Event.
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns nextcloud calendar event.
+       */
       async function createNextcloudCalendarEvent(title, start, end, allDay, calendarId) {
         if (!isHttpContext()) {
           throw new Error('Calendar is not running on http(s). Open the preview server URL.');
@@ -2021,6 +2595,12 @@
         return { event: out && out.event ? out.event : null };
       }
 
+      /**
+       * Update Nextcloud Calendar Event.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function updateNextcloudCalendarEvent(event, payload) {
         var props = event && event.extendedProps ? event.extendedProps : {};
         var calendarId = String(props.nextcloudCalendarId || '').trim();
@@ -2048,6 +2628,11 @@
         return out && out.event ? out.event : null;
       }
 
+      /**
+       * Delete Nextcloud Calendar Event.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function deleteNextcloudCalendarEvent(event) {
         var props = event && event.extendedProps ? event.extendedProps : {};
         var calendarId = String(props.nextcloudCalendarId || '').trim();
@@ -2069,6 +2654,12 @@
         }
       }
 
+      /**
+       * Apply Google Event Response.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function applyGoogleEventResponse(targetEvent, replacement) {
         if (!targetEvent || !replacement) return;
         if (replacement.title) targetEvent.setProp('title', replacement.title);
@@ -2084,6 +2675,12 @@
         }
       }
 
+      /**
+       * Apply Nextcloud Event Response.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function applyNextcloudEventResponse(targetEvent, replacement) {
         if (!targetEvent || !replacement) return;
         if (replacement.title) targetEvent.setProp('title', replacement.title);
@@ -2104,6 +2701,10 @@
         }
       }
 
+      /**
+       * Fetch Calendar Session Token.
+       * @returns {*} Returns calendar session token.
+       */
       async function fetchCalendarSessionToken() {
         var sessionUrl = new URL('/api/session', CALENDAR_API_BASE).toString();
         var response = await fetch(sessionUrl, { method: 'GET' });
@@ -2119,6 +2720,10 @@
         return token;
       }
 
+      /**
+       * Mutation Headers.
+       * @returns {*} Returns the function result.
+       */
       function mutationHeaders() {
         if (!calendarApiToken) {
           throw new Error('Missing session token. Reload the calendar page.');
@@ -2129,6 +2734,11 @@
         };
       }
 
+      /**
+       * Create Filter Select.
+       * @param {*}
+       * @returns {*} Returns filter select.
+       */
       function createFilterSelect(meta) {
         var wrap = document.createElement('span');
         wrap.className = 'calendar-filter-wrap';
@@ -2156,6 +2766,11 @@
         return { wrap: wrap, select: select };
       }
 
+      /**
+       * Mount Filter Dropdown.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function mountFilterDropdown(calendarEl) {
         try {
           var meta = await fetchCalendarFilters();
@@ -2195,6 +2810,11 @@
         }
       }
 
+      /**
+       * On Event Date Change.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function onEventDateChange(info) {
         if (isExternalReadOnlyEvent(info.event)) {
           info.revert();
@@ -2228,6 +2848,11 @@
         }
       }
 
+      /**
+       * On Event Click.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function onEventClick(info) {
         if (isGoogleEvent(info.event) || isNextcloudEvent(info.event)) {
           try {
@@ -2256,6 +2881,14 @@
         }
       }
 
+      /**
+       * Create Event For Dates.
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns event for dates.
+       */
       async function createEventForDates(calendar, start, end, allDay) {
         if (isCreateFlowActive) return;
         isCreateFlowActive = true;
@@ -2291,6 +2924,11 @@
         }
       }
 
+      /**
+       * On Date Select.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function onDateSelect(info) {
         closeEventPreviewPopover();
         info.view.calendar.unselect();
@@ -2337,6 +2975,11 @@
         }
       }
 
+      /**
+       * On Date Click.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       async function onDateClick(info) {
         closeEventPreviewPopover();
         var viewType = info && info.view && info.view.type ? String(info.view.type) : '';
@@ -2366,6 +3009,11 @@
         }
       }
 
+      /**
+       * Is External Read Only Event.
+       * @param {*}
+       * @returns {*} Returns whether the condition is met.
+       */
       function isExternalReadOnlyEvent(event) {
         var source = String(event && event.extendedProps && event.extendedProps.externalSource || '').toLowerCase();
         if (source === 'google') {
@@ -2377,24 +3025,46 @@
         return false;
       }
 
+      /**
+       * Is Google Event.
+       * @param {*}
+       * @returns {*} Returns whether the condition is met.
+       */
       function isGoogleEvent(event) {
         var source = String(event && event.extendedProps && event.extendedProps.externalSource || '').toLowerCase();
         return source === 'google';
       }
 
+      /**
+       * Is Google Write Enabled.
+       * @returns {*} Returns whether the condition is met.
+       */
       function isGoogleWriteEnabled() {
         return Boolean(window.googleCalendarState && window.googleCalendarState.oauthWritable === true);
       }
 
+      /**
+       * Is Nextcloud Event.
+       * @param {*}
+       * @returns {*} Returns whether the condition is met.
+       */
       function isNextcloudEvent(event) {
         var source = String(event && event.extendedProps && event.extendedProps.externalSource || '').toLowerCase();
         return source === 'nextcloud';
       }
 
+      /**
+       * Is Nextcloud Write Enabled.
+       * @returns {*} Returns whether the condition is met.
+       */
       function isNextcloudWriteEnabled() {
         return Boolean(window.nextcloudCalendarState && window.nextcloudCalendarState.writable === true);
       }
 
+      /**
+       * Create Google Event Source.
+       * @returns {*} Returns google event source.
+       */
       function createGoogleEventSource() {
         return {
           id: 'google',
@@ -2418,6 +3088,10 @@
         };
       }
 
+      /**
+       * Create Nextcloud Event Source.
+       * @returns {*} Returns nextcloud event source.
+       */
       function createNextcloudEventSource() {
         return {
           id: 'nextcloud',
@@ -2441,6 +3115,12 @@
         };
       }
 
+      /**
+       * Set Google Events Enabled.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function setGoogleEventsEnabled(calendar, enabled) {
         if (!calendar || !window.googleCalendarState || !window.googleCalendarState.configured) return;
         var source = calendar.getEventSourceById('google');
@@ -2458,6 +3138,12 @@
       }
       window.setGoogleEventsEnabled = setGoogleEventsEnabled;
 
+      /**
+       * Set Nextcloud Events Enabled.
+       * @param {*}
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function setNextcloudEventsEnabled(calendar, enabled) {
         if (!calendar || !window.nextcloudCalendarState || !window.nextcloudCalendarState.configured) return;
         var source = calendar.getEventSourceById('nextcloud');
@@ -2475,6 +3161,11 @@
       }
       window.setNextcloudEventsEnabled = setNextcloudEventsEnabled;
 
+      /**
+       * Update Source Toggle Buttons.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function updateSourceToggleButtons(calendarEl) {
         var root = calendarEl && typeof calendarEl.closest === 'function' ? calendarEl.closest('body') : document.body;
         if (!root) return;
@@ -2508,6 +3199,11 @@
         }
       }
 
+      /**
+       * Refresh Nextcloud Events.
+       * @param {*}
+       * @returns {*} Returns the function result.
+       */
       function refreshNextcloudEvents(calendar) {
         if (!calendar) return;
         var source = calendar.getEventSourceById('nextcloud');
@@ -2752,4 +3448,6 @@
         mountCalendarSettingsPopover(calendarEl, calendar);
 
       });
+
+
 

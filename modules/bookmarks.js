@@ -1,3 +1,8 @@
+﻿/**
+ * Maps raw bookmark item types to user-facing German labels.
+ * @param {unknown} type - Raw bookmark type from `.obsidian/bookmarks.json`.
+ * @returns {string} Display label for the bookmark type.
+ */
 function normalizeItemType(type) {
   const raw = String(type || "").toLowerCase();
   if (raw === "file") return "Datei";
@@ -7,6 +12,12 @@ function normalizeItemType(type) {
   return raw || "Bookmark";
 }
 
+/**
+ * Recursively flattens nested bookmark groups into leaf entries.
+ * @param {Array<object>|undefined|null} items - Bookmark items to traverse.
+ * @param {Array<object>} collector - Output list for non-group entries.
+ * @returns {void}
+ */
 function flattenGroupItems(items, collector) {
   if (!Array.isArray(items)) return;
   for (const item of items) {
@@ -18,6 +29,11 @@ function flattenGroupItems(items, collector) {
   }
 }
 
+/**
+ * Builds sidebar groups from raw bookmark root items.
+ * @param {Array<object>} rawItems - Root bookmark items from the API payload.
+ * @returns {Array<{id: string, title: string, entries: Array<object>}>} Grouped bookmark model.
+ */
 function buildGroups(rawItems) {
   const groups = [];
   for (const rootItem of rawItems) {
@@ -40,6 +56,12 @@ function buildGroups(rawItems) {
   return groups;
 }
 
+/**
+ * Renders the bookmarks module UI and wires API-backed open actions.
+ * @param {{head: HTMLElement, body: HTMLElement}} shell - Module shell DOM nodes.
+ * @param {{showPath?: boolean, showType?: boolean, openInNewTab?: boolean, cardMaxWidth?: number|string}} moduleSettings - Bookmarks module settings.
+ * @returns {Promise<() => void>} Cleanup callback that clears module DOM.
+ */
 export async function renderBookmarksModule(shell, moduleSettings) {
   let groupedData = [];
   let selectedGroup = "";
@@ -98,6 +120,12 @@ export async function renderBookmarksModule(shell, moduleSettings) {
   shell.body.appendChild(status);
   shell.body.appendChild(layout);
 
+  /**
+   * Updates the module status message and state class.
+   * @param {string} text - Status text.
+   * @param {"ok"|"err"|""} [state] - Optional visual state modifier.
+   * @returns {void}
+   */
   function setStatus(text, state) {
     status.textContent = text || "";
     status.classList.remove("ok", "err");
@@ -105,6 +133,10 @@ export async function renderBookmarksModule(shell, moduleSettings) {
     if (state === "err") status.classList.add("err");
   }
 
+  /**
+   * Returns bookmark entries after group and search filtering.
+   * @returns {Array<object>} Filtered bookmark entries for card rendering.
+   */
   function getActiveEntries() {
     const source =
       selectedGroup === "__all__"
@@ -121,6 +153,10 @@ export async function renderBookmarksModule(shell, moduleSettings) {
     });
   }
 
+  /**
+   * Renders group filter buttons and active-state styles.
+   * @returns {void}
+   */
   function renderGroups() {
     groupList.innerHTML = "";
     for (const group of groupedData) {
@@ -148,6 +184,10 @@ export async function renderBookmarksModule(shell, moduleSettings) {
     groupList.appendChild(allBtn);
   }
 
+  /**
+   * Renders bookmark cards for the active group and query.
+   * @returns {void}
+   */
   function renderCards() {
     const entries = getActiveEntries();
     cards.innerHTML = "";
@@ -206,6 +246,10 @@ export async function renderBookmarksModule(shell, moduleSettings) {
     }
   }
 
+  /**
+   * Loads bookmarks from backend, updates local grouping state, and re-renders UI.
+   * @returns {Promise<void>}
+   */
   async function loadBookmarks() {
     setStatus("Bookmarks werden geladen...");
     cards.innerHTML = '<div class="empty">Lade Daten...</div>';

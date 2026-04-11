@@ -1,4 +1,4 @@
-import fs from "node:fs";
+﻿import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -6,6 +6,11 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const EVENTS_FILE = path.resolve(__dirname, "events.generated.js");
 
+/**
+ * Fail.
+ * @param {*}
+ * @returns {*} Returns the function result.
+ */
 function fail(message) {
   console.error(`Smoke check failed: ${message}`);
   process.exit(1);
@@ -56,3 +61,5 @@ for (const event of recurringOverrides) {
 }
 
 console.log(`Smoke check OK: ${events.length} events`);
+
+

@@ -1,7 +1,17 @@
+﻿/**
+ * Normalizes free-text form input by trimming and collapsing internal whitespace.
+ * @param {unknown} value - Raw field value.
+ * @returns {string} Sanitized text.
+ */
 function cleanText(value) {
   return String(value || "").trim().replace(/\s+/g, " ");
 }
 
+/**
+ * Builds the final folder/file name preview according to project naming rules.
+ * @param {{year: string|number, society: string, fundingCode: string, title: string, projectType: string}} input - Form values.
+ * @returns {string} Preview folder name or an empty string when mandatory parts are missing.
+ */
 function buildFolderPreview({ year, society, fundingCode, title, projectType }) {
   const cleanYear = String(year || "").trim();
   const cleanSociety = cleanText(society).toUpperCase();
@@ -16,6 +26,12 @@ function buildFolderPreview({ year, society, fundingCode, title, projectType }) 
   return `${cleanYear} ${cleanSociety} - ${cleanTitle}`;
 }
 
+/**
+ * Renders the "new project" module with modal form, metadata hydration, and create action.
+ * @param {{body: HTMLElement}} shell - Module shell returned by homepage renderer.
+ * @param {{openInNewTab?: boolean}} moduleSettings - Module settings from effective config.
+ * @returns {Promise<() => void>} Cleanup callback for event listeners and modal nodes.
+ */
 export async function renderNewProjectModule(shell, moduleSettings) {
   let meta = null;
   const openInNewTab = moduleSettings?.openInNewTab !== false;
@@ -36,6 +52,12 @@ export async function renderNewProjectModule(shell, moduleSettings) {
   shell.body.appendChild(openBtn);
   shell.body.appendChild(status);
 
+  /**
+   * Updates the module-level status message.
+   * @param {string} text - Status text.
+   * @param {"ok"|"err"|""} [state] - Optional visual state.
+   * @returns {void}
+   */
   function setStatus(text, state) {
     status.textContent = text || "";
     status.classList.remove("ok", "err");
@@ -43,6 +65,10 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     if (state === "err") status.classList.add("err");
   }
 
+  /**
+   * Loads project suggestion metadata from the server.
+   * @returns {Promise<object>} Metadata payload for year/society/type/funding defaults.
+   */
   async function fetchMeta() {
     const response = await fetch("/api/projects/meta");
     if (!response.ok) {
@@ -53,6 +79,11 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     return payload || {};
   }
 
+  /**
+   * Creates a project through the backend API.
+   * @param {object} payload - Normalized creation payload from form values.
+   * @returns {Promise<object>} API response with created paths.
+   */
   async function createProject(payload) {
     const response = await fetch("/api/projects/create", {
       method: "POST",
@@ -66,6 +97,12 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     return response.json();
   }
 
+  /**
+   * Wraps an input element in the module's labeled-field layout.
+   * @param {string} labelText - Visible field label.
+   * @param {HTMLElement} inputEl - Input/select element to place in the field.
+   * @returns {HTMLLabelElement} Labeled field wrapper.
+   */
   function createLabeledField(labelText, inputEl) {
     const wrap = document.createElement("label");
     wrap.className = "new-project-field";
@@ -77,6 +114,10 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     return wrap;
   }
 
+  /**
+   * Builds modal DOM, wires handlers, and returns an imperative modal controller.
+   * @returns {{show: () => void, hide: () => void, hydrateFromMeta: (data: object) => void, destroy: () => void}} Modal controller.
+   */
   function buildModal() {
     const overlay = document.createElement("div");
     overlay.className = "new-project-modal-overlay";
@@ -91,7 +132,10 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     const head = document.createElement("div");
     head.className = "new-project-head";
     const title = document.createElement("h3");
+    const titleId = `new-project-modal-title-${Math.random().toString(36).slice(2, 10)}`;
+    title.id = titleId;
     title.textContent = "Neues Projekt erstellen";
+    dialog.setAttribute("aria-labelledby", titleId);
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
     closeBtn.className = "module-head-icon-btn";
@@ -169,6 +213,10 @@ export async function renderNewProjectModule(shell, moduleSettings) {
 
     document.body.appendChild(overlay);
 
+    /**
+     * Enables/disables the funding field based on selected project type.
+     * @returns {void}
+     */
     function updateFundingState() {
       const funding = String(typeSelect.value || "").toLowerCase() === "funding";
       fundingInput.disabled = !funding;
@@ -176,6 +224,10 @@ export async function renderNewProjectModule(shell, moduleSettings) {
       if (funding && fundingInput.value === "-") fundingInput.value = "";
     }
 
+    /**
+     * Recomputes and displays the folder/file naming preview.
+     * @returns {void}
+     */
     function updatePreview() {
       const folderName = buildFolderPreview({
         year: yearInput.value,
@@ -189,6 +241,12 @@ export async function renderNewProjectModule(shell, moduleSettings) {
         : "Ordner/Datei: Bitte Pflichtfelder ausfuellen";
     }
 
+    /**
+     * Updates the status message inside the modal form.
+     * @param {string} text - Status text.
+     * @param {"ok"|"err"|""} [state] - Optional visual state.
+     * @returns {void}
+     */
     function setFormStatus(text, state) {
       formStatus.textContent = text || "";
       formStatus.classList.remove("ok", "err");
@@ -196,6 +254,10 @@ export async function renderNewProjectModule(shell, moduleSettings) {
       if (state === "err") formStatus.classList.add("err");
     }
 
+    /**
+     * Opens the modal and focuses the title field.
+     * @returns {void}
+     */
     function show() {
       overlay.hidden = false;
       overlay.setAttribute("aria-hidden", "false");
@@ -204,11 +266,20 @@ export async function renderNewProjectModule(shell, moduleSettings) {
       titleInput.focus();
     }
 
+    /**
+     * Closes the modal.
+     * @returns {void}
+     */
     function hide() {
       overlay.hidden = true;
       overlay.setAttribute("aria-hidden", "true");
     }
 
+    /**
+     * Hydrates select options and defaults from backend project metadata.
+     * @param {object} data - Metadata payload returned by `/api/projects/meta`.
+     * @returns {void}
+     */
     function hydrateFromMeta(data) {
       const now = new Date();
       const years = Array.isArray(data?.options?.years) ? data.options.years : [];
@@ -264,10 +335,11 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     overlay.addEventListener("click", (event) => {
       if (event.target === overlay) hide();
     });
-    document.addEventListener("keydown", (event) => {
+    const onKeyDown = (event) => {
       if (overlay.hidden) return;
       if (event.key === "Escape") hide();
-    });
+    };
+    document.addEventListener("keydown", onKeyDown);
 
     yearInput.addEventListener("input", updatePreview);
     societySelect.addEventListener("change", updatePreview);
@@ -320,6 +392,7 @@ export async function renderNewProjectModule(shell, moduleSettings) {
       hide,
       hydrateFromMeta,
       destroy() {
+        document.removeEventListener("keydown", onKeyDown);
         overlay.remove();
       }
     };
@@ -348,3 +421,5 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     modal.destroy();
   };
 }
+
+
