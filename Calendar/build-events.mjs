@@ -20,8 +20,12 @@ const ALLOW_MARKDOWN_FALLBACK = parseBoolean(process.env.ALLOW_MARKDOWN_FALLBACK
 const EXCLUDE_DIRS = new Set([".obsidian", ".trash", "8. Emails", "Attachments", "Excalidraw"]);
 
 /**
- * Get Obsidian Bin Candidates.
- * @returns {*} Returns obsidian bin candidates.
+ * @typedef {Record<string, string | string[] | undefined>} FrontmatterMap
+ */
+
+/**
+ * Builds a prioritized list of Obsidian CLI binary candidates.
+ * @returns {string[]} Ordered executable candidates without duplicates.
  */
 function getObsidianBinCandidates() {
   const candidates = [];
@@ -43,8 +47,8 @@ function getObsidianBinCandidates() {
 }
 
 /**
- * Resolve Obsidian Bin.
- * @returns {*} Returns obsidian bin.
+ * Resolves the first existing absolute candidate or command name fallback.
+ * @returns {string} Absolute binary path or command name.
  */
 function resolveObsidianBin() {
   for (const candidate of getObsidianBinCandidates()) {
@@ -59,9 +63,9 @@ function resolveObsidianBin() {
 }
 
 /**
- * Is Vault Targeting Error.
- * @param {*}
- * @returns {*} Returns whether the condition is met.
+ * Detects vault-targeting errors returned by Obsidian CLI.
+ * @param {unknown} error - Error from `execFileSync`.
+ * @returns {boolean} `true` when error indicates invalid/missing vault targeting.
  */
 function isVaultTargetingError(error) {
   const text = String(error?.stderr || error?.stdout || error?.message || "").toLowerCase();
@@ -73,28 +77,28 @@ function isVaultTargetingError(error) {
 }
 
 /**
- * Is Markdown File.
- * @param {*}
- * @returns {*} Returns whether the condition is met.
+ * Checks whether a filename is a markdown file.
+ * @param {string} filePath - File path or filename.
+ * @returns {boolean} `true` when file ends with `.md`.
  */
 function isMarkdownFile(filePath) {
   return filePath.toLowerCase().endsWith(".md");
 }
 
 /**
- * Is Excluded Dir.
- * @param {*}
- * @returns {*} Returns whether the condition is met.
+ * Checks whether a directory is excluded from markdown fallback scanning.
+ * @param {string} dirName - Directory name.
+ * @returns {boolean} `true` when directory should be skipped.
  */
 function isExcludedDir(dirName) {
   return EXCLUDE_DIRS.has(dirName);
 }
 
 /**
- * List Markdown Files.
- * @param {*}
- * @param {*}
- * @returns {*} Returns the function result.
+ * Recursively collects markdown files under a directory.
+ * @param {string} dirPath - Start directory.
+ * @param {string[]} [results=[]] - Mutable accumulator.
+ * @returns {string[]} Collected absolute markdown file paths.
  */
 function listMarkdownFiles(dirPath, results = []) {
   for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
@@ -113,9 +117,9 @@ function listMarkdownFiles(dirPath, results = []) {
 }
 
 /**
- * Extract Frontmatter.
- * @param {*}
- * @returns {*} Returns the function result.
+ * Extracts raw YAML frontmatter text from markdown content.
+ * @param {string} content - Markdown content.
+ * @returns {string} Raw frontmatter body without delimiters, or empty string.
  */
 function extractFrontmatter(content) {
   if (!content.startsWith("---\n") && !content.startsWith("---\r\n")) {
@@ -127,18 +131,18 @@ function extractFrontmatter(content) {
 }
 
 /**
- * Strip Wrapping Quotes.
- * @param {*}
- * @returns {*} Returns the function result.
+ * Removes one pair of wrapping single/double quotes and trims value.
+ * @param {unknown} value - Raw scalar value.
+ * @returns {string} Unquoted scalar text.
  */
 function stripWrappingQuotes(value) {
   return String(value ?? "").trim().replace(/^["']|["']$/g, "");
 }
 
 /**
- * Strip Yaml Inline Comment.
- * @param {*}
- * @returns {*} Returns the function result.
+ * Removes unquoted YAML inline comments from a scalar line.
+ * @param {unknown} raw - Raw YAML scalar text.
+ * @returns {string} Scalar value without trailing inline comment.
  */
 function stripYamlInlineComment(raw) {
   const value = String(raw ?? "");
@@ -151,9 +155,9 @@ function stripYamlInlineComment(raw) {
 }
 
 /**
- * Parse Inline Yaml Array.
- * @param {*}
- * @returns {*} Returns inline yaml array.
+ * Parses an inline YAML list (for example `[a, "b"]`) into string values.
+ * @param {unknown} raw - Raw YAML list text.
+ * @returns {string[]} Parsed list entries.
  */
 function parseInlineYamlArray(raw) {
   return stripYamlInlineComment(raw)
@@ -165,9 +169,9 @@ function parseInlineYamlArray(raw) {
 }
 
 /**
- * Parse Frontmatter Data.
- * @param {*}
- * @returns {*} Returns frontmatter data.
+ * Parses selected scalar/list values from YAML frontmatter text.
+ * @param {unknown} frontmatter - Raw frontmatter text.
+ * @returns {FrontmatterMap} Parsed frontmatter map keyed by lowercase field name.
  */
 function parseFrontmatterData(frontmatter) {
   const out = Object.create(null);
@@ -207,10 +211,10 @@ function parseFrontmatterData(frontmatter) {
 }
 
 /**
- * Frontmatter Lookup.
- * @param {*}
- * @param {*}
- * @returns {*} Returns the function result.
+ * Looks up a frontmatter value by key (case-insensitive).
+ * @param {FrontmatterMap | null | undefined} frontmatterData - Parsed frontmatter map.
+ * @param {unknown} name - Field name.
+ * @returns {string | string[] | undefined} Matching value when present.
  */
 function frontmatterLookup(frontmatterData, name) {
   if (!frontmatterData || typeof frontmatterData !== "object") return undefined;

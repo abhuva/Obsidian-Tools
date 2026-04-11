@@ -231,7 +231,7 @@ function buildIncidentScatter(incidents, targets) {
 
 /**
  * Renders the monitoring dashboard module and starts periodic refresh.
- * @param {{body: HTMLElement}} shell - Module shell returned by homepage renderer.
+ * @param {{root: HTMLElement, body: HTMLElement}} shell - Module shell returned by homepage renderer.
  * @param {object} moduleSettings - Module settings from effective config.
  * @returns {Promise<() => void>} Cleanup callback to stop timers and release chart instances.
  */

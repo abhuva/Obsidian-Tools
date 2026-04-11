@@ -332,10 +332,11 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     overlay.addEventListener("click", (event) => {
       if (event.target === overlay) hide();
     });
-    document.addEventListener("keydown", (event) => {
+    const onKeyDown = (event) => {
       if (overlay.hidden) return;
       if (event.key === "Escape") hide();
-    });
+    };
+    document.addEventListener("keydown", onKeyDown);
 
     yearInput.addEventListener("input", updatePreview);
     societySelect.addEventListener("change", updatePreview);
@@ -388,6 +389,7 @@ export async function renderNewProjectModule(shell, moduleSettings) {
       hide,
       hydrateFromMeta,
       destroy() {
+        document.removeEventListener("keydown", onKeyDown);
         overlay.remove();
       }
     };

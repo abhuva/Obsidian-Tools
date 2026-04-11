@@ -339,14 +339,21 @@ async function applyUiTheme(themeConfig) {
 
   clearMirroredThemeVars();
   if (mode === "mirror-obsidian") {
+    delete rootEl.dataset.obsidianMode;
     let mirrored = false;
     try {
       const theme = await fetchObsidianThemeSnapshot();
       mirrored = applyMirroredThemeVars(theme?.vars);
-      if (theme?.mode === "dark") rootEl.dataset.obsidianMode = "dark";
-      if (theme?.mode === "light") rootEl.dataset.obsidianMode = "light";
+      if (theme?.mode === "dark") {
+        rootEl.dataset.obsidianMode = "dark";
+      } else if (theme?.mode === "light") {
+        rootEl.dataset.obsidianMode = "light";
+      } else {
+        delete rootEl.dataset.obsidianMode;
+      }
     } catch {
       mirrored = false;
+      delete rootEl.dataset.obsidianMode;
     }
     rootEl.dataset.themeMode = mirrored ? "mirror-obsidian" : "preset";
     persistThemeBootstrapCache({
@@ -412,12 +419,23 @@ async function renderPage() {
         const cleanup = await definition.render(shell, moduleCfg);
         addCleanup(cleanup);
       } catch (error) {
-        shell.body.innerHTML = `<div class="empty">Modulfehler: ${error.message || error}</div>`;
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = `Modulfehler: ${error?.message || String(error)}`;
+        shell.body.replaceChildren(empty);
       }
     }
   } catch (error) {
-    moduleGridEl.innerHTML =
-      `<section class="module"><div class="module-body"><div class="empty">Fehler beim Laden der Einstellungen: ${error.message || error}</div></div></section>`;
+    const section = document.createElement("section");
+    section.className = "module";
+    const body = document.createElement("div");
+    body.className = "module-body";
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = `Fehler beim Laden der Einstellungen: ${error?.message || String(error)}`;
+    body.appendChild(empty);
+    section.appendChild(body);
+    moduleGridEl.replaceChildren(section);
   }
 }
 
