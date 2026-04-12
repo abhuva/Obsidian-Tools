@@ -24,6 +24,8 @@ const UPDO_RAW_FILE = path.join(DATA_DIR, "raw.jsonl");
 const UPDO_LONGTERM_FILE = path.join(DATA_DIR, "longterm.jsonl");
 const UPDO_INCIDENTS_FILE = path.join(DATA_DIR, "incidents.jsonl");
 const UPDO_STATE_FILE = path.join(DATA_DIR, "state.json");
+const BEANTIME_STATE_FILE = path.join(ROOT, "data", "beantime", "state.json");
+const BEANTIME_TEMPLATE_FILE = path.join(ROOT, "beantime", "zeit.beancount");
 const PROJECTS_ROOT_REL = "2. Projektverwaltung";
 const PROJECTS_ROOT = path.join(VAULT_ROOT, PROJECTS_ROOT_REL);
 const TEMPLATE_PROJECT_FILE_REL = "6. Obsidian/_template/Projekt.md";
@@ -75,6 +77,14 @@ const DEFAULT_SETTINGS_FALLBACK = {
       enabled: true,
       title: "Projektverwaltung",
       openInNewTab: true
+    },
+    beantime: {
+      enabled: true,
+      title: "Beantime",
+      file: "data/beantime/zeit.beancount",
+      personAccount: "Zeit:Marc",
+      stateFile: "data/beantime/state.json",
+      bookableAccountPrefix: "Projekte:"
     },
     updo: {
       enabled: true,
@@ -404,8 +414,219 @@ function toNumberInRange(value, fallback, min, max) {
 function resolveDataPath(relativePath, fallbackAbsolutePath) {
   const raw = String(relativePath || "").trim();
   if (!raw) return fallbackAbsolutePath;
-  const normalized = raw.replace(/^[/\\]+/, "").replace(/[\\/]+/g, path.sep);
-  return path.resolve(ROOT, normalized);
+  if (path.isAbsolute(raw)) return fallbackAbsolutePath;
+  if (/^[a-zA-Z]:/.test(raw)) return fallbackAbsolutePath;
+
+  const toolsRoot = path.resolve(ROOT);
+  const normalized = path.normalize(raw.replace(/[\\/]+/g, path.sep));
+  if (!normalized || normalized === ".") return fallbackAbsolutePath;
+
+  const resolved = path.resolve(toolsRoot, normalized);
+  const rel = path.relative(toolsRoot, resolved);
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+    return fallbackAbsolutePath;
+  }
+  return resolved;
+}
+
+/**
+ * Returns current local date as `YYYY-MM-DD`.
+ * @returns {string} Date token.
+ */
+function localTodayToken() {
+  const now = new Date();
+  const yyyy = String(now.getFullYear());
+  const mm = String(now.getMonth() + 1).padStart(2, "0");
+  const dd = String(now.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+/**
+ * Derives runtime Beantime configuration from effective settings.
+ * @param {object} settings - Effective settings object.
+ * @returns {{enabled: boolean, title: string, filePath: string, personAccount: string, stateFilePath: string, bookableAccountPrefix: string}} Runtime config.
+ */
+function getBeantimeConfigFromSettings(settings) {
+  const moduleCfg = settings?.modules?.beantime || {};
+  return {
+    enabled: toBool(moduleCfg.enabled, DEFAULT_SETTINGS_FALLBACK.modules.beantime.enabled),
+    title: toCleanString(moduleCfg.title, DEFAULT_SETTINGS_FALLBACK.modules.beantime.title),
+    filePath: resolveDataPath(
+      toCleanString(moduleCfg.file, DEFAULT_SETTINGS_FALLBACK.modules.beantime.file),
+      path.join(ROOT, "data", "beantime", "zeit.beancount")
+    ),
+    personAccount: toCleanString(
+      moduleCfg.personAccount,
+      DEFAULT_SETTINGS_FALLBACK.modules.beantime.personAccount
+    ),
+    stateFilePath: resolveDataPath(
+      toCleanString(moduleCfg.stateFile, DEFAULT_SETTINGS_FALLBACK.modules.beantime.stateFile),
+      BEANTIME_STATE_FILE
+    ),
+    bookableAccountPrefix: toCleanString(
+      moduleCfg.bookableAccountPrefix,
+      DEFAULT_SETTINGS_FALLBACK.modules.beantime.bookableAccountPrefix
+    )
+  };
+}
+
+/**
+ * Ensures a Beancount file exists for Beantime writes.
+ * @param {string} filePath - Absolute path to Beancount ledger.
+ * @returns {void}
+ */
+function ensureBeantimeLedgerExists(filePath) {
+  ensureParentDir(filePath);
+  if (!fs.existsSync(filePath)) {
+    const template = fs.readFileSync(BEANTIME_TEMPLATE_FILE, "utf8");
+    fs.writeFileSync(filePath, template, "utf8");
+  }
+}
+
+/**
+ * Reads and normalizes the Beantime running timer state.
+ * @param {string} stateFilePath - Absolute path to state JSON.
+ * @returns {{startedAt: string, startedDate: string, account: string, personAccount: string, summary: string}|null} Running timer state.
+ */
+function readBeantimeState(stateFilePath) {
+  const raw = readJsonFileSafe(stateFilePath, null);
+  if (!raw || typeof raw !== "object") return null;
+  const startedAt = toCleanString(raw.startedAt, "");
+  const startedDate = toCleanString(raw.startedDate, "");
+  const account = toCleanString(raw.account, "");
+  const personAccount = toCleanString(raw.personAccount, "");
+  if (!startedAt || !startedDate || !account) return null;
+  return {
+    startedAt,
+    startedDate,
+    account,
+    personAccount,
+    summary: toCleanString(raw.summary, "")
+  };
+}
+
+/**
+ * Persists a running timer state for Beantime.
+ * @param {string} stateFilePath - Absolute state file path.
+ * @param {{startedAt: string, startedDate: string, account: string, personAccount: string, summary: string}|null} state - Next state.
+ * @returns {void}
+ */
+function writeBeantimeState(stateFilePath, state) {
+  if (!state) {
+    if (fs.existsSync(stateFilePath)) fs.unlinkSync(stateFilePath);
+    return;
+  }
+  writeJson(stateFilePath, state);
+}
+
+/**
+ * Parses open account directives and returns candidate person accounts (`Zeit:*`).
+ * @param {string} filePath - Absolute Beancount file path.
+ * @returns {string[]} Sorted list of person account names.
+ */
+function readBeantimePersonAccounts(filePath) {
+  return readBeantimeBookableAccounts(filePath, "Zeit:");
+}
+
+/**
+ * Parses open account directives and returns bookable project accounts.
+ * @param {string} filePath - Absolute Beancount file path.
+ * @param {string} prefix - Account prefix filter.
+ * @returns {string[]} Sorted list of account names.
+ */
+function readBeantimeBookableAccounts(filePath, prefix) {
+  ensureBeantimeLedgerExists(filePath);
+  const raw = fs.readFileSync(filePath, "utf8");
+  const out = new Set();
+  const cleanPrefix = String(prefix || "").trim();
+  for (const line of raw.split(/\r?\n/)) {
+    const match = line.match(/^\d{4}-\d{2}-\d{2}\s+open\s+([A-Z][A-Za-z0-9:-]*)(?:\s+;.*)?\s*$/);
+    if (!match) continue;
+    const account = String(match[1] || "").trim();
+    if (!account) continue;
+    if (cleanPrefix && !account.startsWith(cleanPrefix)) continue;
+    out.add(account);
+  }
+  return Array.from(out).sort((a, b) => a.localeCompare(b));
+}
+
+/**
+ * Escapes text for safe use as a Beancount quoted string.
+ * @param {unknown} value - Raw text value.
+ * @returns {string} Escaped string.
+ */
+function asBeanString(value) {
+  return String(value ?? "")
+    .replace(/[\r\n]+/g, " ")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"');
+}
+
+/**
+ * Validates a Beancount account token for user-supplied fallback scenarios.
+ * @param {string} value - Candidate account name.
+ * @returns {boolean} `true` when the value matches a safe account format.
+ */
+function isSafeBeancountAccount(value) {
+  const clean = String(value || "").trim();
+  if (!clean) return false;
+  if (/[\r\n\0-\x1f\x7f]/.test(clean)) return false;
+  return /^([A-Z][A-Za-z0-9-]*)(:[A-Z][A-Za-z0-9-]*)*$/.test(clean);
+}
+
+/**
+ * Formats decimal hours from minutes for Beancount HR postings.
+ * @param {number} minutes - Duration in minutes.
+ * @returns {string} Decimal hours string with two fraction digits.
+ */
+function minutesToHourAmount(minutes) {
+  const safe = Number.isFinite(minutes) ? Math.max(0, minutes) : 0;
+  return (safe / 60).toFixed(2);
+}
+
+/**
+ * Appends one Beantime transaction to the configured ledger.
+ * @param {{filePath: string, personAccount: string}} cfg - Runtime Beantime config.
+ * @param {{startedAt: string, startedDate: string, account: string, personAccount: string, summary: string}} state - Running state to finalize.
+ * @returns {{date: string, durationMinutes: number, amountHours: string}} Append summary.
+ */
+function appendBeantimeTransaction(cfg, state) {
+  ensureBeantimeLedgerExists(cfg.filePath);
+  const startMs = Date.parse(state.startedAt);
+  if (!Number.isFinite(startMs)) {
+    throw new Error("Invalid start timestamp in state");
+  }
+  const end = new Date();
+  const endIso = end.toISOString();
+  const diffMs = Math.max(0, end.getTime() - startMs);
+  const durationMinutes = Math.max(0, Math.round(diffMs / 60000));
+  const amountHours = minutesToHourAmount(durationMinutes);
+  const txDate = toCleanString(state.startedDate, localTodayToken());
+  const personAccount = toCleanString(state.personAccount, cfg.personAccount);
+  const payee = personAccount.includes(":") ? personAccount.split(":").pop() : personAccount;
+  const narration = state.summary || "Zeiterfassung";
+
+  const tx = [
+    `${txDate} * "${asBeanString(payee)}" "${asBeanString(narration)}"`,
+    `  start: "${asBeanString(state.startedAt)}"`,
+    `  end: "${asBeanString(endIso)}"`,
+    `  duration_minutes: ${durationMinutes}`,
+    `  timer_module: "beantime"`,
+    `  ${state.account}  ${amountHours} HR`,
+    `  ${personAccount}`,
+    ""
+  ].join("\n");
+
+  const current = fs.existsSync(cfg.filePath) ? fs.readFileSync(cfg.filePath, "utf8") : "";
+  const spacer = current.length && !current.endsWith("\n") ? "\n\n" : current.length ? "\n" : "";
+  fs.appendFileSync(cfg.filePath, `${spacer}${tx}`, "utf8");
+
+  return {
+    date: txDate,
+    durationMinutes,
+    amountHours,
+    personAccount
+  };
 }
 
 /**
@@ -798,6 +1019,32 @@ function normalizeSettings(input) {
         openInNewTab: toBool(
           merged?.modules?.newProject?.openInNewTab,
           DEFAULT_SETTINGS_FALLBACK.modules.newProject.openInNewTab
+        )
+      },
+      beantime: {
+        enabled: toBool(
+          merged?.modules?.beantime?.enabled,
+          DEFAULT_SETTINGS_FALLBACK.modules.beantime.enabled
+        ),
+        title: toCleanString(
+          merged?.modules?.beantime?.title,
+          DEFAULT_SETTINGS_FALLBACK.modules.beantime.title
+        ),
+        file: toCleanString(
+          merged?.modules?.beantime?.file,
+          DEFAULT_SETTINGS_FALLBACK.modules.beantime.file
+        ),
+        personAccount: toCleanString(
+          merged?.modules?.beantime?.personAccount,
+          DEFAULT_SETTINGS_FALLBACK.modules.beantime.personAccount
+        ),
+        stateFile: toCleanString(
+          merged?.modules?.beantime?.stateFile,
+          DEFAULT_SETTINGS_FALLBACK.modules.beantime.stateFile
+        ),
+        bookableAccountPrefix: toCleanString(
+          merged?.modules?.beantime?.bookableAccountPrefix,
+          DEFAULT_SETTINGS_FALLBACK.modules.beantime.bookableAccountPrefix
         )
       },
       updo: {
@@ -2621,6 +2868,132 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "GET" && pathname === "/api/beantime/meta") {
+    try {
+      const settings = getEffectiveSettings();
+      const config = getBeantimeConfigFromSettings(settings);
+      const accounts = readBeantimeBookableAccounts(config.filePath, config.bookableAccountPrefix);
+      const personAccounts = readBeantimePersonAccounts(config.filePath);
+      const running = readBeantimeState(config.stateFilePath);
+      const activePerson = running?.personAccount || config.personAccount;
+      sendJson(res, 200, {
+        ok: true,
+        file: path.relative(VAULT_ROOT, config.filePath).replace(/\\/g, "/"),
+        personAccount: activePerson,
+        accountPrefix: config.bookableAccountPrefix,
+        accounts,
+        personAccounts,
+        running
+      });
+    } catch (error) {
+      sendText(res, 500, error.message || "Could not load Beantime meta");
+    }
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/beantime/start") {
+    readRequestBody(req)
+      .then((rawBody) => {
+        let payload;
+        try {
+          payload = JSON.parse(rawBody || "{}");
+        } catch {
+          sendText(res, 400, "Invalid JSON payload");
+          return;
+        }
+
+        try {
+          const settings = getEffectiveSettings();
+          const config = getBeantimeConfigFromSettings(settings);
+          const running = readBeantimeState(config.stateFilePath);
+          if (running) {
+            sendText(res, 409, "A timer is already running");
+            return;
+          }
+
+          const account = toCleanString(payload?.account, "");
+          if (!account) {
+            sendText(res, 400, "Missing account");
+            return;
+          }
+          const accounts = readBeantimeBookableAccounts(config.filePath, config.bookableAccountPrefix);
+          if (!accounts.includes(account)) {
+            sendText(res, 422, "Selected account is not open/bookable");
+            return;
+          }
+          const personAccounts = readBeantimePersonAccounts(config.filePath);
+          const personAccount = toCleanString(payload?.personAccount, config.personAccount);
+          if (personAccounts.length) {
+            if (!personAccounts.includes(personAccount)) {
+              sendText(res, 422, "Selected person account is not open/bookable");
+              return;
+            }
+          } else if (!isSafeBeancountAccount(personAccount)) {
+            sendText(res, 422, "Selected person account is invalid");
+            return;
+          }
+
+          const startedAt = new Date().toISOString();
+          const state = {
+            startedAt,
+            startedDate: localTodayToken(),
+            account,
+            personAccount,
+            summary: toCleanString(payload?.summary, "")
+          };
+          writeBeantimeState(config.stateFilePath, state);
+          sendJson(res, 200, { ok: true, running: state });
+        } catch (error) {
+          sendText(res, 422, error.message || "Could not start Beantime");
+        }
+      })
+      .catch((error) => {
+        sendText(res, 500, error.message || "Unknown error while starting Beantime");
+      });
+    return;
+  }
+
+  if (req.method === "POST" && pathname === "/api/beantime/stop") {
+    readRequestBody(req)
+      .then((rawBody) => {
+        let payload;
+        try {
+          payload = JSON.parse(rawBody || "{}");
+        } catch {
+          sendText(res, 400, "Invalid JSON payload");
+          return;
+        }
+
+        try {
+          const settings = getEffectiveSettings();
+          const config = getBeantimeConfigFromSettings(settings);
+          const running = readBeantimeState(config.stateFilePath);
+          if (!running) {
+            sendText(res, 409, "No running Beantime timer");
+            return;
+          }
+
+          if (Object.prototype.hasOwnProperty.call(payload || {}, "summary")) {
+            running.summary = String(payload?.summary ?? "").trim();
+          }
+
+          const appendResult = appendBeantimeTransaction(config, running);
+          writeBeantimeState(config.stateFilePath, null);
+          sendJson(res, 200, {
+            ok: true,
+            appended: appendResult,
+            file: path.relative(VAULT_ROOT, config.filePath).replace(/\\/g, "/")
+          });
+        } catch (error) {
+          sendText(res, 422, error.message || "Could not stop Beantime");
+        }
+      })
+      .catch((error) => {
+        sendText(res, 500, error.message || "Unknown error while stopping Beantime");
+      });
+    return;
+  }
+
   if (req.method === "GET" && pathname === "/api/projects/meta") {
     try {
       const payload = buildProjectMetaPayload();
@@ -2734,7 +3107,7 @@ server.listen(PORT, HOST, () => {
   ensureUpdoMonitor();
   console.log(`Homepage preview server: http://${HOST}:${PORT}/home.html`);
   console.log(
-    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/projects/meta, POST /api/projects/create, GET /api/updo/snapshot, GET /api/updo/history, POST /api/updo/restart"
+    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/beantime/meta, POST /api/beantime/start, POST /api/beantime/stop, GET /api/projects/meta, POST /api/projects/create, GET /api/updo/snapshot, GET /api/updo/history, POST /api/updo/restart"
   );
 });
 

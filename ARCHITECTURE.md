@@ -9,6 +9,7 @@ Das Tool ist als modulares UI + Settings-Seite aufgebaut:
 - einzelne Module in `modules/*.js`
 - Feature-Toggles ueber Settings
 - gemeinsames Theme-Modell (`ui.theme`) fuer beide Seiten
+- Header-basierte Modulnavigation mit Icon-Tabs (ein aktives Modul-Panel im Content-Bereich)
 
 ## Why This Fits Long-Term Collaboration
 
@@ -22,10 +23,17 @@ Das Tool ist als modulares UI + Settings-Seite aufgebaut:
 ## Tradeoffs
 
 - Frontend ist modularisiert; CSS liegt zentral in `app/homepage.css`.
+- Modul-Layout ist absichtlich "single-active": nur das aktive Tab-Modul wird gerendert; spart Platz bei vielen Modulen.
 - Settings-Schema ist bewusst klein gehalten; bei Wachstum kann es in mehrere Dateien geteilt werden.
 - Theme-Logik ist aktuell in `app/homepage.js` und inline in `settings.html` dupliziert.
 - Mirror ist "best effort": Mapping von Obsidian-Variablen auf lokale Tokens ist nicht 1:1.
 - Kein Flash beim Laden wird ueber lokalen Theme-Bootstrap-Cache erreicht (`homepage-theme-bootstrap-v1`).
+- Aktives Modul-Tab wird lokal wiederhergestellt (`homepage-active-module-v1`).
+
+## Time Tracking Mode (Aktuell)
+
+- `beantime`-Modul (Beancount): Start/Stop mit temporaerer State-Datei; beim Stop wird eine fertige Beancount-Transaktion mit Zeit-Metadaten geschrieben.
+- Das Modul nutzt einstellbare Dateipfade in `settings.html`, damit projekt- oder nutzerspezifische Speicherorte moeglich bleiben.
 
 ## Theme Pipeline (Aktuell)
 

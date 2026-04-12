@@ -16,6 +16,7 @@ Lokaler Preview-Server fuer eine modulare Obsidian-Homepage.
 - `Tools/app/homepage.js`: Bootstrap + Modul-Registry.
 - `Tools/modules/bookmarks.js`: Bookmarks-Modul.
 - `Tools/modules/clock.js`: Uhrzeit-Modul.
+- `Tools/modules/beantime.js`: Beancount-basiertes Start/Stop-Zeiterfassungs-Modul.
 - `Tools/settings.html`: Settings-Seite (UI fuer Konfiguration).
 - `Tools/serve.mjs`: HTTP-Server + API.
 - `Tools/stop-preview.mjs`: stoppt den Preview-Server auf Port `4174`.
@@ -76,6 +77,9 @@ obsidian web url="http://127.0.0.1:4174/settings.html"
 - `GET /api/updo/history`: Liefert komprimierte Langzeitdaten + Incident-Liste (`rangeDays` optional).
   - Enthält bei TLS-Fehlern ein `sslIssue`-Objekt (z. B. `ERR_TLS_CERT_ALTNAME_INVALID`).
 - `POST /api/updo/restart`: Startet den `updo`-Monitorprozess neu.
+- `GET /api/beantime/meta`: Liefert laufenden Beantime-Timer + buchbare Beancount-Konten + Personenkonten (`Zeit:*`).
+- `POST /api/beantime/start`: Startet Beantime-Timer (nur State-Datei, noch keine Ledger-Buchung).
+- `POST /api/beantime/stop`: Stoppt Timer, berechnet Dauer und schreibt Beancount-Transaktion.
 
 ## Konfigurationsprinzip
 
@@ -87,6 +91,10 @@ Damit sind spaetere Features stabil erweiterbar (neue Module, neue Optionen).
 
 ## Aktuelle Module
 
+- Homepage-Layout:
+  - Aktivierte Module erscheinen als Icon-Tabs im Header.
+  - Es wird jeweils genau ein Modul-Panel unterhalb des Headers gerendert (Tab-Prinzip statt gestapelter Boxen).
+  - Die zuletzt aktive Modul-Auswahl wird lokal gespeichert (`homepage-active-module-v1`).
 - `bookmarks`: Visuelle Bookmark-Navigation.
   - Optional: Pfadanzeige (`showPath`) an/aus.
   - Optional: Typ-Badge (`showType`) an/aus.
@@ -94,6 +102,9 @@ Damit sind spaetere Features stabil erweiterbar (neue Module, neue Optionen).
   - Optional: Kartenbreite (`cardMaxWidth`, 205-420 px).
 - `clock` (Uhrzeit): Live-Digitaluhr im Header/Banner.
 - `newProject` (Neues Projekt erstellen): Dialog fuer neue Projekte in `2. Projektverwaltung` inkl. Naming-Validierung.
+- `beantime` (Beancount): Start/Stop-Timer mit Konten- und Personenauswahl; schreibt beim Stop eine fertige `HR`-Buchung inkl. Metadaten in eine Beancount-Datei.
+  - Standard-Ziel fuer Laufzeitbuchungen: `Tools/data/beantime/zeit.beancount` (lokal, git-ignored).
+  - Vorlage fuer Kontenstruktur: `Tools/beantime/zeit.beancount` (Repository-Template).
 - `updo` (Website Monitoring): Statuskarten + Latenz/Verfuegbarkeits-Charts fuer konfigurierten URL-Satz.
   - Live-Ansicht: 15m / 1h / 6h aus In-Memory-Ringpuffer.
   - Langzeit-Ansicht: 7d / 30d / 90d aus komprimierten Persistenzdaten.
@@ -160,6 +171,8 @@ UI-Optionen liegen unter `ui` in den Settings:
 
 ## Recent Changes
 
+- Homepage-Module von gestapelten, einklappbaren Boxen auf Header-Icon-Tabs umgestellt (ein aktives Modul zur Zeit).
+- Aktive Modulwahl wird lokal gespeichert (`homepage-active-module-v1`) und beim Laden wiederhergestellt.
 - Modulares Theme-System eingefuehrt (`ui.theme.mode/preset/shape`).
 - Presets hinzugefuegt: `soft`, `flat`, `high-contrast`.
 - Shape-Profile hinzugefuegt: `rounded`, `comfortable`, `sharp`.
@@ -167,6 +180,7 @@ UI-Optionen liegen unter `ui` in den Settings:
 - Theme gilt jetzt fuer `home.html` und `settings.html`.
 - First-paint Theme-Bootstrap via `localStorage` hinzugefuegt (`homepage-theme-bootstrap-v1`) zur Vermeidung von Theme-Flash.
 - Header angepasst: kein Untertitel mehr, Titelgroesse konfigurierbar (`ui.titleSize`), neue Such-Icon-Aktion fuer Omnisearch.
+- Neues `beantime`-Modul (Beancount) eingefuehrt, mit Start/Stop-State-Datei und Beancount-Append beim Stop.
 
 ## Neue Module ergaenzen
 
@@ -175,3 +189,6 @@ UI-Optionen liegen unter `ui` in den Settings:
 3. In `Tools/config/settings.default.json` Modul-Konfiguration aufnehmen.
 4. Optional in `Tools/settings.html` UI-Toggles/Felder ergaenzen.
 5. Falls Backend noetig: Endpoint in `Tools/serve.mjs` ergaenzen.
+
+
+

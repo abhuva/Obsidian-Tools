@@ -529,6 +529,40 @@
       <section class="panel panel-collapsible">
         <header class="panel-head">
           <div>
+            <h2 class="panel-title">Beantime (Beancount)</h2>
+            <div class="panel-help">Start/Stop-Zeiterfassung mit Buchung direkt in Beancount.</div>
+          </div>
+        </header>
+        <div class="panel-body">
+          <label class="toggle-line" for="beantimeEnabled">
+            <input id="beantimeEnabled" class="switch" type="checkbox" />
+            <span class="toggle-copy">
+              <span class="toggle-title">Modul aktiv</span>
+              <span class="toggle-help">Zeigt Start/Stop fuer direkte Beancount-Zeitbuchungen.</span>
+            </span>
+          </label>
+          <div class="field">
+            <label for="beantimeFile">Pfad zur Beancount-Datei</label>
+            <input id="beantimeFile" type="text" placeholder="data/beantime/zeit.beancount" />
+          </div>
+          <div class="field">
+            <label for="beantimePersonAccount">Person-Konto (Gegenkonto)</label>
+            <select id="beantimePersonAccount"></select>
+          </div>
+          <div class="field">
+            <label for="beantimeStateFile">State-Datei (laufender Timer)</label>
+            <input id="beantimeStateFile" type="text" placeholder="data/beantime/state.json" />
+          </div>
+          <div class="field">
+            <label for="beantimeAccountPrefix">Buchbare Konten-Prefix</label>
+            <input id="beantimeAccountPrefix" type="text" placeholder="Projekte:" />
+          </div>
+        </div>
+      </section>
+
+      <section class="panel panel-collapsible">
+        <header class="panel-head">
+          <div>
             <h2 class="panel-title">Website Monitoring (updo)</h2>
             <div class="panel-help">Status- und Latenz-Modul fuer definierte Webseiten.</div>
           </div>
@@ -632,6 +666,11 @@
       const clock12h = document.getElementById("clock12h");
       const newProjectEnabled = document.getElementById("newProjectEnabled");
       const newProjectOpenInNewTab = document.getElementById("newProjectOpenInNewTab");
+      const beantimeEnabled = document.getElementById("beantimeEnabled");
+      const beantimeFile = document.getElementById("beantimeFile");
+      const beantimePersonAccount = document.getElementById("beantimePersonAccount");
+      const beantimeStateFile = document.getElementById("beantimeStateFile");
+      const beantimeAccountPrefix = document.getElementById("beantimeAccountPrefix");
       const updoEnabled = document.getElementById("updoEnabled");
       const updoRefreshSec = document.getElementById("updoRefreshSec");
       const updoWindowMinutes = document.getElementById("updoWindowMinutes");
@@ -876,6 +915,47 @@
         return out;
       }
 
+      async function loadBeantimePersonOptions(preferredValue = "") {
+        const fallback = String(preferredValue || "").trim() || "Zeit:Marc";
+        try {
+          const response = await fetch("/api/beantime/meta");
+          if (!response.ok) throw new Error("meta unavailable");
+          const payload = await response.json();
+          const persons = Array.isArray(payload?.personAccounts)
+            ? payload.personAccounts.map((item) => String(item || "").trim()).filter(Boolean)
+            : [];
+          const selected = String(preferredValue || payload?.personAccount || "").trim() || fallback;
+          beantimePersonAccount.innerHTML = "";
+          const values = persons.length ? persons : [selected];
+          for (const value of values) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = value;
+            beantimePersonAccount.appendChild(option);
+          }
+          if (!persons.length && !values.includes(selected)) {
+            const option = document.createElement("option");
+            option.value = selected;
+            option.textContent = selected;
+            beantimePersonAccount.appendChild(option);
+          }
+          if (values.includes(selected)) {
+            beantimePersonAccount.value = selected;
+          } else {
+            const fallbackSelected = (fallback && values.includes(fallback) ? fallback : "") || values[0] || "";
+            beantimePersonAccount.value = fallbackSelected;
+          }
+        } catch {
+          const selected = fallback;
+          beantimePersonAccount.innerHTML = "";
+          const option = document.createElement("option");
+          option.value = selected;
+          option.textContent = selected;
+          beantimePersonAccount.appendChild(option);
+          beantimePersonAccount.value = selected;
+        }
+      }
+
       function readFormToSettings() {
         const parsedTitleSize = Number.parseInt(String(titleSizeInput.value || ""), 10);
         const titleSize = Number.isFinite(parsedTitleSize)
@@ -906,6 +986,10 @@
           String(updoOutageMinConsecutiveFailures.value || ""),
           10
         );
+        const cleanBeantimeFile = String(beantimeFile.value || "").trim() || "data/beantime/zeit.beancount";
+        const cleanBeantimePersonAccount = String(beantimePersonAccount.value || "").trim() || "Zeit:Marc";
+        const cleanBeantimeStateFile = String(beantimeStateFile.value || "").trim() || "data/beantime/state.json";
+        const cleanBeantimeAccountPrefix = String(beantimeAccountPrefix.value || "").trim() || "Projekte:";
         const parsedUpdoGapFactor = Number.parseFloat(String(updoGapFactor.value || ""));
         return {
           schemaVersion: 1,
@@ -941,6 +1025,14 @@
               enabled: Boolean(newProjectEnabled.checked),
               title: "Projektverwaltung",
               openInNewTab: Boolean(newProjectOpenInNewTab.checked)
+            },
+            beantime: {
+              enabled: Boolean(beantimeEnabled.checked),
+              title: "Beantime",
+              file: cleanBeantimeFile,
+              personAccount: cleanBeantimePersonAccount,
+              stateFile: cleanBeantimeStateFile,
+              bookableAccountPrefix: cleanBeantimeAccountPrefix
             },
             updo: {
               enabled: Boolean(updoEnabled.checked),
@@ -1019,6 +1111,19 @@
         clock12h.checked = Boolean(settings?.modules?.clock?.hour12);
         newProjectEnabled.checked = Boolean(settings?.modules?.newProject?.enabled);
         newProjectOpenInNewTab.checked = Boolean(settings?.modules?.newProject?.openInNewTab);
+        beantimeEnabled.checked = Boolean(settings?.modules?.beantime?.enabled);
+        beantimeFile.value = String(settings?.modules?.beantime?.file ?? "data/beantime/zeit.beancount");
+        const initialBeantimePerson = String(settings?.modules?.beantime?.personAccount ?? "Zeit:Marc").trim() || "Zeit:Marc";
+        beantimePersonAccount.innerHTML = "";
+        {
+          const option = document.createElement("option");
+          option.value = initialBeantimePerson;
+          option.textContent = initialBeantimePerson;
+          beantimePersonAccount.appendChild(option);
+        }
+        beantimePersonAccount.value = initialBeantimePerson;
+        beantimeStateFile.value = String(settings?.modules?.beantime?.stateFile ?? "data/beantime/state.json");
+        beantimeAccountPrefix.value = String(settings?.modules?.beantime?.bookableAccountPrefix ?? "Projekte:");
         updoEnabled.checked = Boolean(settings?.modules?.updo?.enabled);
         updoRefreshSec.value = String(settings?.modules?.updo?.refreshSec ?? 5);
         updoWindowMinutes.value = String(settings?.modules?.updo?.windowMinutes ?? 60);
@@ -1057,6 +1162,9 @@
           const payload = await response.json();
           currentSettings = payload.settings || null;
           fillForm(currentSettings || {});
+          await loadBeantimePersonOptions(
+            String(currentSettings?.modules?.beantime?.personAccount ?? "Zeit:Marc")
+          );
           setStatus("Einstellungen geladen.", "ok");
         } catch (error) {
           setStatus(`Konnte Einstellungen nicht laden: ${error.message || error}`, "err");
@@ -1079,6 +1187,9 @@
           const payload = await response.json();
           currentSettings = payload.settings || settings;
           fillForm(currentSettings);
+          await loadBeantimePersonOptions(
+            String(currentSettings?.modules?.beantime?.personAccount ?? "Zeit:Marc")
+          );
           setStatus("Gespeichert. Oeffne die Homepage neu, falls noetig.", "ok");
         } catch (error) {
           setStatus(`Speichern fehlgeschlagen: ${error.message || error}`, "err");

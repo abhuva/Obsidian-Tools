@@ -33,6 +33,14 @@
       "title": "Projektverwaltung",
       "openInNewTab": true
     },
+    "beantime": {
+      "enabled": true,
+      "title": "Beantime",
+      "file": "data/beantime/zeit.beancount",
+      "personAccount": "Zeit:Marc",
+      "stateFile": "data/beantime/state.json",
+      "bookableAccountPrefix": "Projekte:"
+    },
     "updo": {
       "enabled": true,
       "title": "Website Monitoring",

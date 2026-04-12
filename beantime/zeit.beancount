@@ -1,0 +1,10 @@
+option "title" "Beantime Template"
+option "operating_currency" "HR"
+
+2023-01-01 commodity HR
+  name: "Stunde"
+
+2023-01-01 open Zeit:Marc
+2023-01-01 open Projekte:Sonstiges
+
+; Template only. Runtime bookings should go to data/beantime/zeit.beancount.
