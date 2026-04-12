@@ -1108,6 +1108,15 @@
         newProjectOpenInNewTab.checked = Boolean(settings?.modules?.newProject?.openInNewTab);
         beantimeEnabled.checked = Boolean(settings?.modules?.beantime?.enabled);
         beantimeFile.value = String(settings?.modules?.beantime?.file ?? "data/beantime/zeit.beancount");
+        const initialBeantimePerson = String(settings?.modules?.beantime?.personAccount ?? "Zeit:Marc").trim() || "Zeit:Marc";
+        beantimePersonAccount.innerHTML = "";
+        {
+          const option = document.createElement("option");
+          option.value = initialBeantimePerson;
+          option.textContent = initialBeantimePerson;
+          beantimePersonAccount.appendChild(option);
+        }
+        beantimePersonAccount.value = initialBeantimePerson;
         beantimeStateFile.value = String(settings?.modules?.beantime?.stateFile ?? "data/beantime/state.json");
         beantimeAccountPrefix.value = String(settings?.modules?.beantime?.bookableAccountPrefix ?? "Projekte:");
         updoEnabled.checked = Boolean(settings?.modules?.updo?.enabled);

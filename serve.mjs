@@ -25,6 +25,7 @@ const UPDO_LONGTERM_FILE = path.join(DATA_DIR, "longterm.jsonl");
 const UPDO_INCIDENTS_FILE = path.join(DATA_DIR, "incidents.jsonl");
 const UPDO_STATE_FILE = path.join(DATA_DIR, "state.json");
 const BEANTIME_STATE_FILE = path.join(ROOT, "data", "beantime", "state.json");
+const BEANTIME_TEMPLATE_FILE = path.join(ROOT, "beantime", "zeit.beancount");
 const PROJECTS_ROOT_REL = "2. Projektverwaltung";
 const PROJECTS_ROOT = path.join(VAULT_ROOT, PROJECTS_ROOT_REL);
 const TEMPLATE_PROJECT_FILE_REL = "6. Obsidian/_template/Projekt.md";
@@ -477,7 +478,8 @@ function getBeantimeConfigFromSettings(settings) {
 function ensureBeantimeLedgerExists(filePath) {
   ensureParentDir(filePath);
   if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, "", "utf8");
+    const template = fs.readFileSync(BEANTIME_TEMPLATE_FILE, "utf8");
+    fs.writeFileSync(filePath, template, "utf8");
   }
 }
 

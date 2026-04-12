@@ -171,8 +171,8 @@ export async function renderBeantimeModule(shell) {
     } else if (meta?.personAccount) {
       setOrAppendSelectValue(personSelect, String(meta.personAccount));
     }
-    if (meta?.running?.summary) {
-      summaryInput.value = String(meta.running.summary);
+    if (meta?.running) {
+      summaryInput.value = String(meta.running.summary ?? "");
     }
 
     renderInfo(meta);
