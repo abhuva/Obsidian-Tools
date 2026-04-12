@@ -933,13 +933,18 @@
             option.textContent = value;
             beantimePersonAccount.appendChild(option);
           }
-          if (!values.includes(selected)) {
+          if (!persons.length && !values.includes(selected)) {
             const option = document.createElement("option");
             option.value = selected;
             option.textContent = selected;
             beantimePersonAccount.appendChild(option);
           }
-          beantimePersonAccount.value = selected;
+          if (values.includes(selected)) {
+            beantimePersonAccount.value = selected;
+          } else {
+            const fallbackSelected = (fallback && values.includes(fallback) ? fallback : "") || values[0] || "";
+            beantimePersonAccount.value = fallbackSelected;
+          }
         } catch {
           const selected = fallback;
           beantimePersonAccount.innerHTML = "";

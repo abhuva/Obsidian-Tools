@@ -5,6 +5,8 @@
  */
 export async function renderBeantimeModule(shell) {
   let running = false;
+  let isStarting = false;
+  let isStopping = false;
 
   const controls = document.createElement("div");
   controls.className = "beantime-controls";
@@ -104,8 +106,8 @@ export async function renderBeantimeModule(shell) {
    * @returns {void}
    */
   function syncButtons() {
-    startBtn.disabled = running;
-    stopBtn.disabled = !running;
+    startBtn.disabled = running || isStarting || isStopping;
+    stopBtn.disabled = !running || isStarting || isStopping;
     accountSelect.disabled = running;
     personSelect.disabled = running;
     summaryInput.disabled = running;
@@ -184,6 +186,7 @@ export async function renderBeantimeModule(shell) {
    * @returns {Promise<void>}
    */
   async function startTimer() {
+    if (isStarting || isStopping) return;
     const account = String(accountSelect.value || "").trim();
     const personAccount = String(personSelect.value || "").trim();
     const summary = String(summaryInput.value || "").trim();
@@ -195,18 +198,25 @@ export async function renderBeantimeModule(shell) {
       setStatus("Bitte eine Person auswaehlen.", "err");
       return;
     }
-    setStatus("Starte Timer...");
-    const response = await fetch("/api/beantime/start", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ account, personAccount, summary })
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || "Start fehlgeschlagen");
+    isStarting = true;
+    syncButtons();
+    try {
+      setStatus("Starte Timer...");
+      const response = await fetch("/api/beantime/start", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ account, personAccount, summary })
+      });
+      if (!response.ok && response.status !== 409) {
+        const text = await response.text();
+        throw new Error(text || "Start fehlgeschlagen");
+      }
+      await loadMeta();
+      setStatus(response.status === 409 ? "Timer laeuft bereits." : "Timer gestartet.", "ok");
+    } finally {
+      isStarting = false;
+      syncButtons();
     }
-    await loadMeta();
-    setStatus("Timer gestartet.", "ok");
   }
 
   /**
@@ -214,20 +224,28 @@ export async function renderBeantimeModule(shell) {
    * @returns {Promise<void>}
    */
   async function stopTimer() {
-    setStatus("Stoppe Timer...");
-    const summary = String(summaryInput.value || "").trim();
-    const response = await fetch("/api/beantime/stop", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ summary })
-    });
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(text || "Stop fehlgeschlagen");
+    if (isStarting || isStopping) return;
+    isStopping = true;
+    syncButtons();
+    try {
+      setStatus("Stoppe Timer...");
+      const summary = String(summaryInput.value || "").trim();
+      const response = await fetch("/api/beantime/stop", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ summary })
+      });
+      if (!response.ok && response.status !== 409) {
+        const text = await response.text();
+        throw new Error(text || "Stop fehlgeschlagen");
+      }
+      summaryInput.value = "";
+      await loadMeta();
+      setStatus(response.status === 409 ? "Kein laufender Timer." : "Timer gestoppt und Eintrag gebucht.", "ok");
+    } finally {
+      isStopping = false;
+      syncButtons();
     }
-    summaryInput.value = "";
-    await loadMeta();
-    setStatus("Timer gestoppt und Eintrag gebucht.", "ok");
   }
 
   startBtn.addEventListener("click", () => {

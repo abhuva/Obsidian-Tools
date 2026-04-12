@@ -563,6 +563,18 @@ function asBeanString(value) {
 }
 
 /**
+ * Validates a Beancount account token for user-supplied fallback scenarios.
+ * @param {string} value - Candidate account name.
+ * @returns {boolean} `true` when the value matches a safe account format.
+ */
+function isSafeBeancountAccount(value) {
+  const clean = String(value || "").trim();
+  if (!clean) return false;
+  if (/[\r\n\0-\x1f\x7f]/.test(clean)) return false;
+  return /^([A-Z][A-Za-z0-9-]*)(:[A-Z][A-Za-z0-9-]*)*$/.test(clean);
+}
+
+/**
  * Formats decimal hours from minutes for Beancount HR postings.
  * @param {number} minutes - Duration in minutes.
  * @returns {string} Decimal hours string with two fraction digits.
@@ -2911,8 +2923,13 @@ const server = http.createServer((req, res) => {
           }
           const personAccounts = readBeantimePersonAccounts(config.filePath);
           const personAccount = toCleanString(payload?.personAccount, config.personAccount);
-          if (personAccounts.length && !personAccounts.includes(personAccount)) {
-            sendText(res, 422, "Selected person account is not open/bookable");
+          if (personAccounts.length) {
+            if (!personAccounts.includes(personAccount)) {
+              sendText(res, 422, "Selected person account is not open/bookable");
+              return;
+            }
+          } else if (!isSafeBeancountAccount(personAccount)) {
+            sendText(res, 422, "Selected person account is invalid");
             return;
           }
 
