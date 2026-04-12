@@ -91,6 +91,10 @@ Damit sind spaetere Features stabil erweiterbar (neue Module, neue Optionen).
 
 ## Aktuelle Module
 
+- Homepage-Layout:
+  - Aktivierte Module erscheinen als Icon-Tabs im Header.
+  - Es wird jeweils genau ein Modul-Panel unterhalb des Headers gerendert (Tab-Prinzip statt gestapelter Boxen).
+  - Die zuletzt aktive Modul-Auswahl wird lokal gespeichert (`homepage-active-module-v1`).
 - `bookmarks`: Visuelle Bookmark-Navigation.
   - Optional: Pfadanzeige (`showPath`) an/aus.
   - Optional: Typ-Badge (`showType`) an/aus.
@@ -165,6 +169,8 @@ UI-Optionen liegen unter `ui` in den Settings:
 
 ## Recent Changes
 
+- Homepage-Module von gestapelten, einklappbaren Boxen auf Header-Icon-Tabs umgestellt (ein aktives Modul zur Zeit).
+- Aktive Modulwahl wird lokal gespeichert (`homepage-active-module-v1`) und beim Laden wiederhergestellt.
 - Modulares Theme-System eingefuehrt (`ui.theme.mode/preset/shape`).
 - Presets hinzugefuegt: `soft`, `flat`, `high-contrast`.
 - Shape-Profile hinzugefuegt: `rounded`, `comfortable`, `sharp`.

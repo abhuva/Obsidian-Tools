@@ -8,31 +8,61 @@ let pageTitleEl = null;
 let moduleGridEl = null;
 let headerClockEl = null;
 let openSearchBtnEl = null;
+let moduleTabsEl = null;
 
-const activeCleanups = [];
+const pageCleanups = [];
+const activeModuleCleanups = [];
 const rootEl = document.documentElement;
 const THEME_CACHE_KEY = "homepage-theme-bootstrap-v1";
+const MODULE_TAB_CACHE_KEY = "homepage-active-module-v1";
 let searchConfig = {
   provider: "omnisearch",
   openInNewTab: false
 };
+let activeModuleKey = "";
+let enabledModuleEntries = [];
+let activeModuleRenderSeq = 0;
 
 /**
- * Registers a module cleanup callback to run before the next render.
+ * Registers a page-level cleanup callback to run before the next page render.
  * @param {Function} fn - Cleanup function returned by a module renderer.
  * @returns {void}
  */
-function addCleanup(fn) {
-  if (typeof fn === "function") activeCleanups.push(fn);
+function addPageCleanup(fn) {
+  if (typeof fn === "function") pageCleanups.push(fn);
 }
 
 /**
- * Executes and clears all registered cleanup callbacks.
+ * Executes and clears all registered page-level cleanup callbacks.
  * @returns {void}
  */
-function cleanupAllModules() {
-  while (activeCleanups.length) {
-    const fn = activeCleanups.pop();
+function cleanupPage() {
+  while (pageCleanups.length) {
+    const fn = pageCleanups.pop();
+    try {
+      fn();
+    } catch {
+      // noop
+    }
+  }
+}
+
+/**
+ * Registers a cleanup callback for the currently visible module.
+ * @param {Function} fn - Cleanup function returned by the active module renderer.
+ * @returns {void}
+ */
+function addActiveModuleCleanup(fn) {
+  if (typeof fn === "function") activeModuleCleanups.push(fn);
+}
+
+/**
+ * Executes and clears all cleanup callbacks for the currently visible module.
+ * @returns {void}
+ */
+function cleanupActiveModule() {
+  while (activeModuleCleanups.length) {
+    const fn = activeModuleCleanups.pop();
     try {
       fn();
     } catch {
@@ -65,47 +95,6 @@ function createModuleShell(title) {
   return { root, head, body };
 }
 
-/**
- * Adds expand/collapse behavior to a module shell header and returns a listener cleanup.
- * @param {{root: HTMLElement, head: HTMLElement, body: HTMLElement}} shell - Module shell DOM nodes.
- * @param {boolean} startCollapsed - Initial collapsed state.
- * @returns {() => void} Cleanup callback that removes all registered listeners.
- */
-function makeShellCollapsible(shell, startCollapsed = false) {
-  if (!shell?.root || !shell?.head || !shell?.body) return () => {};
-
-  shell.root.classList.add("module-collapsible");
-  shell.head.setAttribute("role", "button");
-  shell.head.tabIndex = 0;
-
-  const applyState = (collapsed) => {
-    shell.root.classList.toggle("module-collapsed", collapsed);
-    shell.head.setAttribute("aria-expanded", String(!collapsed));
-  };
-
-  const toggle = () => {
-    const collapsed = !shell.root.classList.contains("module-collapsed");
-    applyState(collapsed);
-  };
-
-  const onClick = () => toggle();
-  const onKeyDown = (event) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      toggle();
-    }
-  };
-
-  shell.head.addEventListener("click", onClick);
-  shell.head.addEventListener("keydown", onKeyDown);
-  applyState(Boolean(startCollapsed));
-
-  return () => {
-    shell.head.removeEventListener("click", onClick);
-    shell.head.removeEventListener("keydown", onKeyDown);
-  };
-}
-
 const moduleRegistry = {
   bookmarks: {
     render: renderBookmarksModule
@@ -120,6 +109,174 @@ const moduleRegistry = {
     render: renderUpdoModule
   }
 };
+
+const moduleUiMeta = {
+  bookmarks: {
+    icon: "\ud83d\udd16"
+  },
+  newProject: {
+    icon: "\ud83d\uddc2\ufe0f"
+  },
+  beantime: {
+    icon: "\u23f1\ufe0f"
+  },
+  updo: {
+    icon: "\ud83d\udcc8"
+  }
+};
+
+/**
+ * Resolves the icon glyph for a module tab.
+ * @param {string} moduleKey - Registry key of the module.
+ * @returns {string} Emoji/icon text used by tab button.
+ */
+function moduleIconForKey(moduleKey) {
+  const icon = moduleUiMeta[moduleKey]?.icon;
+  if (typeof icon === "string" && icon.trim()) return icon;
+  return "\ud83e\udde9";
+}
+
+/**
+ * Persists the active module key in localStorage.
+ * @param {string} moduleKey - Module key to cache.
+ * @returns {void}
+ */
+function persistActiveModuleKey(moduleKey) {
+  try {
+    localStorage.setItem(MODULE_TAB_CACHE_KEY, String(moduleKey || ""));
+  } catch {
+    // noop
+  }
+}
+
+/**
+ * Restores the last active module key from localStorage.
+ * @returns {string} Cached module key or an empty string.
+ */
+function restoreActiveModuleKey() {
+  try {
+    return String(localStorage.getItem(MODULE_TAB_CACHE_KEY) || "");
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * Re-renders tab button active states to mirror current selection.
+ * @returns {void}
+ */
+function syncModuleTabSelectionState() {
+  if (!moduleTabsEl) return;
+  const tabButtons = Array.from(moduleTabsEl.querySelectorAll(".module-tab-btn"));
+  for (const button of tabButtons) {
+    const moduleKey = String(button.dataset.moduleKey || "");
+    const isActive = moduleKey === activeModuleKey;
+    button.classList.toggle("active", isActive);
+    button.setAttribute("aria-selected", String(isActive));
+    button.tabIndex = isActive ? 0 : -1;
+  }
+}
+
+/**
+ * Computes active tab key from current state, cache, and enabled module list.
+ * @returns {string} Valid active module key.
+ */
+function pickActiveModuleKey() {
+  const enabledKeys = enabledModuleEntries.map(([moduleKey]) => moduleKey);
+  if (enabledKeys.includes(activeModuleKey)) return activeModuleKey;
+  const cached = restoreActiveModuleKey();
+  if (enabledKeys.includes(cached)) return cached;
+  return enabledKeys[0] || "";
+}
+
+/**
+ * Renders module icon tabs in the hero header area.
+ * @returns {void}
+ */
+function renderModuleTabs() {
+  if (!moduleTabsEl) return;
+  moduleTabsEl.innerHTML = "";
+  moduleTabsEl.hidden = enabledModuleEntries.length === 0;
+  if (!enabledModuleEntries.length) return;
+
+  for (const [moduleKey, moduleCfg] of enabledModuleEntries) {
+    const title = String(moduleCfg?.title || moduleKey);
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "icon-link icon-btn module-tab-btn";
+    button.dataset.moduleKey = moduleKey;
+    button.setAttribute("role", "tab");
+    button.setAttribute("aria-label", title);
+    button.title = title;
+    button.textContent = moduleIconForKey(moduleKey);
+    button.addEventListener("click", () => {
+      if (moduleKey === activeModuleKey) return;
+      activeModuleKey = moduleKey;
+      persistActiveModuleKey(moduleKey);
+      syncModuleTabSelectionState();
+      void renderActiveModule();
+    });
+    moduleTabsEl.appendChild(button);
+  }
+
+  syncModuleTabSelectionState();
+}
+
+/**
+ * Renders exactly one active module panel below the header.
+ * @returns {Promise<void>}
+ */
+async function renderActiveModule() {
+  if (!moduleGridEl) return;
+  const renderSeq = ++activeModuleRenderSeq;
+
+  cleanupActiveModule();
+  moduleGridEl.innerHTML = "";
+
+  if (!activeModuleKey) {
+    moduleGridEl.innerHTML =
+      '<section class="module"><div class="module-body"><div class="empty">Keine Bereiche aktiv. In den Settings aktivieren.</div></div></section>';
+    return;
+  }
+
+  const entry = enabledModuleEntries.find(([moduleKey]) => moduleKey === activeModuleKey);
+  if (!entry) {
+    moduleGridEl.innerHTML =
+      '<section class="module"><div class="module-body"><div class="empty">Modul nicht verfuegbar.</div></div></section>';
+    return;
+  }
+
+  const [moduleKey, moduleCfg] = entry;
+  const definition = moduleRegistry[moduleKey];
+  if (!definition) {
+    moduleGridEl.innerHTML =
+      '<section class="module"><div class="module-body"><div class="empty">Moduldefinition fehlt.</div></div></section>';
+    return;
+  }
+
+  const shell = createModuleShell(String(moduleCfg?.title || moduleKey));
+  moduleGridEl.appendChild(shell.root);
+
+  try {
+    const cleanup = await definition.render(shell, moduleCfg);
+    if (renderSeq !== activeModuleRenderSeq) {
+      if (typeof cleanup === "function") {
+        try {
+          cleanup();
+        } catch {
+          // noop
+        }
+      }
+      return;
+    }
+    addActiveModuleCleanup(cleanup);
+  } catch (error) {
+    const empty = document.createElement("div");
+    empty.className = "empty";
+    empty.textContent = `Modulfehler: ${error?.message || String(error)}`;
+    shell.body.replaceChildren(empty);
+  }
+}
 
 /**
  * Loads effective settings from the backend API.
@@ -382,7 +539,8 @@ async function renderPage() {
     console.error("Missing required #moduleGrid mount node.");
     return;
   }
-  cleanupAllModules();
+  cleanupActiveModule();
+  cleanupPage();
   moduleGridEl.innerHTML = "";
 
   try {
@@ -398,44 +556,24 @@ async function renderPage() {
     };
 
     if (settings?.modules?.clock?.enabled && headerClockEl) {
-      addCleanup(renderClockInElement(headerClockEl, settings.modules.clock));
+      addPageCleanup(renderClockInElement(headerClockEl, settings.modules.clock));
     } else if (headerClockEl) {
       headerClockEl.textContent = "";
     }
 
     const moduleEntries = Object.entries(settings?.modules || {});
-    const enabledEntries = moduleEntries.filter(
+    enabledModuleEntries = moduleEntries.filter(
       ([moduleKey, cfg]) => moduleKey !== "clock" && Boolean(cfg?.enabled)
     );
 
-    if (!enabledEntries.length) {
-      moduleGridEl.innerHTML =
-        '<section class="module"><div class="module-body"><div class="empty">Keine Bereiche aktiv. In den Settings aktivieren.</div></div></section>';
-      return;
-    }
-
-    for (const [moduleKey, moduleCfg] of enabledEntries) {
-      const definition = moduleRegistry[moduleKey];
-      if (!definition) continue;
-
-      const title = String(moduleCfg?.title || moduleKey);
-      const shell = createModuleShell(title);
-      moduleGridEl.appendChild(shell.root);
-      if (["bookmarks", "updo", "newProject", "beantime"].includes(moduleKey)) {
-        addCleanup(makeShellCollapsible(shell, false));
-      }
-
-      try {
-        const cleanup = await definition.render(shell, moduleCfg);
-        addCleanup(cleanup);
-      } catch (error) {
-        const empty = document.createElement("div");
-        empty.className = "empty";
-        empty.textContent = `Modulfehler: ${error?.message || String(error)}`;
-        shell.body.replaceChildren(empty);
-      }
-    }
+    activeModuleKey = pickActiveModuleKey();
+    persistActiveModuleKey(activeModuleKey);
+    renderModuleTabs();
+    await renderActiveModule();
   } catch (error) {
+    enabledModuleEntries = [];
+    activeModuleKey = "";
+    renderModuleTabs();
     const section = document.createElement("section");
     section.className = "module";
     const body = document.createElement("div");
@@ -458,6 +596,7 @@ function initHomepage() {
   moduleGridEl = document.getElementById("moduleGrid");
   headerClockEl = document.getElementById("headerClock");
   openSearchBtnEl = document.getElementById("openSearchBtn");
+  moduleTabsEl = document.getElementById("moduleTabs");
 
   if (openSearchBtnEl) {
     openSearchBtnEl.addEventListener("click", () => {
@@ -471,7 +610,10 @@ function initHomepage() {
   void renderPage();
 }
 
-window.addEventListener("beforeunload", cleanupAllModules);
+window.addEventListener("beforeunload", () => {
+  cleanupActiveModule();
+  cleanupPage();
+});
 if (document.readyState === "loading") {
   document.addEventListener("DOMContentLoaded", initHomepage, { once: true });
 } else {
