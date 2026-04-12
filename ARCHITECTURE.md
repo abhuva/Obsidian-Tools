@@ -27,6 +27,12 @@ Das Tool ist als modulares UI + Settings-Seite aufgebaut:
 - Mirror ist "best effort": Mapping von Obsidian-Variablen auf lokale Tokens ist nicht 1:1.
 - Kein Flash beim Laden wird ueber lokalen Theme-Bootstrap-Cache erreicht (`homepage-theme-bootstrap-v1`).
 
+## Time Tracking Modes (Aktuell)
+
+- `timetracking`-Modul (klog): CLI-orientierte Aktivitaetszeiterfassung mit Tagesansicht.
+- `beantime`-Modul (Beancount): Start/Stop mit temporaerer State-Datei; beim Stop wird eine fertige Beancount-Transaktion mit Zeit-Metadaten geschrieben.
+- Beide Module nutzen einstellbare Dateipfade in `settings.html`, damit projekt- oder nutzerspezifische Speicherorte moeglich bleiben.
+
 ## Theme Pipeline (Aktuell)
 
 1. Defaults + lokale Settings werden in `serve.mjs` gemerged und normalisiert (`ui.theme` eingeschlossen).

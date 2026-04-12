@@ -33,6 +33,21 @@
       "title": "Projektverwaltung",
       "openInNewTab": true
     },
+    "timetracking": {
+      "enabled": true,
+      "title": "Zeiterfassung",
+      "file": "timetracking/timetracking.klg",
+      "pauseSummary": "Pause #pause",
+      "refreshSec": 20
+    },
+    "beantime": {
+      "enabled": true,
+      "title": "Beantime",
+      "file": "beantime/zeit.beancount",
+      "personAccount": "Zeit:Marc",
+      "stateFile": "data/beantime/state.json",
+      "bookableAccountPrefix": "Projekte:"
+    },
     "updo": {
       "enabled": true,
       "title": "Website Monitoring",

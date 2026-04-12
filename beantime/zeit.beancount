@@ -1,0 +1,835 @@
+* Options
+
+option "title" "Zeiterfassung Tohuwabohu Halle e.V."
+option "operating_currency" "HR" ; Unsere "Währung" ist die Stunde (Hour)
+
+; Deutsche Namen für die Hauptkonten
+option "name_assets"       "Zeitguthaben"       ; Für Überstunden etc. (Fortgeschritten)
+option "name_liabilities"  "Zeitschulden"       ; Für Minusstunden etc. (Fortgeschritten)
+option "name_equity"       "Equity"             ; Wird hier kaum genutzt
+option "name_income"       "Zeit"               ; WER hat die Zeit erbracht?
+option "name_expenses"     "Projekte"           ; WOFÜR wurde die Zeit verwendet?
+
+
+;; --- Definition unserer "Währung" ---
+2023-01-01 commodity HR
+  name: "Stunde"
+
+* Konten
+
+;; --- Konten eröffnen ---
+; Hier definieren wir, wer Zeit erfassen kann.
+; Das sind unsere Zeit-"Quellen".
+2023-01-01 open Zeit:Marc
+2023-01-01 open Zeit:Charly
+2023-01-01 open Zeit:Amanda
+2023-01-01 open Zeit:Peter
+
+; Hier definieren wir, worauf Zeit gebucht werden kann.
+; Das sind unsere Zeit-"Ziele". Die hierarchische Struktur ist sehr nützlich!
+2023-01-01 open Projekte:Intern:Vereinsarbeit:Buchhaltung
+2023-01-01 open Projekte:Intern:Vereinsarbeit:Oeffentlichkeitsarbeit
+2023-01-01 open Projekte:SAD2030
+2023-01-01 open Projekte:SAD2030:Umfrage  ; Zeit für Umfrage, Interview, Planung dafür etc
+2023-01-01 open Projekte:SAD2030:Planung  ; Dies sind alle allgemeinen Treffen 
+2023-01-01 open Projekte:SAD2030:Sonstiges  ; Dies sind alle allgemeinen Treffen 
+2023-01-01 open Projekte:SAD2030:Kurserstellung  ; Dies sind alle allgemeinen Treffen 
+
+
+2023-01-01 open Projekte:Sonstiges
+
+***********************************************************************************
+* Zeiterfassung
+** Marc
+***********************************************************************************
+;; --- Einträge / Transaktionen ---
+; jeder Eintrag ist eine getätigte Arbeit.
+; Das Format ist: Datum * "Person" "Beschreibung der Tätigkeit"
+
+
+
+2026-01-30 * "Marc" "26-30.1"
+  Projekte:SAD2030:Planung      20 HR 
+  Projekte:SAD2030:Sonstiges      15 HR 
+  Zeit:Marc 
+
+
+2026-01-23 * "Marc" "19-23.1"
+  Projekte:SAD2030:Planung      20 HR 
+  Projekte:SAD2030:Sonstiges      15 HR 
+  Zeit:Marc 
+
+
+2026-01-16 * "Marc" "12-16.1"
+  Projekte:SAD2030:Planung      20 HR 
+  Projekte:SAD2030:Sonstiges      15 HR 
+  Zeit:Marc 
+
+
+2026-01-09 * "Marc" "6-9.1"
+  Projekte:SAD2030:Planung      15 HR 
+  Projekte:SAD2030:Sonstiges      15 HR 
+  Zeit:Marc 
+
+
+2025-12-19 * "Marc" "15-19.12"
+  Projekte:SAD2030:Planung      15 HR 
+  Projekte:SAD2030:Sonstiges      10 HR 
+  Zeit:Marc 
+
+
+2025-12-12 * "Marc" "8-12.12"
+  Projekte:SAD2030:Planung      10 HR 
+  Projekte:SAD2030:Sonstiges      10 HR 
+  Zeit:Marc 
+
+
+2025-12-05 * "Marc" "1-5.12"
+  Projekte:SAD2030:Planung      15 HR 
+  Projekte:SAD2030:Sonstiges      15 HR 
+  Zeit:Marc 
+
+
+2025-11-28 * "Marc" "24-28.11"
+  Projekte:SAD2030:Planung      10 HR 
+  Projekte:SAD2030:Sonstiges      10 HR 
+  Zeit:Marc 
+
+
+2025-11-21 * "Marc" "17-21.11"
+  Projekte:SAD2030:Planung      10 HR 
+  Projekte:SAD2030:Sonstiges      10 HR 
+  Zeit:Marc 
+
+
+2025-11-12 * "Marc" "Gespräch Charly, Peter, Amanda + Research"
+  Projekte:SAD2030:Planung      2 HR 
+  Projekte:SAD2030:Sonstiges      2 HR 
+  ; Gegencheck / Absprache mit Amanada für (Quality Assurance, Zotero, Umfrage, Interview)
+  ; Research Zotero, Setup für NICA, Tests und Eintrag erster Inhalte
+  Zeit:Marc 
+
+2025-11-12 * "Marc" "Gespräch Amanda, Research"
+  Projekte:SAD2030:Planung      6 HR 
+  ; Gegencheck / Absprache mit Amanada für (Quality Assurance, Zotero, Umfrage, Interview)
+  ; Research Zotero, Setup für NICA, Tests und Eintrag erster Inhalte
+  Zeit:Marc 
+
+2025-11-11 * "Marc" "Gespräch Amanda, Zeiterfassung Team"
+  Projekte:SAD2030:Planung      1 HR 
+  ; Gegencheck / Absprache mit Amanada für Umfrage
+  ; Zeiterfassung Amanda (Übertrag Daten in Beancount)
+  Zeit:Marc 
+
+2025-11-11 * "Marc" "Kooperation"
+  Projekte:Sonstiges      5 HR 
+  ; 11:00 - 15:00  Einholen von Unterschriften + Kooperationsgespräche 
+  ; 16:00 - 17:00 Koopverträge digital an Förderer, Daten zusammengestellt etc.
+  ; (Quartiersmanagement Süd, Hort Jessener Straße, Schöpfkelle, AEB Bildungsträger)
+  Zeit:Marc 
+
+
+2025-11-10 * "Marc" "Kooperation"
+  Projekte:Sonstiges      7 HR 
+  ; 8:00 - 15:00  Einholen von Unterschriften + Kooperationsgespräche 
+  ; (Quartiersmanagement Süd, Hort Jessener Straße, Schöpfkelle, Kita Lustiger Kater)
+  Zeit:Marc 
+
+2025-11-09 * "Marc" "Kooperation, Research"
+  Projekte:SAD2030:Planung      1 HR ; 15:00 - 16:00  Kooperationsgespräche Steve
+  Projekte:SAD2030:Sonstiges        3 HR ; 23:00 - 02:00 Research e-learning best practice
+  Zeit:Marc 
+
+2025-11-07 * "Marc" "Values NICA Work"
+  Projekte:SAD2030:Planung        3 HR ; 16:00 - 19:00 Call mit Charly + Veronika
+  Projekte:SAD2030:Kurserstellung        2 HR ; 22:00 - 24:00 Kurserstellung
+  Zeit:Marc 
+
+2025-11-07 * "Marc" "Values NICA Work"
+  Projekte:Sonstiges      2 HR ; 14:00 - 16:00  Kooperationsgespräche (Roxy, Dornrößchen, CVJM, Emmaus Gemeinde)
+  Zeit:Marc 
+
+2025-11-06 * "Marc" "Kurserstellung"
+  Projekte:SAD2030:Kurserstellung        4 HR ; 20:00 - 24:00 Kurserstellung
+  Zeit:Marc 
+
+2025-11-06 * "Marc" "Koop, Calls, Kurserstellung"
+  Projekte:Sonstiges      2 HR ; 14:00 - 16:00  Kooperationsgespräche (Roxy, Dornrößchen, CVJM, Emmaus Gemeinde)
+  Zeit:Marc 
+
+2025-11-04 * "Marc" "Koop, Calls, Kurserstellung"
+  Projekte:SAD2030:Planung        3 HR ; 16:00 - 19:00 Call mit Amanda, Peter, Charly
+  Projekte:SAD2030:Kurserstellung        4 HR ; 20:00 - 24:00 Kurserstellung
+  Zeit:Marc 
+
+2025-11-04 * "Marc" "Koop, Calls, Kurserstellung"
+  Projekte:Sonstiges      6 HR ; 10:00 - 16:00  Kooperationsgespräche (Roxy, Dornrößchen, CVJM, Emmaus Gemeinde)
+  Projekte:Sonstiges      1 HR ; Abrechnung Tohu mit Peter
+  Zeit:Marc 
+
+2025-11-03 * "Marc" "Call Amanda, Peter Charly + Kurserstellung"
+  Projekte:SAD2030:Planung        3 HR ; 16:00 - 19:00 Call mit Amanda, Peter, Charly
+  Projekte:SAD2030:Kurserstellung        4 HR ; 20:00 - 24:00 Kurserstellung
+  Zeit:Marc 
+
+2025-11-03 * "Marc" "Koop Gespräche, Abrechnung"
+  Projekte:Sonstiges      7 HR ; 09:00 - 16:00  Kooperationsgespräche (Roxy, Dornrößchen, CVJM, Emmaus Gemeinde)
+  Projekte:Sonstiges      1 HR ; Abrechnung Tohu mit Peter
+  Zeit:Marc 
+
+2025-11-03 * "Marc" "Values NICA Work"
+  Projekte:SAD2030:Sonstiges                              2 HR ; 23:00 - 02:00  Arbeit an dem Thema "Values NICA e.V."
+  Zeit:Marc   
+
+2025-10-16 * "Marc" "Research LMS"
+  Projekte:SAD2030:Sonstiges   1 HR
+  Zeit:Marc               
+
+2025-10-17 * "Marc" "Planung mit Charly"
+  Zeit:Marc           -6 HR
+  Projekte:SAD2030:Planung  
+
+2025-10-27 * "Marc" "Subdomain, LMS Einrichtung"
+  Projekte:SAD2030:Sonstiges   3 HR
+  Zeit:Marc    
+
+2025-10-28 * "Marc" "Einführung mit Amanda, Einrichtung Zeiterfassung"
+  Projekte:SAD2030:Sonstiges   2 HR
+  Zeit:Marc    
+
+
+2025-10-29 * "Marc" "Buchhaltung, Projektabrechnung"
+  Projekte:Intern:Vereinsarbeit:Buchhaltung     1.75 HR ; 14:00 - 15:45  Projektabrechnung + Buchhaltung NICA
+  Zeit:Marc    
+
+2025-10-29 * "Marc" "Gespräche mit Lapo, Peter und Charly"
+  Projekte:SAD2030:Planung                              0.75 HR ; 15:45 - 16:30  Gespräch mit Lapo
+  Projekte:SAD2030:Planung                              2.5 HR ; 16:30 - 19:00 Gespräch mit Peter + Charly, Einführung + Aufgabenverteilung
+  Projekte:SAD2030:Sonstiges                              2 HR; ; Erstellung Entwurf "Werte NICA e.V" 
+  Zeit:Marc    
+
+2025-10-30 * "Marc" "Draft Values"
+  Projekte:SAD2030:Sonstiges                              2 HR; ; Erstellung Entwurf "Werte NICA e.V" 
+  Zeit:Marc    
+
+2025-11-03 * "Marc" "Gespräche mit Peter und Charly"
+  Projekte:SAD2030:Planung                              2 HR ; 16:30 - 18:30  Gespräch mit Charly + Peter
+  Zeit:Marc    
+
+
+***********************************************************************************
+** Amanda
+***********************************************************************************
+
+
+2025-11-10 * "Amanda" "Testlauf Fragebogen, Email, Veröffentlichung"
+  Projekte:SAD2030:Umfrage                              1 HR 
+  Zeit:Amanda    
+
+2025-11-08 * "Amanda" "Fragebogen überarbeiten.  "
+  Projekte:SAD2030:Umfrage                              0.5 HR 
+  Zeit:Amanda    
+
+2025-11-06 * "Amanda" "Fragebogen überarbeiten.  "
+  Projekte:SAD2030:Umfrage                              1 HR 
+  Zeit:Amanda    
+
+2025-11-05 * "Amanda" "Interview erstellen  "
+  Projekte:SAD2030:Umfrage                              1 HR 
+  Zeit:Amanda    
+
+2025-11-04 * "Amanda" "Besprechung NICA, Beginn Interviewgestaltung "
+  Projekte:SAD2030:Planung                              1.5 HR 
+  Projekte:SAD2030:Umfrage                              1 HR 
+  Zeit:Amanda    
+
+2025-11-03 * "Amanda" "Recherche inklusive Inhalte "
+  Projekte:SAD2030:Planung                              0.5 HR 
+  Zeit:Amanda    
+
+2025-11-01 * "Amanda" "Fragebogen überarbeiten, Telefonat Charly, Google Forms erstellen, Recherche"
+  Projekte:SAD2030:Umfrage                              2 HR 
+  Zeit:Amanda    
+
+2025-10-31 * "Amanda" "Recherche inklusive Inhalte  + Besprechung mit Charly"
+  Projekte:SAD2030:Planung                              2 HR 
+  Zeit:Amanda    
+
+2025-11-11 * "Amanda" "Telefonat Fragebogen, Überarbeitung"
+  Projekte:SAD2030:Umfrage          2.00 HR
+  Zeit:Amanda
+
+2025-11-12 * "Amanda" "Fragebogen verteilen, E-Mails,Interview überarbeiten, Feedback Marc"
+  Projekte:SAD2030:Umfrage          2.00 HR
+  Zeit:Amanda
+
+2025-11-13 * "Amanda" "Interviews überarbeiten, Call Team Inhalte"
+  Projekte:SAD2030:Planung          2.50 HR
+  Zeit:Amanda
+
+2025-11-14 * "Amanda" "Fragebogen verteilen, Recherche Akrobatik inklusiv + Flow"
+  Projekte:SAD2030:Kurserstellung   1.00 HR
+  Zeit:Amanda
+
+2025-11-15 * "Amanda" "0,5h Telefonat Charly, Recherche"
+  Projekte:SAD2030:Planung          1.00 HR
+  Zeit:Amanda
+
+2025-11-17 * "Amanda" "Orga, Telefonat Charly"
+  Projekte:SAD2030:Planung          3.00 HR
+  Zeit:Amanda
+
+2025-11-18 * "Amanda" "Kontakt Lapo, BAG"
+  Projekte:SAD2030:Planung          0.50 HR
+  Zeit:Amanda
+
+2025-11-19 * "Amanda" "Überarbeitung + Übersetzung Interviewplanung"
+  Projekte:SAD2030:Umfrage          1.00 HR
+  Zeit:Amanda
+
+2025-11-20 * "Amanda" "Ausarbeitung Flow, Fragenkatalog ins System, Feedback"
+  Projekte:SAD2030:Umfrage          2.00 HR
+  Zeit:Amanda
+
+2025-11-21 * "Amanda" "Interview + Auswertung Lapo, Telefonat Marc"
+  Projekte:SAD2030:Umfrage          2.00 HR
+  Zeit:Amanda
+
+2025-12-03 * "Amanda" "Konzept/Recherche Akrobatikkurs, Kommunikation Interview"
+  Projekte:SAD2030:Kurserstellung   1.00 HR
+  Zeit:Amanda
+
+2025-12-05 * "Amanda" "Interview mit Vor -und nach Gespräch + Digitalisierung"
+  Projekte:SAD2030:Umfrage          4.00 HR
+  Zeit:Amanda
+
+2025-12-07 * "Amanda" "Recherche Inklusion"
+  Projekte:SAD2030:Kurserstellung   1.50 HR
+  Zeit:Amanda
+
+2025-12-08 * "Amanda" "Interview mit Vor- und nach Gespräch, Orga"
+  Projekte:SAD2030:Umfrage          3.00 HR
+  Zeit:Amanda
+
+2025-12-09 * "Amanda" "Konzept Akrobatikkurs + Technikrecherche"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Amanda
+
+2025-12-10 * "Amanda" "Fortbildung + Orga"
+  Projekte:SAD2030:Sonstiges        3.00 HR
+  Zeit:Amanda
+
+2025-12-11 * "Amanda" "Akrobatikkurs Design"
+  Projekte:SAD2030:Kurserstellung   0.50 HR
+  Zeit:Amanda
+
+2025-12-15 * "Amanda" "Design + Konzept Akrobatik"
+  Projekte:SAD2030:Kurserstellung   3.50 HR
+  Zeit:Amanda
+
+2025-12-16 * "Amanda" "Team Meeting und Akrobatik-Konzept"
+  Projekte:SAD2030:Kurserstellung   4.00 HR
+  Zeit:Amanda
+
+2025-12-20 * "Amanda" "Interview Julius & orga"
+  Projekte:SAD2030:Umfrage          1.50 HR
+  Zeit:Amanda
+
+2025-12-22 * "Amanda" "Molton-Recherche und Planung mit marc"
+  Projekte:SAD2030:Planung          1.00 HR
+  Zeit:Amanda
+
+2026-01-02 * "Amanda" "Akrobatikkurs Design Lektion 1"
+  Projekte:SAD2030:Kurserstellung   2.50 HR
+  Zeit:Amanda
+
+2026-01-05 * "Amanda" "Design Karteikarten"
+  Projekte:SAD2030:Kurserstellung   1.50 HR
+  Zeit:Amanda
+
+2026-01-06 * "Amanda" "team meeting, erstellung akrobatik karten"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Amanda
+
+2026-01-08 * "Amanda" "Meeting mit Charly"
+  Projekte:SAD2030:Planung          2.00 HR
+  Zeit:Amanda
+
+2026-01-09 * "Amanda" "Disclaimer inklusion"
+  Projekte:SAD2030:Kurserstellung   1.00 HR
+  Zeit:Amanda
+
+2026-01-12 * "Amanda" "Projekttag , Teamabsprachen"
+  Projekte:SAD2030:Planung          4.00 HR
+  Zeit:Amanda
+
+2026-01-13 * "Amanda" "Inklusion -Kurs, Aufhängung Greenscreen"
+  Projekte:SAD2030:Kurserstellung   4.50 HR
+  Zeit:Amanda
+
+2026-01-14 * "Amanda" "Akrobatik kurs bei Charly, Skript Überarbeitung zu Hause, Büro"
+  Projekte:SAD2030:Kurserstellung   4.50 HR
+  Zeit:Amanda
+
+2026-01-15 * "Amanda" "Kurs Akrobatik, Kameravergleich"
+  Projekte:SAD2030:Kurserstellung   5.00 HR
+  Zeit:Amanda
+
+2026-01-16 * "Amanda" "Umsetzung Kurs Akrobatik, Kurs Einführung Inklusion"
+  Projekte:SAD2030:Kurserstellung   5.00 HR
+  Zeit:Amanda
+
+2026-01-19 * "Amanda" "Einführung Inklusion"
+  Projekte:SAD2030:Kurserstellung   2.50 HR
+  Zeit:Amanda
+
+2026-01-20 * "Amanda" "vorbereitung drehtag"
+  Projekte:SAD2030:Kurserstellung   4.00 HR
+  Zeit:Amanda
+
+2026-01-21 * "Amanda" "Drehtag"
+  Projekte:SAD2030:Kurserstellung   11.00 HR
+  Zeit:Amanda
+
+2026-01-23 * "Amanda" "Büro, Inklusionskurs, Davinci"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Amanda
+
+2026-01-27 * "Amanda" "Projektarbeit bei Peter, Formatierung Canva"
+  Projekte:SAD2030:Kurserstellung   4.00 HR
+  Zeit:Amanda
+
+2026-01-28 * "Amanda" "Drehtag 2"
+  Projekte:SAD2030:Kurserstellung   7.00 HR
+  Zeit:Amanda
+
+2026-01-31 * "Amanda" "Datensicherung, Layout, Datenübergabe + Absprachen mit Millo"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Amanda
+
+2026-02-01 * "Amanda" "Design Mindmap"
+  Projekte:SAD2030:Kurserstellung   0.50 HR
+  Zeit:Amanda
+
+2026-02-02 * "Amanda" "Design Mindmap"
+  Projekte:SAD2030:Kurserstellung   0.50 HR
+  Zeit:Amanda
+
+2026-02-06 * "Amanda" "Video + Design mit Dörte"
+  Projekte:SAD2030:Kurserstellung   2.50 HR
+  Zeit:Amanda
+
+2026-02-07 * "Amanda" "Kursmaterial Digitalisieren , Meeting Charly"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Amanda
+
+2026-02-08 * "Amanda" "Design anpassen"
+  Projekte:SAD2030:Kurserstellung   1.00 HR
+  Zeit:Amanda
+
+2026-02-12 * "Amanda" "Datensicherung und Besprechung mit Peter"
+  Projekte:SAD2030:Planung          1.00 HR
+  Zeit:Amanda
+
+2026-02-13 * "Amanda" "Drehtag + Schnitt + Absprachen Millo + Meeting Charly"
+  Projekte:SAD2030:Kurserstellung   6.00 HR
+  Zeit:Amanda
+
+2026-02-14 * "Amanda" "Bürotag, Schnitt Akrobatik Kurs, Absprachen Millo"
+  Projekte:SAD2030:Kurserstellung   6.00 HR
+  Zeit:Amanda
+
+***********************************************************************************
+** Charly
+***********************************************************************************
+
+2025-10-17 * "Charly" "Planung, Vorbereitung Reise, Programme Download"
+  Projekte:SAD2030:Planung                              2.25 HR ; 13:15 - 15:25	2,17	(aufgerundet auf 2.25)
+  Projekte:SAD2030:Sonstiges                              1.25 HR ; 16:45 - 18:00	1,25	
+  Zeit:Charly 
+
+2025-10-29 * "Charly" "Videocall mit Marc & Peter, Craig, Planung, ersten Überblick selbst verschaffen"
+  Projekte:SAD2030:Planung                              2 HR ; 16:30 - 18:30
+  Zeit:Charly 
+
+2025-10-30 * "Charly" "Ausprobieren Erstellung eines Fragebogens"
+  Projekte:SAD2030:Umfrage                              0.5 HR ; 17:30 - 18:00
+  Zeit:Charly 
+
+2025-10-31 * "Charly" "Telefonat Amanda Planung, Marc & Peter kurz telefoniert"
+  Projekte:SAD2030:Planung                              2 HR ; 16:00 - 18:00
+  Zeit:Charly 
+
+2025-11-01 * "Charly" "Ausarbeitung des Fragebogens"
+  Projekte:SAD2030:Umfrage                              2.5 HR ; 15:30 - 18:00
+  Zeit:Charly 
+
+2025-11-03 * "Charly" "Videocall mit Marc & Peter, Craig, Selbstverständnis für NICA angefangen zu formulieren"
+  Projekte:SAD2030:Planung                              2 HR ; 16:30 - 18:30
+  Zeit:Charly 
+
+2025-11-04 * "Charly" "Einführung in Wordpress"
+  Projekte:SAD2030:Sonstiges                              2 HR ; 16:30 - 18:30
+  Zeit:Charly 
+
+2025-11-06 * "Charly" "Fragebogen überarbeiten & digitalisieren"
+  Projekte:SAD2030:Umfrage                              3.5 HR ; 12:30 - 16:00
+  Zeit:Charly 
+
+2025-11-07 * "Charly" "Marc Update Fragebogen & Überarbeitung Fragebogen"
+  Projekte:SAD2030:Umfrage                              1.75 HR ; 17:00 - 18:45
+  Zeit:Charly 
+
+2025-11-08 * "Charly" "Überarbeitung Fragebogen & Bearbeitung Interviewfragen"
+  Projekte:SAD2030:Umfrage                              1.25 HR ; 18:30 - 19:45
+  Zeit:Charly 
+
+2025-11-10 * "Charly" "Fertigstellung Fragebogen & Erstentwurf zu den E-Mails zum Fragebogen und Interviews"
+  Projekte:SAD2030:Umfrage                              2 HR ; 09:30 - 11:30
+  Zeit:Charly 
+
+2025-11-13 * "Charly" "Überarbeitung Interviewfragen, Call mit Amanda Fragebogen & Interviewfragen, gemeinsamer Videocall mit Amanda, Peter, Marc Update"
+  Projekte:SAD2030:Umfrage                              1 HR ; 09:00 - 10:00
+  Projekte:SAD2030:Umfrage                              1 HR ; 19:30 - 22:00
+  Projekte:SAD2030:Planung                              1.5 HR 
+  Zeit:Charly 
+
+2025-11-14 * "Charly" "Orgakram Call mit Marc"
+  Projekte:SAD2030:Planung          1.00 HR
+  Zeit:Charly
+
+2025-11-15 * "Charly" "Call mit Amanda Orgakram"
+  Projekte:SAD2030:Planung          0.50 HR
+  Zeit:Charly
+
+2025-11-16 * "Charly" "Überarbeiten Interviewfragen, Rausschicken E-Mails Interviewanfragen & Fragebogen an Personen"
+  Projekte:SAD2030:Umfrage          2.50 HR
+  Zeit:Charly
+
+2025-11-17 * "Charly" "Call mit Amanda Konzeptualisierung inklusive Akrobatik"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Charly
+
+2025-11-19 * "Charly" "Call mit Marc Orgakram, weiteres Rumschicken Fragebogen & Anfragen Interviews usw."
+  Projekte:SAD2030:Planung          2.50 HR
+  Zeit:Charly
+
+2025-12-04 * "Charly" "Meeting mit Marc & Peter Austausch über Gespräch von Peter, Lapo & Craig"
+  Projekte:SAD2030:Planung          3.00 HR
+  Zeit:Charly
+
+2025-12-05 * "Charly" "Meeting mit Marc, Peter & Amanda bei Peter zum Stand des Projekts"
+  Projekte:SAD2030:Planung          2.00 HR
+  Zeit:Charly
+
+2025-12-08 * "Charly" "Akrobatikkarten herumprobieren, Interview mit Waseem & Amanda, Videos machen mit Marc & Amanda"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Charly
+
+2025-12-09 * "Charly" "Kursausarbeitung für Akrobatik mit Amanda & für Poi mit Peter"
+  Projekte:SAD2030:Kurserstellung   4.00 HR
+  Zeit:Charly
+
+2025-12-10 * "Charly" "Weiterbildung mit Marc fürs Obsidian usw."
+  Projekte:SAD2030:Sonstiges        3.00 HR
+  Zeit:Charly
+
+2025-12-15 * "Charly" "Konzeption Akrobatikkurs Amanda"
+  Projekte:SAD2030:Kurserstellung   2.50 HR
+  Zeit:Charly
+
+2025-12-16 * "Charly" "Meeting alle zusammen Update & Ausarbeitung Akrobatikkurs mit Amanda"
+  Projekte:SAD2030:Kurserstellung   4.00 HR
+  Zeit:Charly
+
+2025-12-17 * "Charly" "Treffen mit Marc, Ausloten Filmen im Wohnzimmer & Einrichten Msty und Prompts"
+  Projekte:SAD2030:Kurserstellung   2.58 HR
+  Zeit:Charly
+
+2025-12-18 * "Charly" "Juggleboard gestrichen & Planung mit Marc, Weiterentwicklung Akrobatikkonzept mit Amanda"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Charly
+
+2025-12-19 * "Charly" "Kamera bei Amanda auschecken, Weiterentwicklung Akrobatikkonzept mit Amanda"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Charly
+
+2025-12-20 * "Charly" "Interview mit Julius & Orga mit Amanda"
+  Projekte:SAD2030:Planung          1.50 HR
+  Zeit:Charly
+
+2026-01-02 * "Charly" "Besprechung mit Amanda über Ehrenamtsgelder & weitere Planung Akrobatikkurs"
+  Projekte:SAD2030:Planung          2.50 HR
+  Zeit:Charly
+
+2026-01-06 * "Charly" "Allgemeines Meeting Check-In, Weiterarbeiten mit Amanda am Akrobatikkurs"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Charly
+
+2026-01-07 * "Charly" "Konzeption Poikurs Peter"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Charly
+
+2026-01-08 * "Charly" "Konzeption Akrobatikkurs Amanda"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Charly
+
+2026-01-09 * "Charly" "Konzeption Poikurs Peter"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Charly
+
+2026-01-12 * "Charly" "Aufräumaktion Büro alle"
+  Projekte:SAD2030:Sonstiges        4.00 HR
+  Zeit:Charly
+
+2026-01-13 * "Charly" "Inklusionskurs Ausarbeitung mit Amanda, Peter & Büroarbeit alle Greenscreen anbringen"
+  Projekte:SAD2030:Kurserstellung   5.00 HR
+  Zeit:Charly
+
+2026-01-14 * "Charly" "Ausarbeitung des Akrobatikkurses mit Amanda, Treffen im Büro Weiterarbeiten, Interview Lisa"
+  Projekte:SAD2030:Kurserstellung   7.50 HR
+  Zeit:Charly
+
+2026-01-15 * "Charly" "Im Team alle getroffen, Orgakram, KI-Bilder erstellen Akrobatikbilder"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Charly
+
+2026-01-16 * "Charly" "Frühs mit Amanda Akrobatikkurs, später im Büro alle getroffen, Orgakram usw."
+  Projekte:SAD2030:Kurserstellung   5.00 HR
+  Zeit:Charly
+
+2026-01-19 * "Charly" "Erst bei Peter getroffen Inklusionskurs, später Büroarbeit alle zusammen"
+  Projekte:SAD2030:Kurserstellung   4.50 HR
+  Zeit:Charly
+
+2026-01-20 * "Charly" "Frühs mit Amanda Akrobatikkurs, später allein zu Inklusionskurs gearbeitet"
+  Projekte:SAD2030:Kurserstellung   5.00 HR
+  Zeit:Charly
+
+2026-01-21 * "Charly" "Großer Drehtag bei mir Zuhause, Sofatalks"
+  Projekte:SAD2030:Kurserstellung   11.00 HR
+  Zeit:Charly
+
+2026-01-24 * "Charly" "Orgakram, weiter Ausarbeiten Akrobatikkurs"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Charly
+
+2026-01-26 * "Charly" "Konzeptualisierung Poi-Kurs mit Peter"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Charly
+
+2026-01-27 * "Charly" "Konzeptualisierung Poi-Kurs mit Peter"
+  Projekte:SAD2030:Kurserstellung   5.00 HR
+  Zeit:Charly
+
+2026-01-28 * "Charly" "Großer Drehtag in der Passendorfer Kirche, Akrobatik & Poi mit Amanda & Peter"
+  Projekte:SAD2030:Kurserstellung   9.00 HR
+  Zeit:Charly
+
+2026-01-29 * "Charly" "Orgakram mit Marc"
+  Projekte:SAD2030:Planung          1.00 HR
+  Zeit:Charly
+
+2026-01-30 * "Charly" "Orgakram Zuhause"
+  Projekte:SAD2030:Planung          1.00 HR
+  Zeit:Charly
+
+2026-02-07 * "Charly" "Weiterausarbeitung Akrobatikkurs mit Amanda"
+  Projekte:SAD2030:Kurserstellung   1.00 HR
+  Zeit:Charly
+
+2026-02-08 * "Charly" "Weiterausarbeitung Akrobatikkurs"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Charly
+
+2026-02-10 * "Charly" "Orgakram mit Marc, Akrobatikkurs, Poikurs"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Charly
+
+2026-02-11 * "Charly" "Poikurs Ausarbeitung mit Peter, Orgakram mit Marc, allein Poikurs weiter Ausarbeitung"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Charly
+
+2026-02-13 * "Charly" "Mit Amanda über verschiedene Kurse gesprochen & weiter organisiert; Poikurs allein weiter gemacht"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Charly
+
+2026-02-14 * "Charly" "Am inklusiven Kurs und am Akrobatikkurs weitergearbeitet"
+  Projekte:SAD2030:Kurserstellung   1.00 HR
+  Zeit:Charly
+
+2026-02-15 * "Charly" "Am Poi-Kurs weitergearbeitet, bisschen Orgakram allein"
+  Projekte:SAD2030:Kurserstellung   6.00 HR
+  Zeit:Charly
+
+2026-02-16 * "Charly" "Am Poi-Kurs mit Peter weitergearbeitet"
+  Projekte:SAD2030:Kurserstellung   1.50 HR
+  Zeit:Charly
+
+2026-02-18 * "Charly" "Weiterausarbeitung Akrobatikkurs, Orgakram, Meeting alle zusammen & Nacharbeitung"
+  Projekte:SAD2030:Kurserstellung   2.50 HR
+  Zeit:Charly
+
+***********************************************************************************
+** Peter
+***********************************************************************************
+
+2025-10-29 * "Peter" "Meeting: Informationsabgleich"
+  Projekte:SAD2030:Planung          1.75 HR
+  Zeit:Peter
+
+2025-11-04 * "Peter" "Meeting: Einführung LMS & Update Fragbogen"
+  Projekte:SAD2030:Planung          2.00 HR
+  Zeit:Peter
+
+2025-11-07 * "Peter" "Meeting: Informationsabgleich"
+  Projekte:SAD2030:Planung          0.25 HR
+  Zeit:Peter
+
+2025-11-08 * "Peter" "Recherche: gegenlesen grundmuster + recherche ZPD"
+  Projekte:SAD2030:Sonstiges        1.00 HR
+  Zeit:Peter
+
+2025-11-13 * "Peter" "Meeting: Inhalte auswählen und verteilen"
+  Projekte:SAD2030:Planung          2.00 HR
+  Zeit:Peter
+
+2025-11-19 * "Peter" "Recherche: Digitale Lerninhalte inklusiv gestalten"
+  Projekte:SAD2030:Sonstiges        1.00 HR
+  Zeit:Peter
+
+2025-11-21 * "Peter" "Poi-Kurs: Brainstorming, Zielgruppe, Inhalte ordnen"
+  Projekte:SAD2030:Kurserstellung   0.50 HR
+  Zeit:Peter
+
+2025-12-05 * "Peter" "Meeting: Inhalte besprechen"
+  Projekte:SAD2030:Planung          2.50 HR
+  Zeit:Peter
+
+2025-12-09 * "Peter" "Poi Kurs: Brainstorm"
+  Projekte:SAD2030:Kurserstellung   1.00 HR
+  Zeit:Peter
+
+2025-12-10 * "Peter" "Fortbildung: Einführung in digitale Verwaltung (Obsidian)"
+  Projekte:SAD2030:Sonstiges        1.50 HR
+  Zeit:Peter
+
+2025-12-11 * "Peter" "Poi/Inklusion: Sichtung bestehender Inhalte"
+  Projekte:SAD2030:Kurserstellung   0.50 HR
+  Zeit:Peter
+
+2025-12-16 * "Peter" "Meeting: Update, Inhaltliche Absprachen"
+  Projekte:SAD2030:Planung          2.00 HR
+  Zeit:Peter
+
+2026-01-05 * "Peter" "Poi/Inklusion: Ausarbeitung von Lektionen poi & Inklusion"
+  Projekte:SAD2030:Kurserstellung   1.50 HR
+  Zeit:Peter
+
+2026-01-06 * "Peter" "Meeting: Update und Planung Intensivwochen"
+  Projekte:SAD2030:Planung          1.00 HR
+  Zeit:Peter
+
+2026-01-07 * "Peter" "Meeting Poi: Update, Lektionsplanung, Inhaltsabsprachen"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Peter
+
+2026-01-08 * "Peter" "Poi: Ausarbeitung von Lektionen"
+  Projekte:SAD2030:Kurserstellung   0.50 HR
+  Zeit:Peter
+
+2026-01-09 * "Peter" "Poi: Ausarbeitung von Lektionen"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Peter
+
+2026-01-12 * "Peter" "Projektwoche: Materialbeschaffung, Meeting Inklusion, Orgameeting"
+  Projekte:SAD2030:Kurserstellung   4.50 HR
+  Zeit:Peter
+
+2026-01-13 * "Peter" "Projektwoche: Meeting Inklusion, Materialbeschaffung, Kameratest, Ausarbeitung Poi"
+  Projekte:SAD2030:Kurserstellung   4.50 HR
+  Zeit:Peter
+
+2026-01-14 * "Peter" "Projektwoche: Kameratest, Ausarbeitung Poi"
+  Projekte:SAD2030:Kurserstellung   3.50 HR
+  Zeit:Peter
+
+2026-01-15 * "Peter" "Projektwoche: Kameratest, Ausarbeitung Poi"
+  Projekte:SAD2030:Kurserstellung   5.50 HR
+  Zeit:Peter
+
+2026-01-16 * "Peter" "Projektwoche: Materialbeschaffung, Kameratest, Ausarbeitung Poi"
+  Projekte:SAD2030:Kurserstellung   5.00 HR
+  Zeit:Peter
+
+2026-01-19 * "Peter" "Projektwoche: Ausarbeitung Inklusion, Ausarbeitung Poi"
+  Projekte:SAD2030:Kurserstellung   5.00 HR
+  Zeit:Peter
+
+2026-01-20 * "Peter" "Projektwoche: Ausarbeitung Poi, Ausarbeitung Inklusion, Materialvorbereitung/-transport"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Peter
+
+2026-01-21 * "Peter" "Filmen: Dreharbeiten: Sofatalk Inklusion"
+  Projekte:SAD2030:Kurserstellung   7.00 HR
+  Zeit:Peter
+
+2026-01-22 * "Peter" "Projektwoche: Filmmaterial sichten, Onlinekurse vorbereiten, Ausarbeitung Poi, Materialtransport"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Peter
+
+2026-01-23 * "Peter" "Projektwoche: OLM einrichten, Ausarbeitung Poi"
+  Projekte:SAD2030:Kurserstellung   2.00 HR
+  Zeit:Peter
+
+2026-01-26 * "Peter" "Projektwoche: Scriptvorbereitung Poi"
+  Projekte:SAD2030:Kurserstellung   3.00 HR
+  Zeit:Peter
+
+2026-01-27 * "Peter" "Projektwoche: Scriptvorbereitung Poi, Filmtagplanung"
+  Projekte:SAD2030:Kurserstellung   5.00 HR
+  Zeit:Peter
+
+2026-01-28 * "Peter" "Projektwoche: Materialtransport und Drehtag Akrobatik und Poi-Pädagogikurs"
+  Projekte:SAD2030:Kurserstellung   9.00 HR
+  Zeit:Peter
+
+2026-01-30 * "Peter" "Poi: Aufbereitung der Inhalte in Textform Poi-Kurs"
+  Projekte:SAD2030:Kurserstellung   1.00 HR
+  Zeit:Peter
+
+2026-01-31 * "Peter" "Poi: Aufbereitung der Inhalte in Textform Poi-Kurs"
+  Projekte:SAD2030:Kurserstellung   1.25 HR
+  Zeit:Peter
+
+2026-02-02 * "Peter" "Poi: Aufbereitung der Inhalte in Textform Poi-Kurs"
+  Projekte:SAD2030:Kurserstellung   6.00 HR
+  Zeit:Peter
+
+2026-02-02 * "Peter" "Poi: Aufbereitung der Inhalte in Textform Poi-Kurs"
+  Projekte:SAD2030:Kurserstellung   1.50 HR
+  Zeit:Peter
+
+2026-02-09 * "Peter" "Poi: Aufbereitung der Inhalte in Textform Poi-Kurs"
+  Projekte:SAD2030:Kurserstellung   1.50 HR
+  Zeit:Peter
+
+2026-02-10 * "Peter" "Poi: Aufbereitung der Inhalte in Textform Poi-Kurs"
+  Projekte:SAD2030:Kurserstellung   3.50 HR
+  Zeit:Peter
+
+2026-02-11 * "Peter" "Poi: Aufbereitung der Inhalte in Textform Poi-Kurs, Meeting Charly Poi"
+  Projekte:SAD2030:Kurserstellung   3.25 HR
+  Zeit:Peter
+
+2026-02-12 * "Peter" "Poi: Aufbereitung der Inhalte in Textform Poi-Kurs, Meeting Amanda"
+  Projekte:SAD2030:Kurserstellung   6.00 HR
+  Zeit:Peter
+
+2026-04-12 * "Marc" "coding beantime"
+  start: "2026-04-12T01:08:16.100Z"
+  end: "2026-04-12T01:09:16.264Z"
+  duration_minutes: 1
+  timer_module: "beantime"
+  Projekte:Sonstiges  0.02 HR
+  Zeit:Marc
