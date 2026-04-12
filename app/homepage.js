@@ -2,7 +2,6 @@
 import { renderBeantimeModule } from "../modules/beantime.js";
 import { renderClockInElement } from "../modules/clock.js";
 import { renderNewProjectModule } from "../modules/new-project.js";
-import { renderTimetrackingModule } from "../modules/timetracking.js";
 import { renderUpdoModule } from "../modules/updo.js";
 
 let pageTitleEl = null;
@@ -116,9 +115,6 @@ const moduleRegistry = {
   },
   newProject: {
     render: renderNewProjectModule
-  },
-  timetracking: {
-    render: renderTimetrackingModule
   },
   updo: {
     render: renderUpdoModule
@@ -425,7 +421,7 @@ async function renderPage() {
       const title = String(moduleCfg?.title || moduleKey);
       const shell = createModuleShell(title);
       moduleGridEl.appendChild(shell.root);
-      if (["bookmarks", "updo", "newProject", "timetracking", "beantime"].includes(moduleKey)) {
+      if (["bookmarks", "updo", "newProject", "beantime"].includes(moduleKey)) {
         addCleanup(makeShellCollapsible(shell, false));
       }
 
@@ -481,6 +477,7 @@ if (document.readyState === "loading") {
 } else {
   initHomepage();
 }
+
 
 
 

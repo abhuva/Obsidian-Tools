@@ -529,36 +529,6 @@
       <section class="panel panel-collapsible">
         <header class="panel-head">
           <div>
-            <h2 class="panel-title">Zeiterfassung (klog)</h2>
-            <div class="panel-help">CLI-basierte Aktivitaetsverfolgung mit konfigurierbarer .klg-Datei.</div>
-          </div>
-        </header>
-        <div class="panel-body">
-          <label class="toggle-line" for="timetrackingEnabled">
-            <input id="timetrackingEnabled" class="switch" type="checkbox" />
-            <span class="toggle-copy">
-              <span class="toggle-title">Modul aktiv</span>
-              <span class="toggle-help">Zeigt Start/Stop/Pause + Tagesliste auf der Homepage.</span>
-            </span>
-          </label>
-          <div class="field">
-            <label for="timetrackingFile">Pfad zur klog-Datei</label>
-            <input id="timetrackingFile" type="text" placeholder="timetracking/timetracking.klg" />
-          </div>
-          <div class="field">
-            <label for="timetrackingPauseSummary">Pause-Summary</label>
-            <input id="timetrackingPauseSummary" type="text" placeholder="Pause #pause" />
-          </div>
-          <div class="field">
-            <label for="timetrackingRefreshSec">Refresh-Intervall (Sekunden)</label>
-            <input id="timetrackingRefreshSec" type="number" min="5" max="300" step="1" />
-          </div>
-        </div>
-      </section>
-
-      <section class="panel panel-collapsible">
-        <header class="panel-head">
-          <div>
             <h2 class="panel-title">Beantime (Beancount)</h2>
             <div class="panel-help">Start/Stop-Zeiterfassung mit Buchung direkt in Beancount.</div>
           </div>
@@ -577,7 +547,7 @@
           </div>
           <div class="field">
             <label for="beantimePersonAccount">Person-Konto (Gegenkonto)</label>
-            <input id="beantimePersonAccount" type="text" placeholder="Zeit:Marc" />
+            <select id="beantimePersonAccount"></select>
           </div>
           <div class="field">
             <label for="beantimeStateFile">State-Datei (laufender Timer)</label>
@@ -696,10 +666,6 @@
       const clock12h = document.getElementById("clock12h");
       const newProjectEnabled = document.getElementById("newProjectEnabled");
       const newProjectOpenInNewTab = document.getElementById("newProjectOpenInNewTab");
-      const timetrackingEnabled = document.getElementById("timetrackingEnabled");
-      const timetrackingFile = document.getElementById("timetrackingFile");
-      const timetrackingPauseSummary = document.getElementById("timetrackingPauseSummary");
-      const timetrackingRefreshSec = document.getElementById("timetrackingRefreshSec");
       const beantimeEnabled = document.getElementById("beantimeEnabled");
       const beantimeFile = document.getElementById("beantimeFile");
       const beantimePersonAccount = document.getElementById("beantimePersonAccount");
@@ -949,6 +915,42 @@
         return out;
       }
 
+      async function loadBeantimePersonOptions(preferredValue = "") {
+        const fallback = String(preferredValue || "").trim() || "Zeit:Marc";
+        try {
+          const response = await fetch("/api/beantime/meta");
+          if (!response.ok) throw new Error("meta unavailable");
+          const payload = await response.json();
+          const persons = Array.isArray(payload?.personAccounts)
+            ? payload.personAccounts.map((item) => String(item || "").trim()).filter(Boolean)
+            : [];
+          const selected = String(preferredValue || payload?.personAccount || "").trim() || fallback;
+          beantimePersonAccount.innerHTML = "";
+          const values = persons.length ? persons : [selected];
+          for (const value of values) {
+            const option = document.createElement("option");
+            option.value = value;
+            option.textContent = value;
+            beantimePersonAccount.appendChild(option);
+          }
+          if (!values.includes(selected)) {
+            const option = document.createElement("option");
+            option.value = selected;
+            option.textContent = selected;
+            beantimePersonAccount.appendChild(option);
+          }
+          beantimePersonAccount.value = selected;
+        } catch {
+          const selected = fallback;
+          beantimePersonAccount.innerHTML = "";
+          const option = document.createElement("option");
+          option.value = selected;
+          option.textContent = selected;
+          beantimePersonAccount.appendChild(option);
+          beantimePersonAccount.value = selected;
+        }
+      }
+
       function readFormToSettings() {
         const parsedTitleSize = Number.parseInt(String(titleSizeInput.value || ""), 10);
         const titleSize = Number.isFinite(parsedTitleSize)
@@ -979,7 +981,6 @@
           String(updoOutageMinConsecutiveFailures.value || ""),
           10
         );
-        const parsedTimetrackingRefreshSec = Number.parseInt(String(timetrackingRefreshSec.value || ""), 10);
         const cleanBeantimeFile = String(beantimeFile.value || "").trim() || "beantime/zeit.beancount";
         const cleanBeantimePersonAccount = String(beantimePersonAccount.value || "").trim() || "Zeit:Marc";
         const cleanBeantimeStateFile = String(beantimeStateFile.value || "").trim() || "data/beantime/state.json";
@@ -1019,15 +1020,6 @@
               enabled: Boolean(newProjectEnabled.checked),
               title: "Projektverwaltung",
               openInNewTab: Boolean(newProjectOpenInNewTab.checked)
-            },
-            timetracking: {
-              enabled: Boolean(timetrackingEnabled.checked),
-              title: "Zeiterfassung",
-              file: String(timetrackingFile.value || "").trim() || "timetracking/timetracking.klg",
-              pauseSummary: String(timetrackingPauseSummary.value || "").trim() || "Pause #pause",
-              refreshSec: Number.isFinite(parsedTimetrackingRefreshSec)
-                ? Math.max(5, Math.min(300, parsedTimetrackingRefreshSec))
-                : 20
             },
             beantime: {
               enabled: Boolean(beantimeEnabled.checked),
@@ -1114,13 +1106,8 @@
         clock12h.checked = Boolean(settings?.modules?.clock?.hour12);
         newProjectEnabled.checked = Boolean(settings?.modules?.newProject?.enabled);
         newProjectOpenInNewTab.checked = Boolean(settings?.modules?.newProject?.openInNewTab);
-        timetrackingEnabled.checked = Boolean(settings?.modules?.timetracking?.enabled);
-        timetrackingFile.value = String(settings?.modules?.timetracking?.file ?? "timetracking/timetracking.klg");
-        timetrackingPauseSummary.value = String(settings?.modules?.timetracking?.pauseSummary ?? "Pause #pause");
-        timetrackingRefreshSec.value = String(settings?.modules?.timetracking?.refreshSec ?? 20);
         beantimeEnabled.checked = Boolean(settings?.modules?.beantime?.enabled);
         beantimeFile.value = String(settings?.modules?.beantime?.file ?? "beantime/zeit.beancount");
-        beantimePersonAccount.value = String(settings?.modules?.beantime?.personAccount ?? "Zeit:Marc");
         beantimeStateFile.value = String(settings?.modules?.beantime?.stateFile ?? "data/beantime/state.json");
         beantimeAccountPrefix.value = String(settings?.modules?.beantime?.bookableAccountPrefix ?? "Projekte:");
         updoEnabled.checked = Boolean(settings?.modules?.updo?.enabled);
@@ -1161,6 +1148,9 @@
           const payload = await response.json();
           currentSettings = payload.settings || null;
           fillForm(currentSettings || {});
+          await loadBeantimePersonOptions(
+            String(currentSettings?.modules?.beantime?.personAccount ?? "Zeit:Marc")
+          );
           setStatus("Einstellungen geladen.", "ok");
         } catch (error) {
           setStatus(`Konnte Einstellungen nicht laden: ${error.message || error}`, "err");
@@ -1183,6 +1173,9 @@
           const payload = await response.json();
           currentSettings = payload.settings || settings;
           fillForm(currentSettings);
+          await loadBeantimePersonOptions(
+            String(currentSettings?.modules?.beantime?.personAccount ?? "Zeit:Marc")
+          );
           setStatus("Gespeichert. Oeffne die Homepage neu, falls noetig.", "ok");
         } catch (error) {
           setStatus(`Speichern fehlgeschlagen: ${error.message || error}`, "err");

@@ -16,7 +16,6 @@ Lokaler Preview-Server fuer eine modulare Obsidian-Homepage.
 - `Tools/app/homepage.js`: Bootstrap + Modul-Registry.
 - `Tools/modules/bookmarks.js`: Bookmarks-Modul.
 - `Tools/modules/clock.js`: Uhrzeit-Modul.
-- `Tools/modules/timetracking.js`: klog-basiertes Zeiterfassungs-Modul.
 - `Tools/modules/beantime.js`: Beancount-basiertes Start/Stop-Zeiterfassungs-Modul.
 - `Tools/settings.html`: Settings-Seite (UI fuer Konfiguration).
 - `Tools/serve.mjs`: HTTP-Server + API.
@@ -78,11 +77,7 @@ obsidian web url="http://127.0.0.1:4174/settings.html"
 - `GET /api/updo/history`: Liefert komprimierte Langzeitdaten + Incident-Liste (`rangeDays` optional).
   - EnthÃ¤lt bei TLS-Fehlern ein `sslIssue`-Objekt (z. B. `ERR_TLS_CERT_ALTNAME_INVALID`).
 - `POST /api/updo/restart`: Startet den `updo`-Monitorprozess neu.
-- `GET /api/timetracking/today`: Liefert klog-Tagesstatus (aktive Aktivitaet + Eintraege).
-- `POST /api/timetracking/start`: Startet/Switcht klog-Aktivitaet.
-- `POST /api/timetracking/pause`: Setzt per `switch` auf konfigurierte Pause-Summary.
-- `POST /api/timetracking/stop`: Stoppt offene klog-Aktivitaet.
-- `GET /api/beantime/meta`: Liefert laufenden Beantime-Timer + buchbare Beancount-Konten.
+- `GET /api/beantime/meta`: Liefert laufenden Beantime-Timer + buchbare Beancount-Konten + Personenkonten (`Zeit:*`).
 - `POST /api/beantime/start`: Startet Beantime-Timer (nur State-Datei, noch keine Ledger-Buchung).
 - `POST /api/beantime/stop`: Stoppt Timer, berechnet Dauer und schreibt Beancount-Transaktion.
 
@@ -103,8 +98,7 @@ Damit sind spaetere Features stabil erweiterbar (neue Module, neue Optionen).
   - Optional: Kartenbreite (`cardMaxWidth`, 205-420 px).
 - `clock` (Uhrzeit): Live-Digitaluhr im Header/Banner.
 - `newProject` (Neues Projekt erstellen): Dialog fuer neue Projekte in `2. Projektverwaltung` inkl. Naming-Validierung.
-- `timetracking` (klog): Start/Stop/Pause und Tagesuebersicht fuer `.klg`-basierte Aktivitaetslogs.
-- `beantime` (Beancount): Start/Stop-Timer mit Kontenauswahl; schreibt beim Stop eine fertige `HR`-Buchung inkl. Metadaten in eine Beancount-Datei.
+- `beantime` (Beancount): Start/Stop-Timer mit Konten- und Personenauswahl; schreibt beim Stop eine fertige `HR`-Buchung inkl. Metadaten in eine Beancount-Datei.
 - `updo` (Website Monitoring): Statuskarten + Latenz/Verfuegbarkeits-Charts fuer konfigurierten URL-Satz.
   - Live-Ansicht: 15m / 1h / 6h aus In-Memory-Ringpuffer.
   - Langzeit-Ansicht: 7d / 30d / 90d aus komprimierten Persistenzdaten.
@@ -178,7 +172,6 @@ UI-Optionen liegen unter `ui` in den Settings:
 - Theme gilt jetzt fuer `home.html` und `settings.html`.
 - First-paint Theme-Bootstrap via `localStorage` hinzugefuegt (`homepage-theme-bootstrap-v1`) zur Vermeidung von Theme-Flash.
 - Header angepasst: kein Untertitel mehr, Titelgroesse konfigurierbar (`ui.titleSize`), neue Such-Icon-Aktion fuer Omnisearch.
-- Neues `timetracking`-Modul (klog) inkl. Dateipfad-Setting eingefuehrt.
 - Neues `beantime`-Modul (Beancount) eingefuehrt, mit Start/Stop-State-Datei und Beancount-Append beim Stop.
 
 ## Neue Module ergaenzen

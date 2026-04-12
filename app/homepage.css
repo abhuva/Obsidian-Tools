@@ -1,4 +1,4 @@
-:root {
+﻿:root {
   --bg-a: #f4f8ff;
   --bg-b: #f8faf4;
   --surface: rgba(255, 255, 255, 0.84);
@@ -194,14 +194,14 @@ html[data-theme-mode="mirror-obsidian"] body {
 }
 
 .module-collapsible .module-head::after {
-  content: "▾";
+  content: "â–¾";
   font-size: 0.9rem;
   color: var(--text-soft);
   margin-left: 4px;
 }
 
 .module-collapsible.module-collapsed .module-head::after {
-  content: "▸";
+  content: "â–¸";
 }
 
 .module-collapsible.module-collapsed .module-body {
@@ -320,60 +320,6 @@ html[data-theme-mode="mirror-obsidian"] body {
   margin: 0 0 10px;
   color: var(--text-soft);
   line-height: 1.4;
-}
-
-.timetracking-controls {
-  display: grid;
-  gap: 8px;
-}
-
-.timetracking-activity-input {
-  width: 100%;
-}
-
-.timetracking-btn-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.timetracking-summary {
-  margin-top: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px 14px;
-  font-size: 0.9rem;
-  color: var(--text-soft);
-}
-
-.timetracking-list {
-  margin-top: 8px;
-  display: grid;
-  gap: 8px;
-}
-
-.timetracking-item {
-  border: 1px solid var(--border);
-  border-radius: var(--radius-card);
-  background: var(--card-bg);
-  padding: 9px 10px;
-  display: grid;
-  gap: 4px;
-}
-
-.timetracking-item-time {
-  font-size: 0.82rem;
-  color: var(--text-soft);
-  font-variant-numeric: tabular-nums;
-}
-
-.timetracking-item-text {
-  font-weight: 600;
-}
-
-.timetracking-item-duration {
-  font-size: 0.82rem;
-  color: var(--text-soft);
 }
 
 .beantime-controls {
@@ -711,3 +657,4 @@ html[data-theme-mode="mirror-obsidian"] body {
     min-width: 160px;
   }
 }
+

@@ -33,13 +33,6 @@
       "title": "Projektverwaltung",
       "openInNewTab": true
     },
-    "timetracking": {
-      "enabled": true,
-      "title": "Zeiterfassung",
-      "file": "timetracking/timetracking.klg",
-      "pauseSummary": "Pause #pause",
-      "refreshSec": 20
-    },
     "beantime": {
       "enabled": true,
       "title": "Beantime",

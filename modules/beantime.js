@@ -1,5 +1,5 @@
-/**
- * Renders Beantime timer controls (start/stop with account + summary).
+﻿/**
+ * Renders Beantime timer controls (start/stop with account + person + summary).
  * @param {{body: HTMLElement}} shell - Module shell DOM nodes.
  * @returns {Promise<() => void>} Cleanup callback.
  */
@@ -12,6 +12,10 @@ export async function renderBeantimeModule(shell) {
     <div class="field-row">
       <label for="beantimeAccount">Konto</label>
       <select id="beantimeAccount" class="input"></select>
+    </div>
+    <div class="field-row">
+      <label for="beantimePerson">Person</label>
+      <select id="beantimePerson" class="input"></select>
     </div>
     <div class="field-row">
       <label for="beantimeSummary">Summary</label>
@@ -33,6 +37,7 @@ export async function renderBeantimeModule(shell) {
   shell.body.appendChild(info);
 
   const accountSelect = controls.querySelector("#beantimeAccount");
+  const personSelect = controls.querySelector("#beantimePerson");
   const summaryInput = controls.querySelector("#beantimeSummary");
   const startBtn = controls.querySelector("#beantimeStartBtn");
   const stopBtn = controls.querySelector("#beantimeStopBtn");
@@ -52,6 +57,49 @@ export async function renderBeantimeModule(shell) {
   }
 
   /**
+   * Replaces all options on a select element.
+   * @param {HTMLSelectElement} selectEl - Target select.
+   * @param {string[]} values - Options to render.
+   * @param {string} emptyLabel - Label for empty fallback option.
+   * @returns {void}
+   */
+  function fillSelect(selectEl, values, emptyLabel) {
+    selectEl.innerHTML = "";
+    if (values.length) {
+      for (const value of values) {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value;
+        selectEl.appendChild(option);
+      }
+      return;
+    }
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = emptyLabel;
+    selectEl.appendChild(option);
+  }
+
+  /**
+   * Forces a select value even if it is not in current options.
+   * @param {HTMLSelectElement} selectEl - Target select.
+   * @param {string} value - Desired option value.
+   * @returns {void}
+   */
+  function setOrAppendSelectValue(selectEl, value) {
+    const clean = String(value || "").trim();
+    if (!clean) return;
+    const exists = Array.from(selectEl.options).some((option) => option.value === clean);
+    if (!exists) {
+      const option = document.createElement("option");
+      option.value = clean;
+      option.textContent = clean;
+      selectEl.appendChild(option);
+    }
+    selectEl.value = clean;
+  }
+
+  /**
    * Updates button disabled states from running snapshot.
    * @returns {void}
    */
@@ -59,6 +107,7 @@ export async function renderBeantimeModule(shell) {
     startBtn.disabled = running;
     stopBtn.disabled = !running;
     accountSelect.disabled = running;
+    personSelect.disabled = running;
   }
 
   /**
@@ -68,7 +117,7 @@ export async function renderBeantimeModule(shell) {
    */
   function renderInfo(meta) {
     const file = String(meta?.file || "").trim();
-    const person = String(meta?.personAccount || "").trim();
+    const person = String(meta?.running?.personAccount || meta?.personAccount || "").trim();
     const startIso = String(meta?.running?.startedAt || "").trim();
     const activeText = startIso ? `Aktiv seit ${startIso}` : "Kein laufender Timer";
     info.innerHTML = `
@@ -89,27 +138,27 @@ export async function renderBeantimeModule(shell) {
       throw new Error(text || "Konnte Beantime-Meta nicht laden");
     }
     const meta = await response.json();
-    const accounts = Array.isArray(meta?.accounts) ? meta.accounts : [];
+    const accounts = Array.isArray(meta?.accounts) ? meta.accounts.map((v) => String(v || "").trim()).filter(Boolean) : [];
+    const people = Array.isArray(meta?.personAccounts)
+      ? meta.personAccounts.map((v) => String(v || "").trim()).filter(Boolean)
+      : [];
+
     running = Boolean(meta?.running);
-    accountSelect.innerHTML = "";
-    for (const account of accounts) {
-      const option = document.createElement("option");
-      option.value = String(account || "");
-      option.textContent = String(account || "");
-      accountSelect.appendChild(option);
-    }
-    if (!accounts.length) {
-      const option = document.createElement("option");
-      option.value = "";
-      option.textContent = "Keine buchbaren Konten gefunden";
-      accountSelect.appendChild(option);
-    }
+    fillSelect(accountSelect, accounts, "Keine buchbaren Konten gefunden");
+    fillSelect(personSelect, people, "Keine Personenkonten gefunden");
+
     if (meta?.running?.account) {
-      accountSelect.value = String(meta.running.account);
+      setOrAppendSelectValue(accountSelect, String(meta.running.account));
+    }
+    if (meta?.running?.personAccount) {
+      setOrAppendSelectValue(personSelect, String(meta.running.personAccount));
+    } else if (meta?.personAccount) {
+      setOrAppendSelectValue(personSelect, String(meta.personAccount));
     }
     if (meta?.running?.summary) {
       summaryInput.value = String(meta.running.summary);
     }
+
     renderInfo(meta);
     syncButtons();
   }
@@ -120,16 +169,21 @@ export async function renderBeantimeModule(shell) {
    */
   async function startTimer() {
     const account = String(accountSelect.value || "").trim();
+    const personAccount = String(personSelect.value || "").trim();
     const summary = String(summaryInput.value || "").trim();
     if (!account) {
       setStatus("Bitte ein Konto auswaehlen.", "err");
+      return;
+    }
+    if (!personAccount) {
+      setStatus("Bitte eine Person auswaehlen.", "err");
       return;
     }
     setStatus("Starte Timer...");
     const response = await fetch("/api/beantime/start", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ account, summary })
+      body: JSON.stringify({ account, personAccount, summary })
     });
     if (!response.ok) {
       const text = await response.text();
@@ -182,4 +236,3 @@ export async function renderBeantimeModule(shell) {
     shell.body.innerHTML = "";
   };
 }
-

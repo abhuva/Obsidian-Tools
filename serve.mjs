@@ -77,13 +77,6 @@ const DEFAULT_SETTINGS_FALLBACK = {
       title: "Projektverwaltung",
       openInNewTab: true
     },
-    timetracking: {
-      enabled: true,
-      title: "Zeiterfassung",
-      file: "timetracking/timetracking.klg",
-      pauseSummary: "Pause #pause",
-      refreshSec: 20
-    },
     beantime: {
       enabled: true,
       title: "Beantime",
@@ -425,66 +418,6 @@ function resolveDataPath(relativePath, fallbackAbsolutePath) {
 }
 
 /**
- * Resolves the configured klog path to an absolute file path.
- * Relative paths are resolved against `Tools/`.
- * @param {unknown} configuredPath - Configured file path from settings.
- * @returns {string} Absolute file path to the `.klg` file.
- */
-function resolveTimetrackingFilePath(configuredPath) {
-  const fallback = path.join(ROOT, "timetracking", "timetracking.klg");
-  const raw = String(configuredPath || "").trim();
-  if (!raw) return fallback;
-  if (path.isAbsolute(raw)) return path.resolve(raw);
-  const normalized = raw.replace(/^[/\\]+/, "").replace(/[\\/]+/g, path.sep);
-  return path.resolve(ROOT, normalized);
-}
-
-/**
- * Ensures a klog file exists so klog commands can append/create records.
- * @param {string} filePath - Absolute path to `.klg` file.
- * @returns {void}
- */
-function ensureKlogFileExists(filePath) {
-  ensureParentDir(filePath);
-  if (!fs.existsSync(filePath)) {
-    fs.writeFileSync(filePath, "", "utf8");
-  }
-}
-
-/**
- * Executes the klog CLI and returns UTF-8 stdout.
- * @param {string[]} args - Argument list passed to `klog`.
- * @returns {string} Command stdout.
- */
-function runKlog(args) {
-  try {
-    return execFileSync("klog", args, {
-      cwd: VAULT_ROOT,
-      encoding: "utf8",
-      stdio: "pipe"
-    });
-  } catch (error) {
-    const details = String(error?.stderr || error?.stdout || error?.message || "").trim();
-    throw new Error(details || "klog command failed");
-  }
-}
-
-/**
- * Parses `H:mm` time values from klog JSON rows.
- * @param {unknown} value - Time token.
- * @returns {number|null} Minutes from day start or `null`.
- */
-function parseKlogTimeMins(value) {
-  const match = String(value || "").trim().match(/^(\d{1,2}):(\d{2})$/);
-  if (!match) return null;
-  const hh = Number.parseInt(match[1], 10);
-  const mm = Number.parseInt(match[2], 10);
-  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
-  if (hh < 0 || hh > 23 || mm < 0 || mm > 59) return null;
-  return hh * 60 + mm;
-}
-
-/**
  * Returns current local date as `YYYY-MM-DD`.
  * @returns {string} Date token.
  */
@@ -494,93 +427,6 @@ function localTodayToken() {
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const dd = String(now.getDate()).padStart(2, "0");
   return `${yyyy}-${mm}-${dd}`;
-}
-
-/**
- * Computes live minutes for an open range on today's record.
- * @param {string} recordDate - Record date token.
- * @param {string} start - Open range start token (`H:mm`).
- * @returns {number} Runtime in minutes.
- */
-function openRangeRuntimeMins(recordDate, start) {
-  if (String(recordDate || "").trim() !== localTodayToken()) return 0;
-  const startMins = parseKlogTimeMins(start);
-  if (startMins == null) return 0;
-  const now = new Date();
-  const nowMins = now.getHours() * 60 + now.getMinutes();
-  return Math.max(0, nowMins - startMins);
-}
-
-/**
- * Builds a client payload for today's time tracking state from klog JSON output.
- * @param {string} filePath - Absolute `.klg` file path.
- * @returns {{ok: true, file: string, date: string, totalMins: number, entries: Array<object>, active: object|null}} Snapshot payload.
- */
-function getTimetrackingTodaySnapshot(filePath) {
-  ensureKlogFileExists(filePath);
-  const raw = runKlog(["json", filePath, "--today", "--pretty", "--no-warn"]);
-  let payload = null;
-  try {
-    payload = JSON.parse(raw || "{}");
-  } catch {
-    throw new Error("Could not parse klog JSON output");
-  }
-
-  const record = Array.isArray(payload?.records) && payload.records.length ? payload.records[0] : null;
-  const entries = Array.isArray(record?.entries) ? record.entries : [];
-  const date = String(record?.date || localTodayToken());
-
-  const shapedEntries = entries.map((entry) => ({
-    type: String(entry?.type || ""),
-    summary: String(entry?.summary || ""),
-    total: String(entry?.total || "0m"),
-    total_mins: toFiniteNumber(entry?.total_mins, 0),
-    start: String(entry?.start || ""),
-    end: String(entry?.end || "")
-  }));
-
-  const active = shapedEntries.find((entry) => entry.type === "open_range") || null;
-  const closedMins = shapedEntries.reduce((sum, entry) => {
-    if (entry.type === "open_range") return sum;
-    return sum + toFiniteNumber(entry.total_mins, 0);
-  }, 0);
-  const activeMins = active ? openRangeRuntimeMins(date, active.start) : 0;
-  const totalMins = Math.max(0, Math.floor(closedMins + activeMins));
-
-  return {
-    ok: true,
-    file: path.relative(VAULT_ROOT, filePath).replace(/\\/g, "/"),
-    date,
-    totalMins,
-    entries: shapedEntries,
-    active
-  };
-}
-
-/**
- * Derives runtime time-tracking config from effective settings.
- * @param {object} settings - Effective settings object.
- * @returns {{enabled: boolean, title: string, filePath: string, pauseSummary: string, refreshSec: number}} Runtime config.
- */
-function getTimetrackingConfigFromSettings(settings) {
-  const moduleCfg = settings?.modules?.timetracking || {};
-  return {
-    enabled: toBool(moduleCfg.enabled, DEFAULT_SETTINGS_FALLBACK.modules.timetracking.enabled),
-    title: toCleanString(moduleCfg.title, DEFAULT_SETTINGS_FALLBACK.modules.timetracking.title),
-    filePath: resolveTimetrackingFilePath(
-      toCleanString(moduleCfg.file, DEFAULT_SETTINGS_FALLBACK.modules.timetracking.file)
-    ),
-    pauseSummary: toCleanString(
-      moduleCfg.pauseSummary,
-      DEFAULT_SETTINGS_FALLBACK.modules.timetracking.pauseSummary
-    ),
-    refreshSec: toIntInRange(
-      moduleCfg.refreshSec,
-      DEFAULT_SETTINGS_FALLBACK.modules.timetracking.refreshSec,
-      5,
-      300
-    )
-  };
 }
 
 /**
@@ -627,7 +473,7 @@ function ensureBeantimeLedgerExists(filePath) {
 /**
  * Reads and normalizes the Beantime running timer state.
  * @param {string} stateFilePath - Absolute path to state JSON.
- * @returns {{startedAt: string, startedDate: string, account: string, summary: string}|null} Running timer state.
+ * @returns {{startedAt: string, startedDate: string, account: string, personAccount: string, summary: string}|null} Running timer state.
  */
 function readBeantimeState(stateFilePath) {
   const raw = readJsonFileSafe(stateFilePath, null);
@@ -635,11 +481,13 @@ function readBeantimeState(stateFilePath) {
   const startedAt = toCleanString(raw.startedAt, "");
   const startedDate = toCleanString(raw.startedDate, "");
   const account = toCleanString(raw.account, "");
+  const personAccount = toCleanString(raw.personAccount, "");
   if (!startedAt || !startedDate || !account) return null;
   return {
     startedAt,
     startedDate,
     account,
+    personAccount,
     summary: toCleanString(raw.summary, "")
   };
 }
@@ -647,7 +495,7 @@ function readBeantimeState(stateFilePath) {
 /**
  * Persists a running timer state for Beantime.
  * @param {string} stateFilePath - Absolute state file path.
- * @param {{startedAt: string, startedDate: string, account: string, summary: string}|null} state - Next state.
+ * @param {{startedAt: string, startedDate: string, account: string, personAccount: string, summary: string}|null} state - Next state.
  * @returns {void}
  */
 function writeBeantimeState(stateFilePath, state) {
@@ -656,6 +504,15 @@ function writeBeantimeState(stateFilePath, state) {
     return;
   }
   writeJson(stateFilePath, state);
+}
+
+/**
+ * Parses open account directives and returns candidate person accounts (`Zeit:*`).
+ * @param {string} filePath - Absolute Beancount file path.
+ * @returns {string[]} Sorted list of person account names.
+ */
+function readBeantimePersonAccounts(filePath) {
+  return readBeantimeBookableAccounts(filePath, "Zeit:");
 }
 
 /**
@@ -704,7 +561,7 @@ function minutesToHourAmount(minutes) {
 /**
  * Appends one Beantime transaction to the configured ledger.
  * @param {{filePath: string, personAccount: string}} cfg - Runtime Beantime config.
- * @param {{startedAt: string, startedDate: string, account: string, summary: string}} state - Running state to finalize.
+ * @param {{startedAt: string, startedDate: string, account: string, personAccount: string, summary: string}} state - Running state to finalize.
  * @returns {{date: string, durationMinutes: number, amountHours: string}} Append summary.
  */
 function appendBeantimeTransaction(cfg, state) {
@@ -719,7 +576,8 @@ function appendBeantimeTransaction(cfg, state) {
   const durationMinutes = Math.max(0, Math.round(diffMs / 60000));
   const amountHours = minutesToHourAmount(durationMinutes);
   const txDate = toCleanString(state.startedDate, localTodayToken());
-  const payee = cfg.personAccount.includes(":") ? cfg.personAccount.split(":").pop() : cfg.personAccount;
+  const personAccount = toCleanString(state.personAccount, cfg.personAccount);
+  const payee = personAccount.includes(":") ? personAccount.split(":").pop() : personAccount;
   const narration = state.summary || "Zeiterfassung";
 
   const tx = [
@@ -729,7 +587,7 @@ function appendBeantimeTransaction(cfg, state) {
     `  duration_minutes: ${durationMinutes}`,
     `  timer_module: "beantime"`,
     `  ${state.account}  ${amountHours} HR`,
-    `  ${cfg.personAccount}`,
+    `  ${personAccount}`,
     ""
   ].join("\n");
 
@@ -740,7 +598,8 @@ function appendBeantimeTransaction(cfg, state) {
   return {
     date: txDate,
     durationMinutes,
-    amountHours
+    amountHours,
+    personAccount
   };
 }
 
@@ -1134,30 +993,6 @@ function normalizeSettings(input) {
         openInNewTab: toBool(
           merged?.modules?.newProject?.openInNewTab,
           DEFAULT_SETTINGS_FALLBACK.modules.newProject.openInNewTab
-        )
-      },
-      timetracking: {
-        enabled: toBool(
-          merged?.modules?.timetracking?.enabled,
-          DEFAULT_SETTINGS_FALLBACK.modules.timetracking.enabled
-        ),
-        title: toCleanString(
-          merged?.modules?.timetracking?.title,
-          DEFAULT_SETTINGS_FALLBACK.modules.timetracking.title
-        ),
-        file: toCleanString(
-          merged?.modules?.timetracking?.file,
-          DEFAULT_SETTINGS_FALLBACK.modules.timetracking.file
-        ),
-        pauseSummary: toCleanString(
-          merged?.modules?.timetracking?.pauseSummary,
-          DEFAULT_SETTINGS_FALLBACK.modules.timetracking.pauseSummary
-        ),
-        refreshSec: toIntInRange(
-          merged?.modules?.timetracking?.refreshSec,
-          DEFAULT_SETTINGS_FALLBACK.modules.timetracking.refreshSec,
-          5,
-          300
         )
       },
       beantime: {
@@ -3007,99 +2842,21 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.method === "GET" && pathname === "/api/timetracking/today") {
-    try {
-      const settings = getEffectiveSettings();
-      const config = getTimetrackingConfigFromSettings(settings);
-      const snapshot = getTimetrackingTodaySnapshot(config.filePath);
-      sendJson(res, 200, snapshot);
-    } catch (error) {
-      sendText(res, 500, error.message || "Could not load time tracking data");
-    }
-    return;
-  }
-
-  if (req.method === "POST" && pathname === "/api/timetracking/start") {
-    readRequestBody(req)
-      .then((rawBody) => {
-        let payload;
-        try {
-          payload = JSON.parse(rawBody || "{}");
-        } catch {
-          sendText(res, 400, "Invalid JSON payload");
-          return;
-        }
-
-        const summary = toCleanString(payload?.summary, "");
-        if (!summary) {
-          sendText(res, 400, "Missing activity summary");
-          return;
-        }
-
-        try {
-          const settings = getEffectiveSettings();
-          const config = getTimetrackingConfigFromSettings(settings);
-          const before = getTimetrackingTodaySnapshot(config.filePath);
-          if (before.active) {
-            runKlog(["switch", config.filePath, "--summary", summary, "--no-style", "--no-warn"]);
-          } else {
-            runKlog(["start", config.filePath, "--summary", summary, "--no-style", "--no-warn"]);
-          }
-          const after = getTimetrackingTodaySnapshot(config.filePath);
-          sendJson(res, 200, after);
-        } catch (error) {
-          sendText(res, 422, error.message || "Could not start tracking");
-        }
-      })
-      .catch((error) => {
-        sendText(res, 500, error.message || "Unknown error while starting tracking");
-      });
-    return;
-  }
-
-  if (req.method === "POST" && pathname === "/api/timetracking/pause") {
-    try {
-      const settings = getEffectiveSettings();
-      const config = getTimetrackingConfigFromSettings(settings);
-      const before = getTimetrackingTodaySnapshot(config.filePath);
-      if (!before.active) {
-        sendText(res, 409, "No active activity to pause");
-        return;
-      }
-      runKlog(["switch", config.filePath, "--summary", config.pauseSummary, "--no-style", "--no-warn"]);
-      const after = getTimetrackingTodaySnapshot(config.filePath);
-      sendJson(res, 200, after);
-    } catch (error) {
-      sendText(res, 422, error.message || "Could not pause tracking");
-    }
-    return;
-  }
-
-  if (req.method === "POST" && pathname === "/api/timetracking/stop") {
-    try {
-      const settings = getEffectiveSettings();
-      const config = getTimetrackingConfigFromSettings(settings);
-      runKlog(["stop", config.filePath, "--no-style", "--no-warn"]);
-      const after = getTimetrackingTodaySnapshot(config.filePath);
-      sendJson(res, 200, after);
-    } catch (error) {
-      sendText(res, 422, error.message || "Could not stop tracking");
-    }
-    return;
-  }
-
   if (req.method === "GET" && pathname === "/api/beantime/meta") {
     try {
       const settings = getEffectiveSettings();
       const config = getBeantimeConfigFromSettings(settings);
       const accounts = readBeantimeBookableAccounts(config.filePath, config.bookableAccountPrefix);
+      const personAccounts = readBeantimePersonAccounts(config.filePath);
       const running = readBeantimeState(config.stateFilePath);
+      const activePerson = running?.personAccount || config.personAccount;
       sendJson(res, 200, {
         ok: true,
         file: path.relative(VAULT_ROOT, config.filePath).replace(/\\/g, "/"),
-        personAccount: config.personAccount,
+        personAccount: activePerson,
         accountPrefix: config.bookableAccountPrefix,
         accounts,
+        personAccounts,
         running
       });
     } catch (error) {
@@ -3138,12 +2895,19 @@ const server = http.createServer((req, res) => {
             sendText(res, 422, "Selected account is not open/bookable");
             return;
           }
+          const personAccounts = readBeantimePersonAccounts(config.filePath);
+          const personAccount = toCleanString(payload?.personAccount, config.personAccount);
+          if (personAccounts.length && !personAccounts.includes(personAccount)) {
+            sendText(res, 422, "Selected person account is not open/bookable");
+            return;
+          }
 
           const startedAt = new Date().toISOString();
           const state = {
             startedAt,
             startedDate: localTodayToken(),
             account,
+            personAccount,
             summary: toCleanString(payload?.summary, "")
           };
           writeBeantimeState(config.stateFilePath, state);
@@ -3293,7 +3057,7 @@ server.listen(PORT, HOST, () => {
   ensureUpdoMonitor();
   console.log(`Homepage preview server: http://${HOST}:${PORT}/home.html`);
   console.log(
-    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/timetracking/today, POST /api/timetracking/start, POST /api/timetracking/pause, POST /api/timetracking/stop, GET /api/beantime/meta, POST /api/beantime/start, POST /api/beantime/stop, GET /api/projects/meta, POST /api/projects/create, GET /api/updo/snapshot, GET /api/updo/history, POST /api/updo/restart"
+    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/beantime/meta, POST /api/beantime/start, POST /api/beantime/stop, GET /api/projects/meta, POST /api/projects/create, GET /api/updo/snapshot, GET /api/updo/history, POST /api/updo/restart"
   );
 });
 
