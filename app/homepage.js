@@ -15,6 +15,8 @@ const activeModuleCleanups = [];
 const rootEl = document.documentElement;
 const THEME_CACHE_KEY = "homepage-theme-bootstrap-v1";
 const MODULE_TAB_CACHE_KEY = "homepage-active-module-v1";
+const MODULE_TAB_ID_PREFIX = "module-tab-";
+const MODULE_PANEL_ID_PREFIX = "module-panel-";
 let searchConfig = {
   provider: "omnisearch",
   openInNewTab: false
@@ -137,6 +139,21 @@ function moduleIconForKey(moduleKey) {
 }
 
 /**
+ * Builds stable DOM ids for tab and tabpanel elements.
+ * @param {string} moduleKey - Registry key of the module.
+ * @returns {{tabId: string, panelId: string}} Linked tab/panel ids.
+ */
+function moduleTabDomIds(moduleKey) {
+  const safeKey = String(moduleKey || "")
+    .trim()
+    .replace(/[^a-zA-Z0-9_-]/g, "-");
+  return {
+    tabId: `${MODULE_TAB_ID_PREFIX}${safeKey}`,
+    panelId: `${MODULE_PANEL_ID_PREFIX}${safeKey}`
+  };
+}
+
+/**
  * Persists the active module key in localStorage.
  * @param {string} moduleKey - Module key to cache.
  * @returns {void}
@@ -178,6 +195,30 @@ function syncModuleTabSelectionState() {
 }
 
 /**
+ * Activates a module tab and re-renders the active panel.
+ * @param {string} moduleKey - Target module key to activate.
+ * @param {{focusTab?: boolean}} [opts] - Activation options.
+ * @returns {Promise<void>}
+ */
+async function activateModule(moduleKey, opts = {}) {
+  const key = String(moduleKey || "");
+  if (!key) return;
+  const isEnabled = enabledModuleEntries.some(([enabledKey]) => enabledKey === key);
+  if (!isEnabled) return;
+  const changed = key !== activeModuleKey;
+  activeModuleKey = key;
+  persistActiveModuleKey(key);
+  syncModuleTabSelectionState();
+  if (opts.focusTab && moduleTabsEl) {
+    const button = moduleTabsEl.querySelector(`.module-tab-btn[data-module-key="${key}"]`);
+    if (button instanceof HTMLElement) button.focus();
+  }
+  if (changed) {
+    await renderActiveModule();
+  }
+}
+
+/**
  * Computes active tab key from current state, cache, and enabled module list.
  * @returns {string} Valid active module key.
  */
@@ -196,6 +237,8 @@ function pickActiveModuleKey() {
 function renderModuleTabs() {
   if (!moduleTabsEl) return;
   moduleTabsEl.innerHTML = "";
+  moduleTabsEl.setAttribute("role", "tablist");
+  moduleTabsEl.setAttribute("aria-orientation", "horizontal");
   moduleTabsEl.hidden = enabledModuleEntries.length === 0;
   if (!enabledModuleEntries.length) return;
 
@@ -205,16 +248,32 @@ function renderModuleTabs() {
     button.type = "button";
     button.className = "icon-link icon-btn module-tab-btn";
     button.dataset.moduleKey = moduleKey;
+    const { tabId, panelId } = moduleTabDomIds(moduleKey);
+    button.id = tabId;
     button.setAttribute("role", "tab");
+    button.setAttribute("aria-controls", panelId);
     button.setAttribute("aria-label", title);
     button.title = title;
     button.textContent = moduleIconForKey(moduleKey);
     button.addEventListener("click", () => {
-      if (moduleKey === activeModuleKey) return;
-      activeModuleKey = moduleKey;
-      persistActiveModuleKey(moduleKey);
-      syncModuleTabSelectionState();
-      void renderActiveModule();
+      void activateModule(moduleKey);
+    });
+    button.addEventListener("keydown", (event) => {
+      const keys = enabledModuleEntries.map(([enabledKey]) => enabledKey);
+      const currentIndex = keys.indexOf(moduleKey);
+      if (currentIndex < 0) return;
+
+      let nextIndex = currentIndex;
+      if (event.key === "ArrowRight") nextIndex = (currentIndex + 1) % keys.length;
+      else if (event.key === "ArrowLeft") nextIndex = (currentIndex - 1 + keys.length) % keys.length;
+      else if (event.key === "Home") nextIndex = 0;
+      else if (event.key === "End") nextIndex = keys.length - 1;
+      else return;
+
+      event.preventDefault();
+      const nextKey = keys[nextIndex];
+      if (!nextKey) return;
+      void activateModule(nextKey, { focusTab: true });
     });
     moduleTabsEl.appendChild(button);
   }
@@ -255,6 +314,11 @@ async function renderActiveModule() {
   }
 
   const shell = createModuleShell(String(moduleCfg?.title || moduleKey));
+  const { tabId, panelId } = moduleTabDomIds(moduleKey);
+  shell.root.id = panelId;
+  shell.root.setAttribute("role", "tabpanel");
+  shell.root.setAttribute("aria-labelledby", tabId);
+  shell.root.tabIndex = 0;
   moduleGridEl.appendChild(shell.root);
 
   try {

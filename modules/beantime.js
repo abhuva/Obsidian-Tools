@@ -108,6 +108,7 @@ export async function renderBeantimeModule(shell) {
     stopBtn.disabled = !running;
     accountSelect.disabled = running;
     personSelect.disabled = running;
+    summaryInput.disabled = running;
   }
 
   /**
@@ -120,11 +121,26 @@ export async function renderBeantimeModule(shell) {
     const person = String(meta?.running?.personAccount || meta?.personAccount || "").trim();
     const startIso = String(meta?.running?.startedAt || "").trim();
     const activeText = startIso ? `Aktiv seit ${startIso}` : "Kein laufender Timer";
-    info.innerHTML = `
-      <span><strong>Datei:</strong> ${file || "-"}</span>
-      <span><strong>Person:</strong> ${person || "-"}</span>
-      <span><strong>Status:</strong> ${activeText}</span>
-    `;
+    info.replaceChildren(
+      createInfoItem("Datei", file || "-"),
+      createInfoItem("Person", person || "-"),
+      createInfoItem("Status", activeText)
+    );
+  }
+
+  /**
+   * Creates one labeled info row item.
+   * @param {string} label - Field label.
+   * @param {string} value - Display value.
+   * @returns {HTMLSpanElement} Rendered info item.
+   */
+  function createInfoItem(label, value) {
+    const item = document.createElement("span");
+    const strong = document.createElement("strong");
+    strong.textContent = `${label}:`;
+    item.appendChild(strong);
+    item.append(` ${value}`);
+    return item;
   }
 
   /**
@@ -199,10 +215,11 @@ export async function renderBeantimeModule(shell) {
    */
   async function stopTimer() {
     setStatus("Stoppe Timer...");
+    const summary = String(summaryInput.value || "").trim();
     const response = await fetch("/api/beantime/stop", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: "{}"
+      body: JSON.stringify({ summary })
     });
     if (!response.ok) {
       const text = await response.text();

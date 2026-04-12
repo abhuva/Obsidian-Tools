@@ -543,7 +543,7 @@
           </label>
           <div class="field">
             <label for="beantimeFile">Pfad zur Beancount-Datei</label>
-            <input id="beantimeFile" type="text" placeholder="beantime/zeit.beancount" />
+            <input id="beantimeFile" type="text" placeholder="data/beantime/zeit.beancount" />
           </div>
           <div class="field">
             <label for="beantimePersonAccount">Person-Konto (Gegenkonto)</label>
@@ -981,7 +981,7 @@
           String(updoOutageMinConsecutiveFailures.value || ""),
           10
         );
-        const cleanBeantimeFile = String(beantimeFile.value || "").trim() || "beantime/zeit.beancount";
+        const cleanBeantimeFile = String(beantimeFile.value || "").trim() || "data/beantime/zeit.beancount";
         const cleanBeantimePersonAccount = String(beantimePersonAccount.value || "").trim() || "Zeit:Marc";
         const cleanBeantimeStateFile = String(beantimeStateFile.value || "").trim() || "data/beantime/state.json";
         const cleanBeantimeAccountPrefix = String(beantimeAccountPrefix.value || "").trim() || "Projekte:";
@@ -1107,7 +1107,7 @@
         newProjectEnabled.checked = Boolean(settings?.modules?.newProject?.enabled);
         newProjectOpenInNewTab.checked = Boolean(settings?.modules?.newProject?.openInNewTab);
         beantimeEnabled.checked = Boolean(settings?.modules?.beantime?.enabled);
-        beantimeFile.value = String(settings?.modules?.beantime?.file ?? "beantime/zeit.beancount");
+        beantimeFile.value = String(settings?.modules?.beantime?.file ?? "data/beantime/zeit.beancount");
         beantimeStateFile.value = String(settings?.modules?.beantime?.stateFile ?? "data/beantime/state.json");
         beantimeAccountPrefix.value = String(settings?.modules?.beantime?.bookableAccountPrefix ?? "Projekte:");
         updoEnabled.checked = Boolean(settings?.modules?.updo?.enabled);

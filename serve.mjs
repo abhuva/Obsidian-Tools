@@ -80,7 +80,7 @@ const DEFAULT_SETTINGS_FALLBACK = {
     beantime: {
       enabled: true,
       title: "Beantime",
-      file: "beantime/zeit.beancount",
+      file: "data/beantime/zeit.beancount",
       personAccount: "Zeit:Marc",
       stateFile: "data/beantime/state.json",
       bookableAccountPrefix: "Projekte:"
@@ -413,8 +413,19 @@ function toNumberInRange(value, fallback, min, max) {
 function resolveDataPath(relativePath, fallbackAbsolutePath) {
   const raw = String(relativePath || "").trim();
   if (!raw) return fallbackAbsolutePath;
-  const normalized = raw.replace(/^[/\\]+/, "").replace(/[\\/]+/g, path.sep);
-  return path.resolve(ROOT, normalized);
+  if (path.isAbsolute(raw)) return fallbackAbsolutePath;
+  if (/^[a-zA-Z]:/.test(raw)) return fallbackAbsolutePath;
+
+  const toolsRoot = path.resolve(ROOT);
+  const normalized = path.normalize(raw.replace(/[\\/]+/g, path.sep));
+  if (!normalized || normalized === ".") return fallbackAbsolutePath;
+
+  const resolved = path.resolve(toolsRoot, normalized);
+  const rel = path.relative(toolsRoot, resolved);
+  if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) {
+    return fallbackAbsolutePath;
+  }
+  return resolved;
 }
 
 /**
@@ -441,7 +452,7 @@ function getBeantimeConfigFromSettings(settings) {
     title: toCleanString(moduleCfg.title, DEFAULT_SETTINGS_FALLBACK.modules.beantime.title),
     filePath: resolveDataPath(
       toCleanString(moduleCfg.file, DEFAULT_SETTINGS_FALLBACK.modules.beantime.file),
-      path.join(ROOT, "beantime", "zeit.beancount")
+      path.join(ROOT, "data", "beantime", "zeit.beancount")
     ),
     personAccount: toCleanString(
       moduleCfg.personAccount,
@@ -544,6 +555,7 @@ function readBeantimeBookableAccounts(filePath, prefix) {
  */
 function asBeanString(value) {
   return String(value ?? "")
+    .replace(/[\r\n]+/g, " ")
     .replace(/\\/g, "\\\\")
     .replace(/"/g, '\\"');
 }
@@ -2923,24 +2935,43 @@ const server = http.createServer((req, res) => {
   }
 
   if (req.method === "POST" && pathname === "/api/beantime/stop") {
-    try {
-      const settings = getEffectiveSettings();
-      const config = getBeantimeConfigFromSettings(settings);
-      const running = readBeantimeState(config.stateFilePath);
-      if (!running) {
-        sendText(res, 409, "No running Beantime timer");
-        return;
-      }
-      const appendResult = appendBeantimeTransaction(config, running);
-      writeBeantimeState(config.stateFilePath, null);
-      sendJson(res, 200, {
-        ok: true,
-        appended: appendResult,
-        file: path.relative(VAULT_ROOT, config.filePath).replace(/\\/g, "/")
+    readRequestBody(req)
+      .then((rawBody) => {
+        let payload;
+        try {
+          payload = JSON.parse(rawBody || "{}");
+        } catch {
+          sendText(res, 400, "Invalid JSON payload");
+          return;
+        }
+
+        try {
+          const settings = getEffectiveSettings();
+          const config = getBeantimeConfigFromSettings(settings);
+          const running = readBeantimeState(config.stateFilePath);
+          if (!running) {
+            sendText(res, 409, "No running Beantime timer");
+            return;
+          }
+
+          if (Object.prototype.hasOwnProperty.call(payload || {}, "summary")) {
+            running.summary = String(payload?.summary ?? "").trim();
+          }
+
+          const appendResult = appendBeantimeTransaction(config, running);
+          writeBeantimeState(config.stateFilePath, null);
+          sendJson(res, 200, {
+            ok: true,
+            appended: appendResult,
+            file: path.relative(VAULT_ROOT, config.filePath).replace(/\\/g, "/")
+          });
+        } catch (error) {
+          sendText(res, 422, error.message || "Could not stop Beantime");
+        }
+      })
+      .catch((error) => {
+        sendText(res, 500, error.message || "Unknown error while stopping Beantime");
       });
-    } catch (error) {
-      sendText(res, 422, error.message || "Could not stop Beantime");
-    }
     return;
   }
 

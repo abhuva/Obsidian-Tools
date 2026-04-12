@@ -1,4 +1,4 @@
-﻿# Homepage Tool (Modular)
+# Homepage Tool (Modular)
 
 Lokaler Preview-Server fuer eine modulare Obsidian-Homepage.
 
@@ -75,7 +75,7 @@ obsidian web url="http://127.0.0.1:4174/settings.html"
 - `POST /api/projects/create`: Erstellt neuen Projektordner + MOC-Datei per Projekt-Template und oeffnet die Datei.
 - `GET /api/updo/snapshot`: Liefert Monitoring-Snapshot fuer das `updo`-Modul.
 - `GET /api/updo/history`: Liefert komprimierte Langzeitdaten + Incident-Liste (`rangeDays` optional).
-  - EnthÃ¤lt bei TLS-Fehlern ein `sslIssue`-Objekt (z. B. `ERR_TLS_CERT_ALTNAME_INVALID`).
+  - Enthält bei TLS-Fehlern ein `sslIssue`-Objekt (z. B. `ERR_TLS_CERT_ALTNAME_INVALID`).
 - `POST /api/updo/restart`: Startet den `updo`-Monitorprozess neu.
 - `GET /api/beantime/meta`: Liefert laufenden Beantime-Timer + buchbare Beancount-Konten + Personenkonten (`Zeit:*`).
 - `POST /api/beantime/start`: Startet Beantime-Timer (nur State-Datei, noch keine Ledger-Buchung).
@@ -103,6 +103,8 @@ Damit sind spaetere Features stabil erweiterbar (neue Module, neue Optionen).
 - `clock` (Uhrzeit): Live-Digitaluhr im Header/Banner.
 - `newProject` (Neues Projekt erstellen): Dialog fuer neue Projekte in `2. Projektverwaltung` inkl. Naming-Validierung.
 - `beantime` (Beancount): Start/Stop-Timer mit Konten- und Personenauswahl; schreibt beim Stop eine fertige `HR`-Buchung inkl. Metadaten in eine Beancount-Datei.
+  - Standard-Ziel fuer Laufzeitbuchungen: `Tools/data/beantime/zeit.beancount` (lokal, git-ignored).
+  - Vorlage fuer Kontenstruktur: `Tools/beantime/zeit.beancount` (Repository-Template).
 - `updo` (Website Monitoring): Statuskarten + Latenz/Verfuegbarkeits-Charts fuer konfigurierten URL-Satz.
   - Live-Ansicht: 15m / 1h / 6h aus In-Memory-Ringpuffer.
   - Langzeit-Ansicht: 7d / 30d / 90d aus komprimierten Persistenzdaten.

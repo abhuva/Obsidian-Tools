@@ -36,7 +36,7 @@
     "beantime": {
       "enabled": true,
       "title": "Beantime",
-      "file": "beantime/zeit.beancount",
+      "file": "data/beantime/zeit.beancount",
       "personAccount": "Zeit:Marc",
       "stateFile": "data/beantime/state.json",
       "bookableAccountPrefix": "Projekte:"
