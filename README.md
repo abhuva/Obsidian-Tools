@@ -80,6 +80,7 @@ obsidian web url="http://127.0.0.1:4174/settings.html"
 - `GET /api/beantime/meta`: Liefert laufenden Beantime-Timer + buchbare Beancount-Konten + Personenkonten (`Zeit:*`).
 - `POST /api/beantime/start`: Startet Beantime-Timer (nur State-Datei, noch keine Ledger-Buchung).
 - `POST /api/beantime/stop`: Stoppt Timer, berechnet Dauer und schreibt Beancount-Transaktion.
+- `POST /api/beantime/show`: Startet (falls noetig) einen Fava-Server auf `127.0.0.1:3464` und oeffnet ihn im Obsidian-Webviewer.
 
 ## Konfigurationsprinzip
 
@@ -105,6 +106,7 @@ Damit sind spaetere Features stabil erweiterbar (neue Module, neue Optionen).
 - `beantime` (Beancount): Start/Stop-Timer mit Konten- und Personenauswahl; schreibt beim Stop eine fertige `HR`-Buchung inkl. Metadaten in eine Beancount-Datei.
   - Standard-Ziel fuer Laufzeitbuchungen: `Tools/data/beantime/zeit.beancount` (lokal, git-ignored).
   - Vorlage fuer Kontenstruktur: `Tools/beantime/zeit.beancount` (Repository-Template).
+  - Enthaelt den Button `Show`, der Fava auf Port `3464` oeffnet.
 - `updo` (Website Monitoring): Statuskarten + Latenz/Verfuegbarkeits-Charts fuer konfigurierten URL-Satz.
   - Live-Ansicht: 15m / 1h / 6h aus In-Memory-Ringpuffer.
   - Langzeit-Ansicht: 7d / 30d / 90d aus komprimierten Persistenzdaten.
@@ -181,6 +183,11 @@ UI-Optionen liegen unter `ui` in den Settings:
 - First-paint Theme-Bootstrap via `localStorage` hinzugefuegt (`homepage-theme-bootstrap-v1`) zur Vermeidung von Theme-Flash.
 - Header angepasst: kein Untertitel mehr, Titelgroesse konfigurierbar (`ui.titleSize`), neue Such-Icon-Aktion fuer Omnisearch.
 - Neues `beantime`-Modul (Beancount) eingefuehrt, mit Start/Stop-State-Datei und Beancount-Append beim Stop.
+- Beantime ergaenzt um `Show`-Button: startet/oeffnet Fava im Obsidian-Webviewer auf Port `3464` in einem neuen Tab.
+- Settings-UI kann jetzt innerhalb der Homepage als Modul-Tab verwendet werden (kein Seitenwechsel erforderlich).
+- Header-Gear rechts neben der Suche aktiviert die eingebettete Settings-Ansicht.
+- Settings-Panels starten standardmaessig eingeklappt.
+- Beantime-Running-Panel wird bei gestopptem Timer hart ausgeblendet (`display: none` + `hidden`), um Webviewer-Inkonsistenzen zu vermeiden.
 
 ## Neue Module ergaenzen
 

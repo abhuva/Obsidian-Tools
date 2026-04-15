@@ -2,6 +2,7 @@
 import { renderBeantimeModule } from "../modules/beantime.js";
 import { renderClockInElement } from "../modules/clock.js";
 import { renderNewProjectModule } from "../modules/new-project.js";
+import { renderSettingsModule } from "../modules/settings.js";
 import { renderUpdoModule } from "../modules/updo.js";
 
 let pageTitleEl = null;
@@ -9,6 +10,7 @@ let moduleGridEl = null;
 let headerClockEl = null;
 let headerBeantimeIndicatorEl = null;
 let openSearchBtnEl = null;
+let openSettingsBtnEl = null;
 let moduleTabsEl = null;
 
 const pageCleanups = [];
@@ -166,6 +168,9 @@ function createModuleShell(title) {
 }
 
 const moduleRegistry = {
+  settings: {
+    render: renderSettingsModule
+  },
   bookmarks: {
     render: renderBookmarksModule
   },
@@ -181,6 +186,9 @@ const moduleRegistry = {
 };
 
 const moduleUiMeta = {
+  settings: {
+    icon: "\u2699\ufe0f"
+  },
   bookmarks: {
     icon: "\ud83d\udd16"
   },
@@ -304,13 +312,14 @@ function pickActiveModuleKey() {
  */
 function renderModuleTabs() {
   if (!moduleTabsEl) return;
+  const visibleTabEntries = enabledModuleEntries.filter(([moduleKey]) => moduleKey !== "settings");
   moduleTabsEl.innerHTML = "";
   moduleTabsEl.setAttribute("role", "tablist");
   moduleTabsEl.setAttribute("aria-orientation", "horizontal");
-  moduleTabsEl.hidden = enabledModuleEntries.length === 0;
-  if (!enabledModuleEntries.length) return;
+  moduleTabsEl.hidden = visibleTabEntries.length === 0;
+  if (!visibleTabEntries.length) return;
 
-  for (const [moduleKey, moduleCfg] of enabledModuleEntries) {
+  for (const [moduleKey, moduleCfg] of visibleTabEntries) {
     const title = String(moduleCfg?.title || moduleKey);
     const button = document.createElement("button");
     button.type = "button";
@@ -327,7 +336,7 @@ function renderModuleTabs() {
       void activateModule(moduleKey);
     });
     button.addEventListener("keydown", (event) => {
-      const keys = enabledModuleEntries.map(([enabledKey]) => enabledKey);
+      const keys = visibleTabEntries.map(([enabledKey]) => enabledKey);
       const currentIndex = keys.indexOf(moduleKey);
       if (currentIndex < 0) return;
 
@@ -718,9 +727,19 @@ async function renderPage() {
     }
 
     const moduleEntries = Object.entries(settings?.modules || {});
-    enabledModuleEntries = moduleEntries.filter(
+    const dynamicEntries = moduleEntries.filter(
       ([moduleKey, cfg]) => moduleKey !== "clock" && Boolean(cfg?.enabled)
     );
+    enabledModuleEntries = [
+      [
+        "settings",
+        {
+          enabled: true,
+          title: "Settings"
+        }
+      ],
+      ...dynamicEntries
+    ];
 
     activeModuleKey = pickActiveModuleKey();
     persistActiveModuleKey(activeModuleKey);
@@ -753,6 +772,7 @@ function initHomepage() {
   headerClockEl = document.getElementById("headerClock");
   headerBeantimeIndicatorEl = document.getElementById("headerBeantimeIndicator");
   openSearchBtnEl = document.getElementById("openSearchBtn");
+  openSettingsBtnEl = document.getElementById("openSettingsBtn");
   moduleTabsEl = document.getElementById("moduleTabs");
 
   if (openSearchBtnEl) {
@@ -761,6 +781,11 @@ function initHomepage() {
         // Keep UI quiet, but visible in devtools.
         console.error(error);
       });
+    });
+  }
+  if (openSettingsBtnEl) {
+    openSettingsBtnEl.addEventListener("click", () => {
+      void activateModule("settings", { focusTab: true });
     });
   }
 

@@ -3389,9 +3389,19 @@
             }
           },
           editable: true,
+          eventStartEditable: true,
+          eventDurationEditable: true,
+          eventResizableFromStart: true,
           selectable: true,
           selectMinDistance: 0,
           eventSources: eventSources,
+          eventDataTransform: function(eventData) {
+            var next = Object.assign({}, eventData || {});
+            next.editable = true;
+            next.startEditable = true;
+            next.durationEditable = true;
+            return next;
+          },
           eventClassNames: eventClassNamesHook,
           eventContent: eventContentHook,
           eventDidMount: eventDidMountHook,
@@ -3402,7 +3412,7 @@
           eventClick: onEventClick,
           dateClick: onDateClick,
           select: onDateSelect,
-          eventAllow: allowRecurringTimedEdit,
+          eventAllow: function() { return true; },
           eventDrop: onEventDateChange,
           eventResize: onEventDateChange,
           datesSet: function(arg) {

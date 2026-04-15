@@ -395,6 +395,14 @@ html[data-theme-mode="mirror-obsidian"] body {
   color: var(--text-soft);
 }
 
+.settings-embed-frame {
+  width: 100%;
+  min-height: 78vh;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: transparent;
+}
+
 .new-project-modal-overlay {
   position: fixed;
   inset: 0;

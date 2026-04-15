@@ -7,6 +7,7 @@ export async function renderBeantimeModule(shell) {
   let running = false;
   let isStarting = false;
   let isStopping = false;
+  let isShowing = false;
   let runningMeta = null;
   let elapsedTickerId = 0;
 
@@ -40,6 +41,7 @@ export async function renderBeantimeModule(shell) {
     <div class="beantime-btn-row">
       <button type="button" class="btn btn-primary" id="beantimeStartBtn">Start</button>
       <button type="button" class="btn btn-ghost" id="beantimeStopBtn">Stop</button>
+      <button type="button" class="btn btn-ghost" id="beantimeShowBtn">Show</button>
       <button type="button" class="btn btn-ghost" id="beantimeReloadBtn">Neu laden</button>
     </div>
   `;
@@ -57,6 +59,7 @@ export async function renderBeantimeModule(shell) {
   const summaryInput = controls.querySelector("#beantimeSummary");
   const startBtn = controls.querySelector("#beantimeStartBtn");
   const stopBtn = controls.querySelector("#beantimeStopBtn");
+  const showBtn = controls.querySelector("#beantimeShowBtn");
   const reloadBtn = controls.querySelector("#beantimeReloadBtn");
   const editorFields = controls.querySelector("#beantimeEditorFields");
   const runningPanel = controls.querySelector("#beantimeRunningPanel");
@@ -197,13 +200,17 @@ export async function renderBeantimeModule(shell) {
    * @returns {void}
    */
   function syncUiState() {
-    startBtn.disabled = running || isStarting || isStopping;
-    stopBtn.disabled = !running || isStarting || isStopping;
-    accountSelect.disabled = running;
-    personSelect.disabled = running;
-    summaryInput.disabled = running;
+    const busy = isStarting || isStopping || isShowing;
+    const showRunningPanel = Boolean(running && String(runningMeta?.startedAt || "").trim());
+    startBtn.disabled = running || busy;
+    stopBtn.disabled = !running || busy;
+    showBtn.disabled = busy;
+    accountSelect.disabled = running || isShowing;
+    personSelect.disabled = running || isShowing;
+    summaryInput.disabled = running || isShowing;
     editorFields.hidden = running;
-    runningPanel.hidden = !running;
+    runningPanel.hidden = !showRunningPanel;
+    runningPanel.style.display = showRunningPanel ? "grid" : "none";
     syncRunningPanel();
     syncElapsedTicker();
   }
@@ -272,21 +279,28 @@ export async function renderBeantimeModule(shell) {
       ? meta.personAccounts.map((v) => String(v || "").trim()).filter(Boolean)
       : [];
 
-    running = Boolean(meta?.running);
-    runningMeta = meta?.running || null;
+    const runningCandidate =
+      meta?.running && typeof meta.running === "object" ? meta.running : null;
+    const hasValidRunningState = Boolean(
+      runningCandidate &&
+        String(runningCandidate.startedAt || "").trim() &&
+        String(runningCandidate.account || "").trim()
+    );
+    running = hasValidRunningState;
+    runningMeta = hasValidRunningState ? runningCandidate : null;
     fillSelect(accountSelect, accounts, "Keine buchbaren Konten gefunden");
     fillSelect(personSelect, people, "Keine Personenkonten gefunden");
 
-    if (meta?.running?.account) {
-      setOrAppendSelectValue(accountSelect, String(meta.running.account));
+    if (runningMeta?.account) {
+      setOrAppendSelectValue(accountSelect, String(runningMeta.account));
     }
-    if (meta?.running?.personAccount) {
-      setOrAppendSelectValue(personSelect, String(meta.running.personAccount));
+    if (runningMeta?.personAccount) {
+      setOrAppendSelectValue(personSelect, String(runningMeta.personAccount));
     } else if (meta?.personAccount) {
       setOrAppendSelectValue(personSelect, String(meta.personAccount));
     }
-    if (meta?.running) {
-      summaryInput.value = String(meta.running.summary ?? "");
+    if (runningMeta) {
+      summaryInput.value = String(runningMeta.summary ?? "");
     }
 
     renderInfo(meta);
@@ -337,7 +351,7 @@ export async function renderBeantimeModule(shell) {
    * @returns {Promise<void>}
    */
   async function stopTimer() {
-    if (isStarting || isStopping) return;
+    if (isStarting || isStopping || isShowing) return;
     isStopping = true;
     syncUiState();
     try {
@@ -352,6 +366,9 @@ export async function renderBeantimeModule(shell) {
         const text = await response.text();
         throw new Error(text || "Stop fehlgeschlagen");
       }
+      running = false;
+      runningMeta = null;
+      syncUiState();
       summaryInput.value = "";
       await loadMeta();
       setStatus(response.status === 409 ? "Kein laufender Timer." : "Timer gestoppt und Eintrag gebucht.", "ok");
@@ -361,11 +378,42 @@ export async function renderBeantimeModule(shell) {
     }
   }
 
+  /**
+   * Starts/opens the local Fava server in Obsidian webviewer.
+   * @returns {Promise<void>}
+   */
+  async function showFava() {
+    if (isStarting || isStopping || isShowing) return;
+    isShowing = true;
+    syncUiState();
+    try {
+      setStatus("Oeffne Fava...");
+      const response = await fetch("/api/beantime/show", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}"
+      });
+      if (!response.ok) {
+        const text = await response.text();
+        throw new Error(text || "Fava konnte nicht geoeffnet werden");
+      }
+      const payload = await response.json().catch(() => ({}));
+      const file = String(payload?.file || "Tools/data/beantime/zeit.beancount").trim();
+      setStatus(`Fava geoeffnet (${file}).`, "ok");
+    } finally {
+      isShowing = false;
+      syncUiState();
+    }
+  }
+
   startBtn.addEventListener("click", () => {
     void startTimer().catch((error) => setStatus(error?.message || String(error), "err"));
   });
   stopBtn.addEventListener("click", () => {
     void stopTimer().catch((error) => setStatus(error?.message || String(error), "err"));
+  });
+  showBtn.addEventListener("click", () => {
+    void showFava().catch((error) => setStatus(error?.message || String(error), "err"));
   });
   reloadBtn.addEventListener("click", () => {
     setStatus("Lade Daten...");
