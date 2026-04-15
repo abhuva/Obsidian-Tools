@@ -363,7 +363,7 @@
             <h1>Homepage Settings</h1>
             <p>Module aktivieren/deaktivieren und Basiseinstellungen anpassen.</p>
           </div>
-          <a class="icon-link" href="/home.html" title="Zur Homepage" aria-label="Zur Homepage">🏠</a>
+          <a class="icon-link" href="/home.html" target="_top" title="Zur Homepage" aria-label="Zur Homepage">🏠</a>
         </div>
       </section>
 
@@ -1206,7 +1206,7 @@
       themeShape.addEventListener("change", applyThemePreviewFromForm);
       document
         .querySelectorAll(".panel-collapsible")
-        .forEach((panel) => makePanelCollapsible(panel, false));
+        .forEach((panel) => makePanelCollapsible(panel, true));
 
       loadSettings();
     </script>

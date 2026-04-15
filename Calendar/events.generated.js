@@ -6,7 +6,8 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
       "coordinates": "51.48452, 11.92733",
-      "isRecurring": true
+      "isRecurring": true,
+      "recurrenceDaysCount": 0
     },
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -14,18 +15,24 @@ window.CALENDAR_EVENTS = [
       "freq": "weekly",
       "interval": 1,
       "byweekday": [
-        "fr"
+        "we"
       ],
-      "dtstart": "2026-03-06T14:00:00",
+      "dtstart": "2026-04-15T15:00:00",
       "count": 20
     },
     "duration": {
       "milliseconds": 7200000
     },
     "exdate": [
-      "2026-04-03T14:00:00",
-      "2026-07-10T14:00:00",
-      "2026-07-17T14:00:00"
+      "2026-04-29T15:00:00",
+      "2026-05-06T15:00:00",
+      "2026-05-27T15:00:00",
+      "2026-07-08T15:00:00",
+      "2026-07-15T15:00:00",
+      "2026-07-22T15:00:00",
+      "2026-07-29T15:00:00",
+      "2026-08-05T15:00:00",
+      "2026-08-12T15:00:00"
     ],
     "editable": true
   },
@@ -35,7 +42,8 @@ window.CALENDAR_EVENTS = [
     "allDay": false,
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU Einradkurs/Einrad Kröllwitz.md",
-      "isRecurring": true
+      "isRecurring": true,
+      "recurrenceDaysCount": 0
     },
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -60,7 +68,8 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
-      "isRecurring": true
+      "isRecurring": true,
+      "recurrenceDaysCount": 1
     },
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -96,7 +105,8 @@ window.CALENDAR_EVENTS = [
     "allDay": false,
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
-      "isRecurring": true
+      "isRecurring": true,
+      "recurrenceDaysCount": 0
     },
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -133,7 +143,8 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
-      "isRecurring": true
+      "isRecurring": true,
+      "recurrenceDaysCount": 1
     },
     "backgroundColor": "#0f766e",
     "borderColor": "#0f766e",
@@ -143,24 +154,50 @@ window.CALENDAR_EVENTS = [
       "byweekday": [
         "mo"
       ],
-      "dtstart": "2026-04-06T14:00:00+02:00",
+      "dtstart": "2026-04-06T15:00:00+02:00",
       "count": 20
     },
     "duration": {
       "milliseconds": 10800000
     },
     "exdate": [
-      "2026-04-27T14:00:00+02:00",
-      "2026-05-04T14:00:00+02:00",
-      "2026-05-25T14:00:00+02:00",
-      "2026-07-06T14:00:00+02:00",
-      "2026-07-13T14:00:00+02:00",
-      "2026-07-20T14:00:00+02:00",
-      "2026-07-27T14:00:00+02:00",
-      "2026-08-03T14:00:00+02:00",
-      "2026-08-10T14:00:00+02:00"
+      "2026-04-27T15:00:00+02:00",
+      "2026-05-04T15:00:00+02:00",
+      "2026-05-25T15:00:00+02:00",
+      "2026-07-06T15:00:00+02:00",
+      "2026-07-13T15:00:00+02:00",
+      "2026-07-20T15:00:00+02:00",
+      "2026-07-27T15:00:00+02:00",
+      "2026-08-03T15:00:00+02:00",
+      "2026-08-10T15:00:00+02:00"
     ],
     "editable": true
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Roxy.md",
+    "title": "Roxy",
+    "allDay": true,
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Roxy.md",
+      "isRecurring": true,
+      "recurrenceDaysCount": 0
+    },
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "rrule": {
+      "freq": "weekly",
+      "interval": 1,
+      "byweekday": [
+        "tu"
+      ],
+      "dtstart": "2026-04-21",
+      "count": 2
+    },
+    "exdate": [
+      "2026-04-21",
+      "2026-04-28"
+    ],
+    "editable": false
   },
   {
     "id": "2. Projektverwaltung/2026 TOHU VHS - Zirkus Kröllwitz/Ferienwoche 1 Kröllwitz.md",
@@ -176,6 +213,82 @@ window.CALENDAR_EVENTS = [
     "end": "2026-02-07"
   },
   {
+    "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-03-06",
+    "title": "Dornrößchen",
+    "start": "2026-03-06T15:00:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
+      "coordinates": "51.48452, 11.92733",
+      "isRecurring": true,
+      "recurrenceDaysCount": 0,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 7200000
+    }
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-03-13",
+    "title": "Dornrößchen",
+    "start": "2026-03-13T15:00:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
+      "coordinates": "51.48452, 11.92733",
+      "isRecurring": true,
+      "recurrenceDaysCount": 0,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 7200000
+    }
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-03-20",
+    "title": "Dornrößchen",
+    "start": "2026-03-20T15:00:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
+      "coordinates": "51.48452, 11.92733",
+      "isRecurring": true,
+      "recurrenceDaysCount": 0,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 7200000
+    }
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-03-27",
+    "title": "Dornrößchen",
+    "start": "2026-03-27T15:00:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
+      "coordinates": "51.48452, 11.92733",
+      "isRecurring": true,
+      "recurrenceDaysCount": 0,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 7200000
+    }
+  },
+  {
     "id": "6. Obsidian/Inbox/Osterferien 2026.md",
     "title": "Osterferien",
     "allDay": true,
@@ -189,11 +302,31 @@ window.CALENDAR_EVENTS = [
     "end": "2026-04-04"
   },
   {
+    "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-04-10",
+    "title": "Dornrößchen",
+    "start": "2026-04-10T15:00:00",
+    "allDay": false,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
+      "coordinates": "51.48452, 11.92733",
+      "isRecurring": true,
+      "recurrenceDaysCount": 0,
+      "isRecurringOverride": true
+    },
+    "duration": {
+      "milliseconds": 7200000
+    }
+  },
+  {
     "id": "2. Projektverwaltung/2026 NICA - Tanzgruppe Leipzig/Tanzgruppe Leipzig Woche 1.md",
     "title": "Tanzgruppe Leipzig 1",
     "allDay": true,
     "extendedProps": {
-      "sourcePath": "2. Projektverwaltung/2026 NICA - Tanzgruppe Leipzig/Tanzgruppe Leipzig Woche 1.md"
+      "sourcePath": "2. Projektverwaltung/2026 NICA - Tanzgruppe Leipzig/Tanzgruppe Leipzig Woche 1.md",
+      "coordinates": "51.29558, 12.38398"
     },
     "backgroundColor": "red",
     "borderColor": "red",
@@ -252,9 +385,54 @@ window.CALENDAR_EVENTS = [
     "end": "2026-05-30"
   },
   {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Roxy.md#rdate-2026-06-09",
+    "title": "Roxy",
+    "start": "2026-06-09",
+    "allDay": true,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Roxy.md",
+      "isRecurring": true,
+      "recurrenceDaysCount": 0,
+      "isRecurringOverride": true
+    }
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Roxy.md#rdate-2026-06-23",
+    "title": "Roxy",
+    "start": "2026-06-23",
+    "allDay": true,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Roxy.md",
+      "isRecurring": true,
+      "recurrenceDaysCount": 0,
+      "isRecurringOverride": true
+    }
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Roxy.md#rdate-2026-06-30",
+    "title": "Roxy",
+    "start": "2026-06-30",
+    "allDay": true,
+    "editable": false,
+    "backgroundColor": "#0f766e",
+    "borderColor": "#0f766e",
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Roxy.md",
+      "isRecurring": true,
+      "recurrenceDaysCount": 0,
+      "isRecurringOverride": true
+    }
+  },
+  {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-07-06",
     "title": "OAC",
-    "start": "2026-07-06T14:00:00+02:00",
+    "start": "2026-07-06T15:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -263,6 +441,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -334,11 +513,11 @@ window.CALENDAR_EVENTS = [
     "end": "2026-07-25"
   },
   {
-    "id": "6. Obsidian/Inbox/Ferienwoche Schöpfkelle.md",
+    "id": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Ferienwoche Schöpfkelle.md",
     "title": "Schöpfkelle",
     "allDay": true,
     "extendedProps": {
-      "sourcePath": "6. Obsidian/Inbox/Ferienwoche Schöpfkelle.md",
+      "sourcePath": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Ferienwoche Schöpfkelle.md",
       "coordinates": "51.43642, 11.96079"
     },
     "backgroundColor": "red",
@@ -347,11 +526,11 @@ window.CALENDAR_EVENTS = [
     "end": "2026-08-01"
   },
   {
-    "id": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 2.md",
+    "id": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Zirkus Waldstadt - Ferienwoche 2.md",
     "title": "Ferien 2",
     "allDay": true,
     "extendedProps": {
-      "sourcePath": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 2.md",
+      "sourcePath": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Zirkus Waldstadt - Ferienwoche 2.md",
       "coordinates": "51.46886, 11.99127"
     },
     "backgroundColor": "red",
@@ -373,27 +552,9 @@ window.CALENDAR_EVENTS = [
     "end": "2026-08-15"
   },
   {
-    "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-08-21",
-    "title": "Dornrößchen",
-    "start": "2026-08-21T14:00:00",
-    "allDay": false,
-    "editable": false,
-    "backgroundColor": "#0f766e",
-    "borderColor": "#0f766e",
-    "extendedProps": {
-      "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
-      "coordinates": "51.48452, 11.92733",
-      "isRecurring": true,
-      "isRecurringOverride": true
-    },
-    "duration": {
-      "milliseconds": 7200000
-    }
-  },
-  {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-08-24",
     "title": "OAC",
-    "start": "2026-08-24T14:00:00+02:00",
+    "start": "2026-08-24T15:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -402,6 +563,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -420,6 +582,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -427,27 +590,9 @@ window.CALENDAR_EVENTS = [
     }
   },
   {
-    "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-08-28",
-    "title": "Dornrößchen",
-    "start": "2026-08-28T14:00:00",
-    "allDay": false,
-    "editable": false,
-    "backgroundColor": "#0f766e",
-    "borderColor": "#0f766e",
-    "extendedProps": {
-      "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
-      "coordinates": "51.48452, 11.92733",
-      "isRecurring": true,
-      "isRecurringOverride": true
-    },
-    "duration": {
-      "milliseconds": 7200000
-    }
-  },
-  {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-08-31",
     "title": "OAC",
-    "start": "2026-08-31T14:00:00+02:00",
+    "start": "2026-08-31T15:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -456,6 +601,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -473,6 +619,7 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
+      "recurrenceDaysCount": 0,
       "isRecurringOverride": true
     },
     "duration": {
@@ -491,6 +638,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -498,27 +646,9 @@ window.CALENDAR_EVENTS = [
     }
   },
   {
-    "id": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md#rdate-2026-09-04",
-    "title": "Dornrößchen",
-    "start": "2026-09-04T14:00:00",
-    "allDay": false,
-    "editable": false,
-    "backgroundColor": "#0f766e",
-    "borderColor": "#0f766e",
-    "extendedProps": {
-      "sourcePath": "2. Projektverwaltung/2026 NICA JEP - Bühnenreif/Kurs Dornroesschen.md",
-      "coordinates": "51.48452, 11.92733",
-      "isRecurring": true,
-      "isRecurringOverride": true
-    },
-    "duration": {
-      "milliseconds": 7200000
-    }
-  },
-  {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-09-07",
     "title": "OAC",
-    "start": "2026-09-07T14:00:00+02:00",
+    "start": "2026-09-07T15:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -527,6 +657,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -544,6 +675,7 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
+      "recurrenceDaysCount": 0,
       "isRecurringOverride": true
     },
     "duration": {
@@ -562,6 +694,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -571,7 +704,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-09-14",
     "title": "OAC",
-    "start": "2026-09-14T14:00:00+02:00",
+    "start": "2026-09-14T15:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -580,6 +713,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -597,6 +731,7 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
+      "recurrenceDaysCount": 0,
       "isRecurringOverride": true
     },
     "duration": {
@@ -615,6 +750,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -624,7 +760,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-09-21",
     "title": "OAC",
-    "start": "2026-09-21T14:00:00+02:00",
+    "start": "2026-09-21T15:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -633,6 +769,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -650,6 +787,7 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
+      "recurrenceDaysCount": 0,
       "isRecurringOverride": true
     },
     "duration": {
@@ -668,6 +806,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -677,7 +816,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-09-28",
     "title": "OAC",
-    "start": "2026-09-28T14:00:00+02:00",
+    "start": "2026-09-28T15:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -686,6 +825,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -715,6 +855,7 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
+      "recurrenceDaysCount": 0,
       "isRecurringOverride": true
     },
     "duration": {
@@ -733,6 +874,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -742,7 +884,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-10-05",
     "title": "OAC",
-    "start": "2026-10-05T14:00:00+02:00",
+    "start": "2026-10-05T15:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -751,6 +893,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -768,6 +911,7 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
+      "recurrenceDaysCount": 0,
       "isRecurringOverride": true
     },
     "duration": {
@@ -786,6 +930,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -795,7 +940,7 @@ window.CALENDAR_EVENTS = [
   {
     "id": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md#rdate-2026-10-12",
     "title": "OAC",
-    "start": "2026-10-12T14:00:00+02:00",
+    "start": "2026-10-12T15:00:00+02:00",
     "allDay": false,
     "editable": false,
     "backgroundColor": "#0f766e",
@@ -804,6 +949,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU OAC - Jahreszeiten-Zirkus/Kurs 1 OAC.md",
       "coordinates": "51.47217, 11.92911",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -821,6 +967,7 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
+      "recurrenceDaysCount": 0,
       "isRecurringOverride": true
     },
     "duration": {
@@ -839,6 +986,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -856,6 +1004,7 @@ window.CALENDAR_EVENTS = [
     "extendedProps": {
       "sourcePath": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Kita.md",
       "isRecurring": true,
+      "recurrenceDaysCount": 0,
       "isRecurringOverride": true
     },
     "duration": {
@@ -874,6 +1023,7 @@ window.CALENDAR_EVENTS = [
       "sourcePath": "2. Projektverwaltung/2026 TOHU JEP - Waldstadt Artisten/Kurs 2 JEP.md",
       "coordinates": "51.43948, 11.96649",
       "isRecurring": true,
+      "recurrenceDaysCount": 1,
       "isRecurringOverride": true
     },
     "duration": {
@@ -881,11 +1031,11 @@ window.CALENDAR_EVENTS = [
     }
   },
   {
-    "id": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 3.md",
+    "id": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Zirkus Waldstadt - Ferienwoche 3.md",
     "title": "Ferien 3",
     "allDay": true,
     "extendedProps": {
-      "sourcePath": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 3.md",
+      "sourcePath": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Zirkus Waldstadt - Ferienwoche 3.md",
       "coordinates": "51.46884, 11.99226"
     },
     "backgroundColor": "blue",
@@ -894,11 +1044,11 @@ window.CALENDAR_EVENTS = [
     "end": "2026-10-24"
   },
   {
-    "id": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 4.md",
+    "id": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Zirkus Waldstadt - Ferienwoche 4.md",
     "title": "Ferien 4",
     "allDay": true,
     "extendedProps": {
-      "sourcePath": "6. Obsidian/Inbox/Zirkus Waldstadt - Ferienwoche 4.md",
+      "sourcePath": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Zirkus Waldstadt - Ferienwoche 4.md",
       "coordinates": "51.46884, 11.99226"
     },
     "backgroundColor": "blue",

@@ -37,3 +37,15 @@ Use it as a compact index. Keep details in specialized docs.
 - Run `npm.cmd --prefix .\Tools run lint` for baseline lint checks.
 - Run `npm.cmd --prefix .\Tools run lint:jsdoc` for doc coverage checks.
 - If JSDoc warnings are introduced, either fix them in the same change or update the rollout tasklist with explicit follow-up tasks.
+
+## Shell Reliability Note (Learned)
+
+- For quick diagnostic/listing commands, prefer running them standalone (single command) instead of batching in parallel pipelines.
+- Avoid `Format-Table` in automated runs because it can stall/truncate in some shell wrappers; prefer machine-safe output (`ConvertTo-Json` or plain text).
+- Always set explicit `timeout_ms` for inspection commands so stuck executions fail fast and can be retried cleanly.
+
+## UI Behavior Notes (Learned)
+
+- Homepage settings behavior is tab-based: use the right header gear icon to activate the `settings` module tab (do not navigate away from `home.html`).
+- Settings panels are expected to be collapsed by default when the embedded settings UI loads.
+- For Beantime running-state UI in Obsidian webviewer, do not rely only on the `hidden` attribute; also set explicit `display: none` when no timer is running.

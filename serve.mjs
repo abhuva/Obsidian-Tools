@@ -26,6 +26,10 @@ const UPDO_INCIDENTS_FILE = path.join(DATA_DIR, "incidents.jsonl");
 const UPDO_STATE_FILE = path.join(DATA_DIR, "state.json");
 const BEANTIME_STATE_FILE = path.join(ROOT, "data", "beantime", "state.json");
 const BEANTIME_TEMPLATE_FILE = path.join(ROOT, "beantime", "zeit.beancount");
+const BEANTIME_FAVA_HOST = "127.0.0.1";
+const BEANTIME_FAVA_PORT = 3464;
+const BEANTIME_FAVA_READY_TIMEOUT_MS = 12000;
+const BEANTIME_FAVA_POLL_INTERVAL_MS = 300;
 const PROJECTS_ROOT_REL = "2. Projektverwaltung";
 const PROJECTS_ROOT = path.join(VAULT_ROOT, PROJECTS_ROOT_REL);
 const TEMPLATE_PROJECT_FILE_REL = "6. Obsidian/_template/Projekt.md";
@@ -147,6 +151,12 @@ const updoState = {
   persistenceLoaded: false,
   persistenceDirty: false,
   lastCompressionCheckMs: 0
+};
+const beantimeFavaState = {
+  process: null,
+  lastError: "",
+  startedAt: "",
+  startedLedgerPath: ""
 };
 
 /**
@@ -467,6 +477,250 @@ function getBeantimeConfigFromSettings(settings) {
       moduleCfg.bookableAccountPrefix,
       DEFAULT_SETTINGS_FALLBACK.modules.beantime.bookableAccountPrefix
     )
+  };
+}
+
+/**
+ * Returns the local Fava URL for the Beantime ledger view.
+ * @returns {string} Beantime Fava URL.
+ */
+function getBeantimeFavaUrl() {
+  return `http://${BEANTIME_FAVA_HOST}:${BEANTIME_FAVA_PORT}/`;
+}
+
+/**
+ * Returns whether the managed Beantime Fava process is currently running.
+ * @returns {boolean} `true` when a child process is alive.
+ */
+function isBeantimeFavaRunning() {
+  const proc = beantimeFavaState.process;
+  return Boolean(proc && !proc.killed && proc.exitCode == null);
+}
+
+/**
+ * Stops the managed Beantime Fava process if it is running.
+ * @returns {void}
+ */
+function stopBeantimeFavaServer() {
+  const proc = beantimeFavaState.process;
+  if (proc && !proc.killed) proc.kill();
+  beantimeFavaState.process = null;
+  beantimeFavaState.startedAt = "";
+  beantimeFavaState.startedLedgerPath = "";
+}
+
+/**
+ * Normalizes startup errors for the Beantime Fava process.
+ * @param {unknown} error - Spawn error object.
+ * @returns {string} Human-readable message.
+ */
+function formatBeantimeFavaStartError(error) {
+  if (error?.code === "ENOENT") {
+    return "fava not found in PATH (ENOENT)";
+  }
+  return String(error?.message || "Could not start fava");
+}
+
+/**
+ * Probes a local HTTP URL and returns whether it is reachable.
+ * @param {string} urlText - Target URL.
+ * @param {number} [timeoutMs=800] - Probe timeout in milliseconds.
+ * @returns {Promise<boolean>} `true` when the endpoint responds.
+ */
+function isHttpUrlReachable(urlText, timeoutMs = 800) {
+  return new Promise((resolve) => {
+    let target;
+    try {
+      target = new URL(urlText);
+    } catch {
+      resolve(false);
+      return;
+    }
+    const req = http.request(
+      {
+        method: "GET",
+        host: target.hostname,
+        port: target.port || 80,
+        path: target.pathname || "/",
+        timeout: timeoutMs
+      },
+      (res) => {
+        res.resume();
+        resolve(true);
+      }
+    );
+    req.on("error", () => resolve(false));
+    req.on("timeout", () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.end();
+  });
+}
+
+/**
+ * Waits until a URL becomes reachable or the timeout is exceeded.
+ * @param {string} urlText - Target URL.
+ * @param {number} [timeoutMs=BEANTIME_FAVA_READY_TIMEOUT_MS] - Max wait time.
+ * @returns {Promise<boolean>} `true` when reachable within timeout.
+ */
+async function waitForHttpUrl(urlText, timeoutMs = BEANTIME_FAVA_READY_TIMEOUT_MS) {
+  const startedAtMs = Date.now();
+  while (Date.now() - startedAtMs < timeoutMs) {
+    if (await isHttpUrlReachable(urlText)) return true;
+    await new Promise((resolve) => setTimeout(resolve, BEANTIME_FAVA_POLL_INTERVAL_MS));
+  }
+  return false;
+}
+
+/**
+ * Starts a managed Fava process for the configured Beantime ledger.
+ * @param {{filePath: string}} config - Runtime Beantime config.
+ * @returns {{startupFailed: Promise<never>, cleanupStartupWatchers: () => void}|null} Startup failure watcher handles.
+ */
+function startBeantimeFavaServer(config) {
+  ensureBeantimeLedgerExists(config.filePath);
+  if (isBeantimeFavaRunning()) return null;
+
+  beantimeFavaState.lastError = "";
+  const cwd = path.dirname(config.filePath);
+  const ledgerFile = path.basename(config.filePath);
+  const args = [ledgerFile, "--host", BEANTIME_FAVA_HOST, "--port", String(BEANTIME_FAVA_PORT)];
+
+  try {
+    const child = spawn("fava", args, {
+      cwd,
+      stdio: ["ignore", "ignore", "pipe"]
+    });
+    beantimeFavaState.process = child;
+    beantimeFavaState.startedAt = new Date().toISOString();
+    beantimeFavaState.startedLedgerPath = config.filePath;
+
+    let startupSettled = false;
+    const startupFailureListeners = {
+      onError: null,
+      onExit: null
+    };
+    const startupFailed = new Promise((_, reject) => {
+      const rejectStartup = (error) => {
+        if (startupSettled) return;
+        startupSettled = true;
+        const message = formatBeantimeFavaStartError(error);
+        beantimeFavaState.lastError = message;
+        if (beantimeFavaState.process === child) {
+          beantimeFavaState.process = null;
+          beantimeFavaState.startedAt = "";
+          beantimeFavaState.startedLedgerPath = "";
+        }
+        cleanupStartupWatchers();
+        reject(new Error(message));
+      };
+      startupFailureListeners.onError = (error) => rejectStartup(error);
+      startupFailureListeners.onExit = (code) => {
+        if (!code || code === 0) return;
+        rejectStartup(new Error(`fava exited with code ${code}`));
+      };
+      child.on("error", startupFailureListeners.onError);
+      child.on("exit", startupFailureListeners.onExit);
+    });
+    const cleanupStartupWatchers = () => {
+      if (startupFailureListeners.onError) child.off("error", startupFailureListeners.onError);
+      if (startupFailureListeners.onExit) child.off("exit", startupFailureListeners.onExit);
+    };
+
+    child.stderr.on("data", (chunk) => {
+      const message = String(chunk || "").trim();
+      if (message) beantimeFavaState.lastError = message;
+    });
+    child.on("error", (error) => {
+      beantimeFavaState.lastError = formatBeantimeFavaStartError(error);
+      if (beantimeFavaState.process === child) {
+        beantimeFavaState.process = null;
+        beantimeFavaState.startedAt = "";
+        beantimeFavaState.startedLedgerPath = "";
+      }
+    });
+    child.on("exit", (code) => {
+      if (code && code !== 0 && !beantimeFavaState.lastError) {
+        beantimeFavaState.lastError = `fava exited with code ${code}`;
+      }
+      if (beantimeFavaState.process === child) {
+        beantimeFavaState.process = null;
+        beantimeFavaState.startedAt = "";
+        beantimeFavaState.startedLedgerPath = "";
+      }
+    });
+    return { startupFailed, cleanupStartupWatchers };
+  } catch (error) {
+    beantimeFavaState.lastError = formatBeantimeFavaStartError(error);
+    beantimeFavaState.process = null;
+    beantimeFavaState.startedAt = "";
+    beantimeFavaState.startedLedgerPath = "";
+    throw new Error(beantimeFavaState.lastError);
+  }
+}
+
+/**
+ * Opens the Beantime Fava URL in Obsidian webviewer.
+ * @returns {void}
+ */
+function openBeantimeFavaWebviewer() {
+  runObsidian(["web", `url=${getBeantimeFavaUrl()}`, "newtab"]);
+}
+
+/**
+ * Ensures a Beantime Fava server is available on port 3464 and opens webviewer.
+ * @param {object} settings - Effective settings object.
+ * @returns {Promise<{url: string, started: boolean}>} Result payload.
+ */
+async function showBeantimeFava(settings) {
+  const config = getBeantimeConfigFromSettings(settings);
+  const url = getBeantimeFavaUrl();
+
+  let started = false;
+  let startupWatcher = null;
+  if (
+    isBeantimeFavaRunning() &&
+    String(beantimeFavaState.startedLedgerPath || "") !== String(config.filePath || "")
+  ) {
+    stopBeantimeFavaServer();
+  }
+  if (!isBeantimeFavaRunning()) {
+    startupWatcher = startBeantimeFavaServer(config);
+    started = true;
+  }
+
+  let ready = false;
+  try {
+    if (startupWatcher?.startupFailed) {
+      ready = await Promise.race([
+        waitForHttpUrl(url),
+        startupWatcher.startupFailed
+      ]);
+    } else {
+      ready = await waitForHttpUrl(url);
+    }
+  } finally {
+    if (startupWatcher?.cleanupStartupWatchers) {
+      startupWatcher.cleanupStartupWatchers();
+    }
+  }
+  if (!ready) {
+    const details = beantimeFavaState.lastError ? ` (${beantimeFavaState.lastError})` : "";
+    throw new Error(`Fava server did not become ready on port ${BEANTIME_FAVA_PORT}${details}`);
+  }
+  if (!isBeantimeFavaRunning()) {
+    const details = beantimeFavaState.lastError ? ` (${beantimeFavaState.lastError})` : "";
+    throw new Error(
+      `Port ${BEANTIME_FAVA_PORT} is occupied by another service; stop it and retry${details}`
+    );
+  }
+
+  openBeantimeFavaWebviewer();
+  return {
+    url,
+    started,
+    file: path.relative(VAULT_ROOT, config.filePath).replace(/\\/g, "/")
   };
 }
 
@@ -2994,6 +3248,19 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "POST" && pathname === "/api/beantime/show") {
+    Promise.resolve()
+      .then(async () => {
+        const settings = getEffectiveSettings();
+        const result = await showBeantimeFava(settings);
+        sendJson(res, 200, { ok: true, ...result, port: BEANTIME_FAVA_PORT });
+      })
+      .catch((error) => {
+        sendText(res, 422, error?.message || "Could not open Beantime Fava");
+      });
+    return;
+  }
+
   if (req.method === "GET" && pathname === "/api/projects/meta") {
     try {
       const payload = buildProjectMetaPayload();
@@ -3107,16 +3374,18 @@ server.listen(PORT, HOST, () => {
   ensureUpdoMonitor();
   console.log(`Homepage preview server: http://${HOST}:${PORT}/home.html`);
   console.log(
-    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/beantime/meta, POST /api/beantime/start, POST /api/beantime/stop, GET /api/projects/meta, POST /api/projects/create, GET /api/updo/snapshot, GET /api/updo/history, POST /api/updo/restart"
+    "Homepage API endpoints ready: GET /api/ping, GET/POST /api/settings, GET /api/bookmarks, GET /api/obsidian/theme, POST /api/bookmarks/open, POST /api/search/open, GET /api/beantime/meta, POST /api/beantime/start, POST /api/beantime/stop, POST /api/beantime/show, GET /api/projects/meta, POST /api/projects/create, GET /api/updo/snapshot, GET /api/updo/history, POST /api/updo/restart"
   );
 });
 
 process.on("SIGINT", () => {
+  stopBeantimeFavaServer();
   stopUpdoMonitor();
   process.exit(0);
 });
 
 process.on("SIGTERM", () => {
+  stopBeantimeFavaServer();
   stopUpdoMonitor();
   process.exit(0);
 });

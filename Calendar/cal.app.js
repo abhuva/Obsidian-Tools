@@ -2095,6 +2095,8 @@
         if (!draggedEvent || draggedEvent.allDay) return true;
         var props = draggedEvent.extendedProps || {};
         if (!props.isRecurring || props.isRecurringOverride) return true;
+        var recurrenceDaysCount = Number(props.recurrenceDaysCount);
+        if (Number.isFinite(recurrenceDaysCount) && recurrenceDaysCount <= 0) return true;
 
         var originalStartDay = localIsoDateKey(draggedEvent.start);
         var originalEndDay = localIsoDateKey(draggedEvent.end || draggedEvent.start);
@@ -3387,9 +3389,19 @@
             }
           },
           editable: true,
+          eventStartEditable: true,
+          eventDurationEditable: true,
+          eventResizableFromStart: true,
           selectable: true,
           selectMinDistance: 0,
           eventSources: eventSources,
+          eventDataTransform: function(eventData) {
+            var next = Object.assign({}, eventData || {});
+            if (typeof next.editable === 'undefined') next.editable = true;
+            if (typeof next.startEditable === 'undefined') next.startEditable = true;
+            if (typeof next.durationEditable === 'undefined') next.durationEditable = true;
+            return next;
+          },
           eventClassNames: eventClassNamesHook,
           eventContent: eventContentHook,
           eventDidMount: eventDidMountHook,

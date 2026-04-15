@@ -2,12 +2,15 @@
 import { renderBeantimeModule } from "../modules/beantime.js";
 import { renderClockInElement } from "../modules/clock.js";
 import { renderNewProjectModule } from "../modules/new-project.js";
+import { renderSettingsModule } from "../modules/settings.js";
 import { renderUpdoModule } from "../modules/updo.js";
 
 let pageTitleEl = null;
 let moduleGridEl = null;
 let headerClockEl = null;
+let headerBeantimeIndicatorEl = null;
 let openSearchBtnEl = null;
+let openSettingsBtnEl = null;
 let moduleTabsEl = null;
 
 const pageCleanups = [];
@@ -24,6 +27,75 @@ let searchConfig = {
 let activeModuleKey = "";
 let enabledModuleEntries = [];
 let activeModuleRenderSeq = 0;
+
+/**
+ * Builds a compact hh:mm:ss duration string from an ISO start timestamp.
+ * @param {string} iso - ISO date-time string.
+ * @returns {string} Duration text or "-" for invalid timestamps.
+ */
+function elapsedFromIso(iso) {
+  const raw = String(iso || "").trim();
+  if (!raw) return "-";
+  const start = new Date(raw);
+  if (Number.isNaN(start.getTime())) return "-";
+  const seconds = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+/**
+ * Renders the top-bar Beantime running indicator.
+ * @param {object|null} running - Running timer payload from /api/beantime/meta.
+ * @returns {void}
+ */
+function renderBeantimeHeaderIndicator(running) {
+  if (!headerBeantimeIndicatorEl) return;
+  if (!running) {
+    headerBeantimeIndicatorEl.hidden = true;
+    headerBeantimeIndicatorEl.style.display = "none";
+    headerBeantimeIndicatorEl.textContent = "";
+    headerBeantimeIndicatorEl.removeAttribute("title");
+    return;
+  }
+  const account = String(running?.account || "-");
+  const person = String(running?.personAccount || "-");
+  const summary = String(running?.summary || "").trim() || "-";
+  const startedAt = String(running?.startedAt || "").trim();
+  const startDate = startedAt ? new Date(startedAt) : null;
+  const startText =
+    startDate && !Number.isNaN(startDate.getTime())
+      ? startDate.toLocaleString("de-DE", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        })
+      : startedAt || "-";
+
+  headerBeantimeIndicatorEl.hidden = false;
+  headerBeantimeIndicatorEl.style.display = "";
+  headerBeantimeIndicatorEl.textContent = `Time run ${elapsedFromIso(startedAt)}`;
+  headerBeantimeIndicatorEl.title = `Konto: ${account}\nPerson: ${person}\nSummary: ${summary}\nStart: ${startText}`;
+}
+
+/**
+ * Loads Beantime meta and refreshes the top-bar running indicator.
+ * @returns {Promise<void>}
+ */
+async function refreshBeantimeHeaderIndicator() {
+  if (!headerBeantimeIndicatorEl) return;
+  const response = await fetch("/api/beantime/meta");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Could not load Beantime meta");
+  }
+  const meta = await response.json();
+  renderBeantimeHeaderIndicator(meta?.running || null);
+}
 
 /**
  * Registers a page-level cleanup callback to run before the next page render.
@@ -98,6 +170,9 @@ function createModuleShell(title) {
 }
 
 const moduleRegistry = {
+  settings: {
+    render: renderSettingsModule
+  },
   bookmarks: {
     render: renderBookmarksModule
   },
@@ -113,6 +188,9 @@ const moduleRegistry = {
 };
 
 const moduleUiMeta = {
+  settings: {
+    icon: "\u2699\ufe0f"
+  },
   bookmarks: {
     icon: "\ud83d\udd16"
   },
@@ -210,8 +288,12 @@ async function activateModule(moduleKey, opts = {}) {
   persistActiveModuleKey(key);
   syncModuleTabSelectionState();
   if (opts.focusTab && moduleTabsEl) {
-    const button = moduleTabsEl.querySelector(`.module-tab-btn[data-module-key="${key}"]`);
-    if (button instanceof HTMLElement) button.focus();
+    if (key === "settings" && openSettingsBtnEl instanceof HTMLElement) {
+      openSettingsBtnEl.focus();
+    } else {
+      const button = moduleTabsEl.querySelector(`.module-tab-btn[data-module-key="${key}"]`);
+      if (button instanceof HTMLElement) button.focus();
+    }
   }
   if (changed) {
     await renderActiveModule();
@@ -236,13 +318,14 @@ function pickActiveModuleKey() {
  */
 function renderModuleTabs() {
   if (!moduleTabsEl) return;
+  const visibleTabEntries = enabledModuleEntries.filter(([moduleKey]) => moduleKey !== "settings");
   moduleTabsEl.innerHTML = "";
   moduleTabsEl.setAttribute("role", "tablist");
   moduleTabsEl.setAttribute("aria-orientation", "horizontal");
-  moduleTabsEl.hidden = enabledModuleEntries.length === 0;
-  if (!enabledModuleEntries.length) return;
+  moduleTabsEl.hidden = visibleTabEntries.length === 0;
+  if (!visibleTabEntries.length) return;
 
-  for (const [moduleKey, moduleCfg] of enabledModuleEntries) {
+  for (const [moduleKey, moduleCfg] of visibleTabEntries) {
     const title = String(moduleCfg?.title || moduleKey);
     const button = document.createElement("button");
     button.type = "button";
@@ -259,7 +342,7 @@ function renderModuleTabs() {
       void activateModule(moduleKey);
     });
     button.addEventListener("keydown", (event) => {
-      const keys = enabledModuleEntries.map(([enabledKey]) => enabledKey);
+      const keys = visibleTabEntries.map(([enabledKey]) => enabledKey);
       const currentIndex = keys.indexOf(moduleKey);
       if (currentIndex < 0) return;
 
@@ -317,7 +400,12 @@ async function renderActiveModule() {
   const { tabId, panelId } = moduleTabDomIds(moduleKey);
   shell.root.id = panelId;
   shell.root.setAttribute("role", "tabpanel");
-  shell.root.setAttribute("aria-labelledby", tabId);
+  if (moduleKey === "settings") {
+    const settingsButtonId = String(openSettingsBtnEl?.id || "openSettingsBtn");
+    shell.root.setAttribute("aria-labelledby", settingsButtonId);
+  } else {
+    shell.root.setAttribute("aria-labelledby", tabId);
+  }
   shell.root.tabIndex = 0;
   moduleGridEl.appendChild(shell.root);
 
@@ -625,10 +713,44 @@ async function renderPage() {
       headerClockEl.textContent = "";
     }
 
+    if (settings?.modules?.beantime?.enabled && headerBeantimeIndicatorEl) {
+      const syncFromApi = async () => {
+        try {
+          await refreshBeantimeHeaderIndicator();
+        } catch {
+          renderBeantimeHeaderIndicator(null);
+        }
+      };
+      const onBeantimeState = (event) => {
+        renderBeantimeHeaderIndicator(event?.detail?.running || null);
+      };
+      const pollId = window.setInterval(() => {
+        void syncFromApi();
+      }, 15000);
+      window.addEventListener("beantime:state", onBeantimeState);
+      addPageCleanup(() => {
+        clearInterval(pollId);
+        window.removeEventListener("beantime:state", onBeantimeState);
+      });
+      await syncFromApi();
+    } else {
+      renderBeantimeHeaderIndicator(null);
+    }
+
     const moduleEntries = Object.entries(settings?.modules || {});
-    enabledModuleEntries = moduleEntries.filter(
+    const dynamicEntries = moduleEntries.filter(
       ([moduleKey, cfg]) => moduleKey !== "clock" && Boolean(cfg?.enabled)
     );
+    enabledModuleEntries = [
+      [
+        "settings",
+        {
+          enabled: true,
+          title: "Settings"
+        }
+      ],
+      ...dynamicEntries
+    ];
 
     activeModuleKey = pickActiveModuleKey();
     persistActiveModuleKey(activeModuleKey);
@@ -659,7 +781,9 @@ function initHomepage() {
   pageTitleEl = document.getElementById("pageTitle");
   moduleGridEl = document.getElementById("moduleGrid");
   headerClockEl = document.getElementById("headerClock");
+  headerBeantimeIndicatorEl = document.getElementById("headerBeantimeIndicator");
   openSearchBtnEl = document.getElementById("openSearchBtn");
+  openSettingsBtnEl = document.getElementById("openSettingsBtn");
   moduleTabsEl = document.getElementById("moduleTabs");
 
   if (openSearchBtnEl) {
@@ -668,6 +792,11 @@ function initHomepage() {
         // Keep UI quiet, but visible in devtools.
         console.error(error);
       });
+    });
+  }
+  if (openSettingsBtnEl) {
+    openSettingsBtnEl.addEventListener("click", () => {
+      void activateModule("settings", { focusTab: true });
     });
   }
 
