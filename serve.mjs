@@ -155,7 +155,8 @@ const updoState = {
 const beantimeFavaState = {
   process: null,
   lastError: "",
-  startedAt: ""
+  startedAt: "",
+  startedLedgerPath: ""
 };
 
 /**
@@ -505,6 +506,7 @@ function stopBeantimeFavaServer() {
   if (proc && !proc.killed) proc.kill();
   beantimeFavaState.process = null;
   beantimeFavaState.startedAt = "";
+  beantimeFavaState.startedLedgerPath = "";
 }
 
 /**
@@ -574,11 +576,11 @@ async function waitForHttpUrl(urlText, timeoutMs = BEANTIME_FAVA_READY_TIMEOUT_M
 /**
  * Starts a managed Fava process for the configured Beantime ledger.
  * @param {{filePath: string}} config - Runtime Beantime config.
- * @returns {void}
+ * @returns {{startupFailed: Promise<never>, cleanupStartupWatchers: () => void}|null} Startup failure watcher handles.
  */
 function startBeantimeFavaServer(config) {
   ensureBeantimeLedgerExists(config.filePath);
-  if (isBeantimeFavaRunning()) return;
+  if (isBeantimeFavaRunning()) return null;
 
   beantimeFavaState.lastError = "";
   const cwd = path.dirname(config.filePath);
@@ -592,6 +594,39 @@ function startBeantimeFavaServer(config) {
     });
     beantimeFavaState.process = child;
     beantimeFavaState.startedAt = new Date().toISOString();
+    beantimeFavaState.startedLedgerPath = config.filePath;
+
+    let startupSettled = false;
+    const startupFailureListeners = {
+      onError: null,
+      onExit: null
+    };
+    const startupFailed = new Promise((_, reject) => {
+      const rejectStartup = (error) => {
+        if (startupSettled) return;
+        startupSettled = true;
+        const message = formatBeantimeFavaStartError(error);
+        beantimeFavaState.lastError = message;
+        if (beantimeFavaState.process === child) {
+          beantimeFavaState.process = null;
+          beantimeFavaState.startedAt = "";
+          beantimeFavaState.startedLedgerPath = "";
+        }
+        cleanupStartupWatchers();
+        reject(new Error(message));
+      };
+      startupFailureListeners.onError = (error) => rejectStartup(error);
+      startupFailureListeners.onExit = (code) => {
+        if (!code || code === 0) return;
+        rejectStartup(new Error(`fava exited with code ${code}`));
+      };
+      child.on("error", startupFailureListeners.onError);
+      child.on("exit", startupFailureListeners.onExit);
+    });
+    const cleanupStartupWatchers = () => {
+      if (startupFailureListeners.onError) child.off("error", startupFailureListeners.onError);
+      if (startupFailureListeners.onExit) child.off("exit", startupFailureListeners.onExit);
+    };
 
     child.stderr.on("data", (chunk) => {
       const message = String(chunk || "").trim();
@@ -602,6 +637,7 @@ function startBeantimeFavaServer(config) {
       if (beantimeFavaState.process === child) {
         beantimeFavaState.process = null;
         beantimeFavaState.startedAt = "";
+        beantimeFavaState.startedLedgerPath = "";
       }
     });
     child.on("exit", (code) => {
@@ -611,12 +647,15 @@ function startBeantimeFavaServer(config) {
       if (beantimeFavaState.process === child) {
         beantimeFavaState.process = null;
         beantimeFavaState.startedAt = "";
+        beantimeFavaState.startedLedgerPath = "";
       }
     });
+    return { startupFailed, cleanupStartupWatchers };
   } catch (error) {
     beantimeFavaState.lastError = formatBeantimeFavaStartError(error);
     beantimeFavaState.process = null;
     beantimeFavaState.startedAt = "";
+    beantimeFavaState.startedLedgerPath = "";
     throw new Error(beantimeFavaState.lastError);
   }
 }
@@ -639,12 +678,33 @@ async function showBeantimeFava(settings) {
   const url = getBeantimeFavaUrl();
 
   let started = false;
+  let startupWatcher = null;
+  if (
+    isBeantimeFavaRunning() &&
+    String(beantimeFavaState.startedLedgerPath || "") !== String(config.filePath || "")
+  ) {
+    stopBeantimeFavaServer();
+  }
   if (!isBeantimeFavaRunning()) {
-    startBeantimeFavaServer(config);
+    startupWatcher = startBeantimeFavaServer(config);
     started = true;
   }
 
-  const ready = await waitForHttpUrl(url);
+  let ready = false;
+  try {
+    if (startupWatcher?.startupFailed) {
+      ready = await Promise.race([
+        waitForHttpUrl(url),
+        startupWatcher.startupFailed
+      ]);
+    } else {
+      ready = await waitForHttpUrl(url);
+    }
+  } finally {
+    if (startupWatcher?.cleanupStartupWatchers) {
+      startupWatcher.cleanupStartupWatchers();
+    }
+  }
   if (!ready) {
     const details = beantimeFavaState.lastError ? ` (${beantimeFavaState.lastError})` : "";
     throw new Error(`Fava server did not become ready on port ${BEANTIME_FAVA_PORT}${details}`);

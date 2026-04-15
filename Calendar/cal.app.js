@@ -3397,9 +3397,9 @@
           eventSources: eventSources,
           eventDataTransform: function(eventData) {
             var next = Object.assign({}, eventData || {});
-            next.editable = true;
-            next.startEditable = true;
-            next.durationEditable = true;
+            if (typeof next.editable === 'undefined') next.editable = true;
+            if (typeof next.startEditable === 'undefined') next.startEditable = true;
+            if (typeof next.durationEditable === 'undefined') next.durationEditable = true;
             return next;
           },
           eventClassNames: eventClassNamesHook,
@@ -3412,7 +3412,7 @@
           eventClick: onEventClick,
           dateClick: onDateClick,
           select: onDateSelect,
-          eventAllow: function() { return true; },
+          eventAllow: allowRecurringTimedEdit,
           eventDrop: onEventDateChange,
           eventResize: onEventDateChange,
           datesSet: function(arg) {

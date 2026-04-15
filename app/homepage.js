@@ -54,6 +54,7 @@ function renderBeantimeHeaderIndicator(running) {
   if (!headerBeantimeIndicatorEl) return;
   if (!running) {
     headerBeantimeIndicatorEl.hidden = true;
+    headerBeantimeIndicatorEl.style.display = "none";
     headerBeantimeIndicatorEl.textContent = "";
     headerBeantimeIndicatorEl.removeAttribute("title");
     return;
@@ -76,6 +77,7 @@ function renderBeantimeHeaderIndicator(running) {
       : startedAt || "-";
 
   headerBeantimeIndicatorEl.hidden = false;
+  headerBeantimeIndicatorEl.style.display = "";
   headerBeantimeIndicatorEl.textContent = `Time run ${elapsedFromIso(startedAt)}`;
   headerBeantimeIndicatorEl.title = `Konto: ${account}\nPerson: ${person}\nSummary: ${summary}\nStart: ${startText}`;
 }
@@ -286,8 +288,12 @@ async function activateModule(moduleKey, opts = {}) {
   persistActiveModuleKey(key);
   syncModuleTabSelectionState();
   if (opts.focusTab && moduleTabsEl) {
-    const button = moduleTabsEl.querySelector(`.module-tab-btn[data-module-key="${key}"]`);
-    if (button instanceof HTMLElement) button.focus();
+    if (key === "settings" && openSettingsBtnEl instanceof HTMLElement) {
+      openSettingsBtnEl.focus();
+    } else {
+      const button = moduleTabsEl.querySelector(`.module-tab-btn[data-module-key="${key}"]`);
+      if (button instanceof HTMLElement) button.focus();
+    }
   }
   if (changed) {
     await renderActiveModule();
@@ -394,7 +400,12 @@ async function renderActiveModule() {
   const { tabId, panelId } = moduleTabDomIds(moduleKey);
   shell.root.id = panelId;
   shell.root.setAttribute("role", "tabpanel");
-  shell.root.setAttribute("aria-labelledby", tabId);
+  if (moduleKey === "settings") {
+    const settingsButtonId = String(openSettingsBtnEl?.id || "openSettingsBtn");
+    shell.root.setAttribute("aria-labelledby", settingsButtonId);
+  } else {
+    shell.root.setAttribute("aria-labelledby", tabId);
+  }
   shell.root.tabIndex = 0;
   moduleGridEl.appendChild(shell.root);
 

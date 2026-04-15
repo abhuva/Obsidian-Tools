@@ -28,7 +28,7 @@ export async function renderBeantimeModule(shell) {
         <input id="beantimeSummary" class="input" type="text" placeholder="Kurze Beschreibung..." />
       </div>
     </div>
-    <section id="beantimeRunningPanel" class="beantime-running-panel" hidden>
+    <section id="beantimeRunningPanel" class="beantime-running-panel" hidden style="display:none;">
       <div class="beantime-running-title">Timer laeuft</div>
       <div class="beantime-running-grid">
         <div><strong>Konto:</strong> <span id="beantimeRunAccount">-</span></div>
@@ -253,10 +253,18 @@ export async function renderBeantimeModule(shell) {
    * @returns {void}
    */
   function publishBeantimeState(meta) {
+    const runningCandidate =
+      meta?.running && typeof meta.running === "object" ? meta.running : null;
+    const sanitizedRunning =
+      runningCandidate &&
+      String(runningCandidate.startedAt || "").trim() &&
+      String(runningCandidate.account || "").trim()
+        ? runningCandidate
+        : null;
     window.dispatchEvent(
       new CustomEvent("beantime:state", {
         detail: {
-          running: meta?.running || null,
+          running: sanitizedRunning,
           meta: meta || null
         }
       })
