@@ -686,6 +686,14 @@ async function showBeantimeFava(settings) {
     stopBeantimeFavaServer();
   }
   if (!isBeantimeFavaRunning()) {
+    const portAlreadyReachable = await isHttpUrlReachable(url);
+    if (portAlreadyReachable) {
+      beantimeFavaState.lastError = `port ${BEANTIME_FAVA_PORT} already responds before managed fava startup`;
+      const details = beantimeFavaState.lastError ? ` (${beantimeFavaState.lastError})` : "";
+      throw new Error(
+        `Port ${BEANTIME_FAVA_PORT} is occupied by another service; stop it and retry${details}`
+      );
+    }
     startupWatcher = startBeantimeFavaServer(config);
     started = true;
   }

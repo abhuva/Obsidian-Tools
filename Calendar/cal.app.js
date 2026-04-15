@@ -3398,8 +3398,12 @@
           eventDataTransform: function(eventData) {
             var next = Object.assign({}, eventData || {});
             if (typeof next.editable === 'undefined') next.editable = true;
-            if (typeof next.startEditable === 'undefined') next.startEditable = true;
-            if (typeof next.durationEditable === 'undefined') next.durationEditable = true;
+            if (typeof next.startEditable === 'undefined') {
+              next.startEditable = next.editable === false ? false : true;
+            }
+            if (typeof next.durationEditable === 'undefined') {
+              next.durationEditable = next.editable === false ? false : true;
+            }
             return next;
           },
           eventClassNames: eventClassNamesHook,

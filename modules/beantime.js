@@ -346,8 +346,18 @@ export async function renderBeantimeModule(shell) {
         const text = await response.text();
         throw new Error(text || "Start fehlgeschlagen");
       }
-      await loadMeta();
+      const knownStartIso = String(runningMeta?.startedAt || "").trim() || new Date().toISOString();
+      running = true;
+      runningMeta = {
+        account,
+        personAccount,
+        summary,
+        startedAt: knownStartIso
+      };
+      syncUiState();
       setStatus(response.status === 409 ? "Timer laeuft bereits." : "Timer gestartet.", "ok");
+      publishBeantimeState({ running: runningMeta });
+      await loadMeta().catch(() => {});
     } finally {
       isStarting = false;
       syncUiState();
@@ -374,12 +384,13 @@ export async function renderBeantimeModule(shell) {
         const text = await response.text();
         throw new Error(text || "Stop fehlgeschlagen");
       }
+      setStatus(response.status === 409 ? "Kein laufender Timer." : "Timer gestoppt und Eintrag gebucht.", "ok");
       running = false;
       runningMeta = null;
       syncUiState();
+      publishBeantimeState({ running: null });
       summaryInput.value = "";
-      await loadMeta();
-      setStatus(response.status === 409 ? "Kein laufender Timer." : "Timer gestoppt und Eintrag gebucht.", "ok");
+      await loadMeta().catch(() => {});
     } finally {
       isStopping = false;
       syncUiState();
