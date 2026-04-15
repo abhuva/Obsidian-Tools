@@ -2095,6 +2095,8 @@
         if (!draggedEvent || draggedEvent.allDay) return true;
         var props = draggedEvent.extendedProps || {};
         if (!props.isRecurring || props.isRecurringOverride) return true;
+        var recurrenceDaysCount = Number(props.recurrenceDaysCount);
+        if (Number.isFinite(recurrenceDaysCount) && recurrenceDaysCount <= 0) return true;
 
         var originalStartDay = localIsoDateKey(draggedEvent.start);
         var originalEndDay = localIsoDateKey(draggedEvent.end || draggedEvent.start);

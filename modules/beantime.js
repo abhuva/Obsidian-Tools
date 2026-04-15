@@ -1,4 +1,4 @@
-﻿/**
+/**
  * Renders Beantime timer controls (start/stop with account + person + summary).
  * @param {{body: HTMLElement}} shell - Module shell DOM nodes.
  * @returns {Promise<() => void>} Cleanup callback.
@@ -7,22 +7,36 @@ export async function renderBeantimeModule(shell) {
   let running = false;
   let isStarting = false;
   let isStopping = false;
+  let runningMeta = null;
+  let elapsedTickerId = 0;
 
   const controls = document.createElement("div");
   controls.className = "beantime-controls";
   controls.innerHTML = `
-    <div class="field-row">
-      <label for="beantimeAccount">Konto</label>
-      <select id="beantimeAccount" class="input"></select>
+    <div id="beantimeEditorFields">
+      <div class="field-row">
+        <label for="beantimeAccount">Konto</label>
+        <select id="beantimeAccount" class="input"></select>
+      </div>
+      <div class="field-row">
+        <label for="beantimePerson">Person</label>
+        <select id="beantimePerson" class="input"></select>
+      </div>
+      <div class="field-row">
+        <label for="beantimeSummary">Summary</label>
+        <input id="beantimeSummary" class="input" type="text" placeholder="Kurze Beschreibung..." />
+      </div>
     </div>
-    <div class="field-row">
-      <label for="beantimePerson">Person</label>
-      <select id="beantimePerson" class="input"></select>
-    </div>
-    <div class="field-row">
-      <label for="beantimeSummary">Summary</label>
-      <input id="beantimeSummary" class="input" type="text" placeholder="Kurze Beschreibung..." />
-    </div>
+    <section id="beantimeRunningPanel" class="beantime-running-panel" hidden>
+      <div class="beantime-running-title">Timer laeuft</div>
+      <div class="beantime-running-grid">
+        <div><strong>Konto:</strong> <span id="beantimeRunAccount">-</span></div>
+        <div><strong>Person:</strong> <span id="beantimeRunPerson">-</span></div>
+        <div><strong>Summary:</strong> <span id="beantimeRunSummary">-</span></div>
+        <div><strong>Start:</strong> <span id="beantimeRunStart">-</span></div>
+        <div><strong>Laufzeit:</strong> <span id="beantimeRunElapsed">-</span></div>
+      </div>
+    </section>
     <div class="beantime-btn-row">
       <button type="button" class="btn btn-primary" id="beantimeStartBtn">Start</button>
       <button type="button" class="btn btn-ghost" id="beantimeStopBtn">Stop</button>
@@ -44,6 +58,13 @@ export async function renderBeantimeModule(shell) {
   const startBtn = controls.querySelector("#beantimeStartBtn");
   const stopBtn = controls.querySelector("#beantimeStopBtn");
   const reloadBtn = controls.querySelector("#beantimeReloadBtn");
+  const editorFields = controls.querySelector("#beantimeEditorFields");
+  const runningPanel = controls.querySelector("#beantimeRunningPanel");
+  const runAccountEl = controls.querySelector("#beantimeRunAccount");
+  const runPersonEl = controls.querySelector("#beantimeRunPerson");
+  const runSummaryEl = controls.querySelector("#beantimeRunSummary");
+  const runStartEl = controls.querySelector("#beantimeRunStart");
+  const runElapsedEl = controls.querySelector("#beantimeRunElapsed");
 
   /**
    * Sets status message and semantic class.
@@ -102,15 +123,89 @@ export async function renderBeantimeModule(shell) {
   }
 
   /**
-   * Updates button disabled states from running snapshot.
+   * Formats a date-time string for display.
+   * @param {string} iso - ISO timestamp.
+   * @returns {string} Localized fallback-safe date-time.
+   */
+  function formatLocalDateTime(iso) {
+    const raw = String(iso || "").trim();
+    if (!raw) return "-";
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return raw;
+    return date.toLocaleString("de-DE", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+  }
+
+  /**
+   * Formats elapsed milliseconds as hh:mm:ss.
+   * @param {number} ms - Elapsed milliseconds.
+   * @returns {string} Human-readable duration.
+   */
+  function formatElapsed(ms) {
+    const totalSec = Math.max(0, Math.floor(Number(ms || 0) / 1000));
+    const hours = Math.floor(totalSec / 3600);
+    const minutes = Math.floor((totalSec % 3600) / 60);
+    const seconds = totalSec % 60;
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+  }
+
+  /**
+   * Updates running panel values from current running snapshot.
    * @returns {void}
    */
-  function syncButtons() {
+  function syncRunningPanel() {
+    const startIso = String(runningMeta?.startedAt || "").trim();
+    runAccountEl.textContent = String(runningMeta?.account || "-");
+    runPersonEl.textContent = String(runningMeta?.personAccount || "-");
+    runSummaryEl.textContent = String(runningMeta?.summary || "-");
+    runStartEl.textContent = formatLocalDateTime(startIso);
+    if (!startIso) {
+      runElapsedEl.textContent = "-";
+      return;
+    }
+    const started = new Date(startIso);
+    if (Number.isNaN(started.getTime())) {
+      runElapsedEl.textContent = "-";
+      return;
+    }
+    runElapsedEl.textContent = formatElapsed(Date.now() - started.getTime());
+  }
+
+  /**
+   * Starts/stops live elapsed ticker for running timer panel.
+   * @returns {void}
+   */
+  function syncElapsedTicker() {
+    if (elapsedTickerId) {
+      clearInterval(elapsedTickerId);
+      elapsedTickerId = 0;
+    }
+    if (!running) return;
+    elapsedTickerId = window.setInterval(() => {
+      syncRunningPanel();
+    }, 1000);
+  }
+
+  /**
+   * Updates button disabled states and switches form/running view.
+   * @returns {void}
+   */
+  function syncUiState() {
     startBtn.disabled = running || isStarting || isStopping;
     stopBtn.disabled = !running || isStarting || isStopping;
     accountSelect.disabled = running;
     personSelect.disabled = running;
     summaryInput.disabled = running;
+    editorFields.hidden = running;
+    runningPanel.hidden = !running;
+    syncRunningPanel();
+    syncElapsedTicker();
   }
 
   /**
@@ -122,7 +217,7 @@ export async function renderBeantimeModule(shell) {
     const file = String(meta?.file || "").trim();
     const person = String(meta?.running?.personAccount || meta?.personAccount || "").trim();
     const startIso = String(meta?.running?.startedAt || "").trim();
-    const activeText = startIso ? `Aktiv seit ${startIso}` : "Kein laufender Timer";
+    const activeText = startIso ? `Aktiv seit ${formatLocalDateTime(startIso)}` : "Kein laufender Timer";
     info.replaceChildren(
       createInfoItem("Datei", file || "-"),
       createInfoItem("Person", person || "-"),
@@ -146,6 +241,22 @@ export async function renderBeantimeModule(shell) {
   }
 
   /**
+   * Broadcasts current timer snapshot for global header indicator updates.
+   * @param {object} meta - Latest Beantime meta payload.
+   * @returns {void}
+   */
+  function publishBeantimeState(meta) {
+    window.dispatchEvent(
+      new CustomEvent("beantime:state", {
+        detail: {
+          running: meta?.running || null,
+          meta: meta || null
+        }
+      })
+    );
+  }
+
+  /**
    * Loads account options and running state from backend.
    * @returns {Promise<void>}
    */
@@ -162,6 +273,7 @@ export async function renderBeantimeModule(shell) {
       : [];
 
     running = Boolean(meta?.running);
+    runningMeta = meta?.running || null;
     fillSelect(accountSelect, accounts, "Keine buchbaren Konten gefunden");
     fillSelect(personSelect, people, "Keine Personenkonten gefunden");
 
@@ -178,7 +290,8 @@ export async function renderBeantimeModule(shell) {
     }
 
     renderInfo(meta);
-    syncButtons();
+    syncUiState();
+    publishBeantimeState(meta);
   }
 
   /**
@@ -199,7 +312,7 @@ export async function renderBeantimeModule(shell) {
       return;
     }
     isStarting = true;
-    syncButtons();
+    syncUiState();
     try {
       setStatus("Starte Timer...");
       const response = await fetch("/api/beantime/start", {
@@ -215,7 +328,7 @@ export async function renderBeantimeModule(shell) {
       setStatus(response.status === 409 ? "Timer laeuft bereits." : "Timer gestartet.", "ok");
     } finally {
       isStarting = false;
-      syncButtons();
+      syncUiState();
     }
   }
 
@@ -226,7 +339,7 @@ export async function renderBeantimeModule(shell) {
   async function stopTimer() {
     if (isStarting || isStopping) return;
     isStopping = true;
-    syncButtons();
+    syncUiState();
     try {
       setStatus("Stoppe Timer...");
       const summary = String(summaryInput.value || "").trim();
@@ -244,7 +357,7 @@ export async function renderBeantimeModule(shell) {
       setStatus(response.status === 409 ? "Kein laufender Timer." : "Timer gestoppt und Eintrag gebucht.", "ok");
     } finally {
       isStopping = false;
-      syncButtons();
+      syncUiState();
     }
   }
 
@@ -268,6 +381,7 @@ export async function renderBeantimeModule(shell) {
   }
 
   return () => {
+    if (elapsedTickerId) clearInterval(elapsedTickerId);
     shell.body.innerHTML = "";
   };
 }

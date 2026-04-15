@@ -706,7 +706,8 @@ function toCalendarEvent(filePath) {
   }
 
   if (recurrenceType === "weekly") {
-    const daysOfWeek = recurrenceDays.length ? recurrenceDays : [dayOfWeekFromIsoDate(startDate)];
+    const parsedDays = parseDaysOfWeek(recurrenceDays);
+    const daysOfWeek = parsedDays.length ? parsedDays : [dayOfWeekFromIsoDate(startDate)];
     const recurringDurationMs = isTimedEvent ? durationMsFromDateLike(startValue, endValue) : 0;
     const recurringTimePortion = extractTimePortion(startValue);
     event.rrule = {
@@ -744,6 +745,7 @@ function toCalendarEvent(filePath) {
 
     event.editable = isTimedEvent;
     event.extendedProps.isRecurring = true;
+    event.extendedProps.recurrenceDaysCount = parsedDays.length;
 
     const overrideEvents = recurrenceRdates.map((dateStr) => ({
       id: `${event.id}#rdate-${dateStr}`,
@@ -1052,6 +1054,7 @@ function baseRowToCalendarEvent(row) {
 
     event.editable = isTimedEvent;
     event.extendedProps.isRecurring = true;
+    event.extendedProps.recurrenceDaysCount = parsedDays.length;
 
     const parsedRdates = parseIsoDateList(recurrenceRdates);
     const overrideEvents = parsedRdates.map((dateStr) => ({

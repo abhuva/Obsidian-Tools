@@ -7,6 +7,7 @@ import { renderUpdoModule } from "../modules/updo.js";
 let pageTitleEl = null;
 let moduleGridEl = null;
 let headerClockEl = null;
+let headerBeantimeIndicatorEl = null;
 let openSearchBtnEl = null;
 let moduleTabsEl = null;
 
@@ -24,6 +25,73 @@ let searchConfig = {
 let activeModuleKey = "";
 let enabledModuleEntries = [];
 let activeModuleRenderSeq = 0;
+
+/**
+ * Builds a compact hh:mm:ss duration string from an ISO start timestamp.
+ * @param {string} iso - ISO date-time string.
+ * @returns {string} Duration text or "-" for invalid timestamps.
+ */
+function elapsedFromIso(iso) {
+  const raw = String(iso || "").trim();
+  if (!raw) return "-";
+  const start = new Date(raw);
+  if (Number.isNaN(start.getTime())) return "-";
+  const seconds = Math.max(0, Math.floor((Date.now() - start.getTime()) / 1000));
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const secs = seconds % 60;
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+}
+
+/**
+ * Renders the top-bar Beantime running indicator.
+ * @param {object|null} running - Running timer payload from /api/beantime/meta.
+ * @returns {void}
+ */
+function renderBeantimeHeaderIndicator(running) {
+  if (!headerBeantimeIndicatorEl) return;
+  if (!running) {
+    headerBeantimeIndicatorEl.hidden = true;
+    headerBeantimeIndicatorEl.textContent = "";
+    headerBeantimeIndicatorEl.removeAttribute("title");
+    return;
+  }
+  const account = String(running?.account || "-");
+  const person = String(running?.personAccount || "-");
+  const summary = String(running?.summary || "").trim() || "-";
+  const startedAt = String(running?.startedAt || "").trim();
+  const startDate = startedAt ? new Date(startedAt) : null;
+  const startText =
+    startDate && !Number.isNaN(startDate.getTime())
+      ? startDate.toLocaleString("de-DE", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
+        })
+      : startedAt || "-";
+
+  headerBeantimeIndicatorEl.hidden = false;
+  headerBeantimeIndicatorEl.textContent = `Time run ${elapsedFromIso(startedAt)}`;
+  headerBeantimeIndicatorEl.title = `Konto: ${account}\nPerson: ${person}\nSummary: ${summary}\nStart: ${startText}`;
+}
+
+/**
+ * Loads Beantime meta and refreshes the top-bar running indicator.
+ * @returns {Promise<void>}
+ */
+async function refreshBeantimeHeaderIndicator() {
+  if (!headerBeantimeIndicatorEl) return;
+  const response = await fetch("/api/beantime/meta");
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(text || "Could not load Beantime meta");
+  }
+  const meta = await response.json();
+  renderBeantimeHeaderIndicator(meta?.running || null);
+}
 
 /**
  * Registers a page-level cleanup callback to run before the next page render.
@@ -625,6 +693,30 @@ async function renderPage() {
       headerClockEl.textContent = "";
     }
 
+    if (settings?.modules?.beantime?.enabled && headerBeantimeIndicatorEl) {
+      const syncFromApi = async () => {
+        try {
+          await refreshBeantimeHeaderIndicator();
+        } catch {
+          renderBeantimeHeaderIndicator(null);
+        }
+      };
+      const onBeantimeState = (event) => {
+        renderBeantimeHeaderIndicator(event?.detail?.running || null);
+      };
+      const pollId = window.setInterval(() => {
+        void syncFromApi();
+      }, 15000);
+      window.addEventListener("beantime:state", onBeantimeState);
+      addPageCleanup(() => {
+        clearInterval(pollId);
+        window.removeEventListener("beantime:state", onBeantimeState);
+      });
+      await syncFromApi();
+    } else {
+      renderBeantimeHeaderIndicator(null);
+    }
+
     const moduleEntries = Object.entries(settings?.modules || {});
     enabledModuleEntries = moduleEntries.filter(
       ([moduleKey, cfg]) => moduleKey !== "clock" && Boolean(cfg?.enabled)
@@ -659,6 +751,7 @@ function initHomepage() {
   pageTitleEl = document.getElementById("pageTitle");
   moduleGridEl = document.getElementById("moduleGrid");
   headerClockEl = document.getElementById("headerClock");
+  headerBeantimeIndicatorEl = document.getElementById("headerBeantimeIndicator");
   openSearchBtnEl = document.getElementById("openSearchBtn");
   moduleTabsEl = document.getElementById("moduleTabs");
 
