@@ -22,7 +22,7 @@ Tohuwabohu Halle e.V.
 
 Name des Förderers:
 
-Alevitische Gemeinde Deutschland K.d.o#.R. (AABF)
+Alevitische Gemeinde Deutschland K.d.ö.R. (AABF)
 
 Förderangebot:
 
@@ -809,7 +809,7 @@ Zirkus
 
 Format:
 
-Pr?sentation
+Präsentation
 
 Art des Projekts:
 
@@ -1142,7 +1142,7 @@ Zirkus
 
 Format:
 
-Pr?sentation
+Präsentation
 
 Art des Projekts:
 
@@ -1272,7 +1272,7 @@ Zirkus
 
 Format:
 
-Pr?sentation
+Präsentation
 
 Art des Projekts:
 

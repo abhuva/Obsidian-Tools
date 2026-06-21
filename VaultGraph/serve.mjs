@@ -152,7 +152,7 @@ const server = http.createServer((req, res) => {
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
   res.writeHead(200, { "Content-Type": contentType });
-  const stream = fs.createReadStream(filePath);
+  const stream = fs.createReadStream(realFilePath);
   stream.on("error", (error) => {
     console.error(`VaultGraph static file read failed: ${error?.message || error}`);
     if (!res.headersSent) {
