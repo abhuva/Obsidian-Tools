@@ -32,8 +32,9 @@ const BEANTIME_FAVA_READY_TIMEOUT_MS = 12000;
 const BEANTIME_FAVA_POLL_INTERVAL_MS = 300;
 const PROJECTS_ROOT_REL = "2. Projektverwaltung";
 const PROJECTS_ROOT = path.join(VAULT_ROOT, PROJECTS_ROOT_REL);
-const TEMPLATE_PROJECT_FILE_REL = "6. Obsidian/_template/Projekt.md";
-const TEMPLATE_PROJECT_FILE = path.join(VAULT_ROOT, TEMPLATE_PROJECT_FILE_REL);
+const PROJECT_TEMPLATE_DIR_REL = "6. Obsidian/_template/project";
+const PROJECT_TEMPLATE_DIR = path.join(VAULT_ROOT, PROJECT_TEMPLATE_DIR_REL);
+const DEFAULT_PROJECT_TEMPLATE_NAME = "Projekt.md";
 
 const MIME_TYPES = {
   ".html": "text/html; charset=utf-8",
@@ -1055,6 +1056,15 @@ function normalizeProjectType(value) {
  */
 function sanitizePathSeparators(input) {
   return String(input || "").replace(/\\/g, "/");
+}
+
+/**
+ * Gets the vault-relative path for a file under the project template directory.
+ * @param {string} fileName - Template filename.
+ * @returns {string} Vault-relative template path.
+ */
+function toProjectTemplateRel(fileName) {
+  return `${PROJECT_TEMPLATE_DIR_REL}/${fileName}`.replace(/\\/g, "/");
 }
 
 /**
@@ -2760,6 +2770,73 @@ function toSortedOptionList(counterObject, options = {}) {
 }
 
 /**
+ * Lists available project MOC templates from the dedicated template folder.
+ * @returns {Array<{id: string, label: string, path: string, isDefault: boolean}>} Template options.
+ */
+function listProjectTemplates() {
+  if (!fs.existsSync(PROJECT_TEMPLATE_DIR) || !fs.statSync(PROJECT_TEMPLATE_DIR).isDirectory()) return [];
+
+  return fs
+    .readdirSync(PROJECT_TEMPLATE_DIR, { withFileTypes: true })
+    .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".md"))
+    .sort((a, b) => {
+      if (a.name === DEFAULT_PROJECT_TEMPLATE_NAME) return -1;
+      if (b.name === DEFAULT_PROJECT_TEMPLATE_NAME) return 1;
+      return a.name.localeCompare(b.name, "de");
+    })
+    .map((entry) => {
+      const relPath = toProjectTemplateRel(entry.name);
+      const label = entry.name.replace(/\.md$/i, "");
+      return {
+        id: relPath,
+        label,
+        path: relPath,
+        isDefault: entry.name === DEFAULT_PROJECT_TEMPLATE_NAME
+      };
+    });
+}
+
+/**
+ * Resolves and validates a project template selected by the UI.
+ * @param {unknown} templatePath - Vault-relative template path.
+ * @returns {{relPath: string, absPath: string, label: string}} Validated template.
+ */
+function resolveProjectTemplate(templatePath) {
+  const templates = listProjectTemplates();
+  if (!templates.length) {
+    throw new Error(`Keine Projekt-Templates unter ${PROJECT_TEMPLATE_DIR_REL} gefunden`);
+  }
+
+  const cleanPath = sanitizePathSeparators(templatePath).trim();
+  const selected =
+    templates.find((entry) => entry.path === cleanPath) ||
+    templates.find((entry) => entry.isDefault) ||
+    templates[0];
+  if (!selected) throw new Error("Projekt-Template wurde nicht gefunden");
+
+  const absPath = path.resolve(VAULT_ROOT, selected.path);
+  const allowedDir = path.resolve(PROJECT_TEMPLATE_DIR);
+  const relativeToAllowed = path.relative(allowedDir, absPath);
+  if (
+    relativeToAllowed.startsWith("..") ||
+    path.isAbsolute(relativeToAllowed) ||
+    !selected.path.startsWith(`${PROJECT_TEMPLATE_DIR_REL}/`) ||
+    !selected.path.toLowerCase().endsWith(".md")
+  ) {
+    throw new Error("Projekt-Template liegt ausserhalb des erlaubten Template-Ordners");
+  }
+  if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
+    throw new Error("Projekt-Template wurde nicht gefunden");
+  }
+
+  return {
+    relPath: selected.path,
+    absPath,
+    label: selected.label
+  };
+}
+
+/**
  * Builds dropdown options and defaults for the "new project" modal.
  * @returns {object} Frontend-ready metadata payload for project creation.
  */
@@ -2790,7 +2867,8 @@ function buildProjectMetaPayload() {
 
   return {
     projectRoot: PROJECTS_ROOT_REL.replace(/\\/g, "/"),
-    templateFile: TEMPLATE_PROJECT_FILE_REL.replace(/\\/g, "/"),
+    templateRoot: PROJECT_TEMPLATE_DIR_REL.replace(/\\/g, "/"),
+    templates: listProjectTemplates(),
     options: {
       societies: societyOptions.length ? societyOptions : [{ value: "NICA", count: 0 }, { value: "TOHU", count: 0 }],
       types: typeOptions.length
@@ -2830,28 +2908,24 @@ for (const part of parts) {
 }
 
 /**
- * Creates a project note from the configured template via Templater (or plain fallback).
- * @param {{projectFolderRel: string, projectFileRel: string, projectName: string}} payload - Target folder/file/title.
+ * Creates a project note from the selected template via Templater (or plain fallback).
+ * @param {{projectFolderRel: string, projectFileRel: string, projectName: string, templateRelPath: string}} payload - Target folder/file/title/template.
  * @returns {{createdPath: string}} Created note path relative to vault root.
  */
-function createProjectNoteFromTemplate({ projectFolderRel, projectFileRel, projectName }) {
+function createProjectNoteFromTemplate({ projectFolderRel, projectFileRel, projectName, templateRelPath }) {
   const js = `
 (async () => {
 const folderPath = ${JSON.stringify(projectFolderRel)};
 const filePath = ${JSON.stringify(projectFileRel)};
 const fileTitle = ${JSON.stringify(projectName)};
-const templatePath = "6. Obsidian/_template/Projekt.md";
-const templateBasename = "Projekt";
+const templatePath = ${JSON.stringify(templateRelPath)};
 
 const folder = app.vault.getAbstractFileByPath(folderPath);
 if (!folder) throw new Error("Projektordner nicht gefunden");
 if (app.vault.getAbstractFileByPath(filePath)) throw new Error("Projektdatei existiert bereits");
 
 const templater = app.plugins.plugins["templater-obsidian"]?.templater;
-let templateFile = app.vault.getAbstractFileByPath(templatePath);
-if (!templateFile) {
-  templateFile = app.vault.getMarkdownFiles().find((file) => file.basename === templateBasename) || null;
-}
+const templateFile = app.vault.getAbstractFileByPath(templatePath);
 if (!templateFile) throw new Error("Projekt-Template nicht gefunden");
 
 let createdFile = null;
@@ -2905,9 +2979,7 @@ function createProject(payload) {
   if (!fs.existsSync(PROJECTS_ROOT) || !fs.statSync(PROJECTS_ROOT).isDirectory()) {
     throw new Error("Projektverwaltung-Ordner wurde nicht gefunden");
   }
-  if (!fs.existsSync(TEMPLATE_PROJECT_FILE) || !fs.statSync(TEMPLATE_PROJECT_FILE).isFile()) {
-    throw new Error("Projekt-Template fehlt unter 6. Obsidian/_template/Projekt.md");
-  }
+  const template = resolveProjectTemplate(payload?.templatePath);
 
   const naming = buildProjectNaming({
     year: payload?.year,
@@ -2931,7 +3003,8 @@ function createProject(payload) {
   const created = createProjectNoteFromTemplate({
     projectFolderRel,
     projectFileRel,
-    projectName: naming.folderName
+    projectName: naming.folderName,
+    templateRelPath: template.relPath
   });
 
   let targetFileAbs = projectFileAbs;
@@ -2949,7 +3022,7 @@ function createProject(payload) {
   }
 
   if (!fs.existsSync(targetFileAbs)) {
-    const templateRaw = fs.readFileSync(TEMPLATE_PROJECT_FILE, "utf8");
+    const templateRaw = fs.readFileSync(template.absPath, "utf8");
     const rendered = renderTemplateFallback(templateRaw, naming.folderName);
     fs.writeFileSync(targetFileAbs, rendered, "utf8");
   }
@@ -2973,6 +3046,10 @@ function createProject(payload) {
     paths: {
       folder: projectFolderRel,
       file: targetFileRel
+    },
+    template: {
+      path: template.relPath,
+      label: template.label
     },
     frontmatter: {
       year: naming.year,

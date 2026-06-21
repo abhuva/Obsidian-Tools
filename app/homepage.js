@@ -4,6 +4,7 @@ import { renderClockInElement } from "../modules/clock.js";
 import { renderNewProjectModule } from "../modules/new-project.js";
 import { renderSettingsModule } from "../modules/settings.js";
 import { renderUpdoModule } from "../modules/updo.js";
+import { renderVaultGraphModule } from "../modules/vault-graph.js";
 
 let pageTitleEl = null;
 let moduleGridEl = null;
@@ -184,6 +185,9 @@ const moduleRegistry = {
   },
   updo: {
     render: renderUpdoModule
+  },
+  vaultGraph: {
+    render: renderVaultGraphModule
   }
 };
 
@@ -202,6 +206,9 @@ const moduleUiMeta = {
   },
   updo: {
     icon: "\ud83d\udcc8"
+  },
+  vaultGraph: {
+    icon: "\ud83d\udd78\ufe0f"
   }
 };
 

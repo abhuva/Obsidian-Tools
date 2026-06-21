@@ -20,6 +20,14 @@ Dieses Dokument definiert das verbindliche Naming fuer neue Projektordner und di
 - Die Projektdatei hat exakt denselben Namen wie der Ordner, plus `.md`.
 - Ungueltige Windows-Dateizeichen sind nicht erlaubt: `< > : " / \\ | ? *`.
 
+## Templates
+
+- Projekt-Templates liegen in `6. Obsidian/_template/project/`.
+- Die Projekterstellung bietet alle `.md` Dateien aus diesem Ordner als Auswahl an.
+- Die Anzeige nutzt den Dateinamen ohne `.md`, z. B. `Projekt Peter`.
+- `Projekt.md` ist das Standard-Template, falls vorhanden.
+- Nach dem Rendern des Templates werden die kanonischen Frontmatter-Felder automatisch gesetzt oder ueberschrieben.
+
 ## Frontmatter-Felder (mindestens)
 
 - `year`

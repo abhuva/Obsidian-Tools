@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>VaultGraph</title>
+    <link rel="stylesheet" href="./vault-graph.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <strong>VaultGraph</strong>
+          <span id="statusText" class="status">Loading graph...</span>
+        </div>
+
+        <section class="control-panel" aria-label="Graph controls">
+          <label>
+            <span>Search</span>
+            <input id="searchInput" type="search" placeholder="Path contains...">
+          </label>
+          <label>
+            <span>Root</span>
+            <select id="topLevelSelect">
+              <option value="">All folders</option>
+            </select>
+          </label>
+          <label class="depth-label">
+            <span>Depth <b id="depthValue">1</b></span>
+            <input id="depthInput" type="range" min="0" max="1" value="1">
+          </label>
+          <label class="checkbox-label">
+            <input id="rootToggle" type="checkbox" checked>
+            <span>Root</span>
+          </label>
+          <label class="checkbox-label">
+            <input id="systemToggle" type="checkbox">
+            <span>System</span>
+          </label>
+          <label class="checkbox-label">
+            <input id="labelsToggle" type="checkbox" checked>
+            <span>Labels</span>
+          </label>
+          <button id="rebuildButton" type="button">Rebuild</button>
+        </section>
+      </header>
+
+      <section class="workspace">
+        <div id="graph" class="graph" role="img" aria-label="Folder hierarchy graph"></div>
+        <div id="nodeHud" class="node-hud" hidden>
+          <button type="button" data-node-action="focus">Set as root</button>
+          <button type="button" data-node-action="hide">Hide subtree</button>
+          <button type="button" data-node-action="reset">Reset node filters</button>
+        </div>
+        <aside class="sidepanel">
+          <section class="view-switcher" aria-label="View mode">
+            <h2>View</h2>
+            <div class="segmented-control">
+              <button id="graphViewButton" class="is-active" type="button">Graph</button>
+              <button id="treeViewButton" type="button">Tree</button>
+              <button id="treemapViewButton" type="button">Treemap</button>
+            </div>
+          </section>
+
+          <section class="tuning" aria-label="Graph tuning">
+            <h2>Physics</h2>
+            <label>
+              <span>Node Scale <b id="nodeScaleValue">1</b></span>
+              <input id="nodeScaleInput" type="range" min="0.25" max="3" step="0.05" value="1">
+            </label>
+            <label>
+              <span>Color</span>
+              <select id="colorModeSelect">
+                <option value="depth">Depth</option>
+                <option value="groups">Groups</option>
+              </select>
+            </label>
+            <label>
+              <span>Repel <b id="repulsionValue">130</b></span>
+              <input id="repulsionInput" type="range" min="20" max="800" step="10" value="130">
+            </label>
+            <label>
+              <span>Edge Min <b id="edgeMinValue">42</b></span>
+              <input id="edgeMinInput" type="range" min="10" max="240" step="2" value="42">
+            </label>
+            <label>
+              <span>Edge Max <b id="edgeMaxValue">116</b></span>
+              <input id="edgeMaxInput" type="range" min="20" max="420" step="4" value="116">
+            </label>
+            <label>
+              <span>Gravity <b id="gravityValue">0.08</b></span>
+              <input id="gravityInput" type="range" min="0" max="1" step="0.01" value="0.08">
+            </label>
+            <label>
+              <span>Friction <b id="frictionValue">0.86</b></span>
+              <input id="frictionInput" type="range" min="0.1" max="1" step="0.01" value="0.86">
+            </label>
+            <label>
+              <span>Line <b id="lineWidthValue">1</b></span>
+              <input id="lineWidthInput" type="range" min="0" max="8" step="0.25" value="1">
+            </label>
+            <label>
+              <span>Tree X <b id="treeGapXValue">140</b></span>
+              <input id="treeGapXInput" type="range" min="40" max="420" step="10" value="140">
+            </label>
+            <label>
+              <span>Tree Y <b id="treeGapYValue">18</b></span>
+              <input id="treeGapYInput" type="range" min="0" max="120" step="5" value="18">
+            </label>
+            <label>
+              <span>Tree Label <b id="treeLabelSpaceValue">180</b></span>
+              <input id="treeLabelSpaceInput" type="range" min="80" max="520" step="10" value="180">
+            </label>
+            <label>
+              <span>Tree Anim <b id="treeAnimationValue">0</b></span>
+              <input id="treeAnimationInput" type="range" min="0" max="1200" step="50" value="0">
+            </label>
+          </section>
+
+          <section class="details">
+          <h2>Selection</h2>
+          <dl id="detailsList">
+            <dt>Folder</dt>
+            <dd>Select a graph node.</dd>
+          </dl>
+          </section>
+        </aside>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+    <script src="./graph.generated.js"></script>
+    <script type="module" src="./vault-graph.app.js"></script>
+  </body>
+</html>

@@ -2311,6 +2311,96 @@
       }
 
       /**
+       * Converts a FullCalendar event to a static public export object.
+       * @param {*} event FullCalendar EventApi.
+       * @returns {object|null} Serializable event or null.
+       */
+      function serializePublicCalendarEvent(event) {
+        if (!event || !event.start) return null;
+        var props = event.extendedProps || {};
+        return {
+          id: String(event.id || ''),
+          title: String(event.title || ''),
+          start: event.startStr || (event.start ? event.start.toISOString() : ''),
+          end: event.endStr || (event.end ? event.end.toISOString() : ''),
+          allDay: event.allDay === true,
+          display: String(event.display || ''),
+          backgroundColor: String(event.backgroundColor || ''),
+          borderColor: String(event.borderColor || ''),
+          textColor: String(event.textColor || ''),
+          classNames: Array.isArray(event.classNames) ? event.classNames : [],
+          extendedProps: {
+            sourcePath: String(props.sourcePath || ''),
+            externalSource: String(props.externalSource || ''),
+            isRecurring: props.isRecurring === true,
+            isRecurringOverride: props.isRecurringOverride === true,
+            coordinates: String(props.coordinates || ''),
+            googleDescription: String(props.googleDescription || ''),
+            googleLocation: String(props.googleLocation || ''),
+            nextcloudDescription: String(props.nextcloudDescription || ''),
+            nextcloudLocation: String(props.nextcloudLocation || ''),
+            nextcloudUrl: String(props.nextcloudUrl || '')
+          }
+        };
+      }
+
+      /**
+       * Checks whether an event intersects the currently rendered date range.
+       * @param {*} event FullCalendar EventApi.
+       * @param {*} view FullCalendar ViewApi.
+       * @returns {boolean} True when event should be part of current-view export.
+       */
+      function isEventInCurrentViewRange(event, view) {
+        if (!event || !event.start || !view || !view.activeStart || !view.activeEnd) return true;
+        var start = event.start;
+        var end = event.end || event.start;
+        return start < view.activeEnd && end >= view.activeStart;
+      }
+
+      /**
+       * Publishes the current calendar view as a static public website.
+       * @param {*} calendar FullCalendar Calendar instance.
+       * @returns {Promise<object>} Publish API response.
+       */
+      async function publishPublicCalendar(calendar) {
+        if (!isHttpContext()) {
+          throw new Error('Calendar is not running on http(s). Open the preview server URL.');
+        }
+        if (!calendar) throw new Error('Calendar is not ready');
+
+        var events = calendar.getEvents()
+          .filter(function(event) {
+            return isEventInCurrentViewRange(event, calendar.view);
+          })
+          .map(serializePublicCalendarEvent)
+          .filter(Boolean);
+        if (!events.length) {
+          throw new Error('Current calendar view does not contain events to publish.');
+        }
+
+        var publishUrl = new URL('/api/events/publish-public', CALENDAR_API_BASE).toString();
+        var response = await fetch(publishUrl, {
+          method: 'POST',
+          headers: mutationHeaders(),
+          body: JSON.stringify({
+            events: events,
+            meta: {
+              title: calendar.view && calendar.view.title ? calendar.view.title : 'NICA Calendar',
+              initialView: calendar.view && calendar.view.type ? calendar.view.type : 'dayGridMonth',
+              initialDate: calendar.getDate ? calendar.getDate().toISOString().slice(0, 10) : '',
+              activeStart: calendar.view && calendar.view.activeStart ? calendar.view.activeStart.toISOString() : '',
+              activeEnd: calendar.view && calendar.view.activeEnd ? calendar.view.activeEnd.toISOString() : ''
+            }
+          })
+        });
+        if (!response.ok) {
+          var text = await response.text();
+          throw new Error(text || 'Could not publish public calendar');
+        }
+        return response.json();
+      }
+
+      /**
        * Fetch Calendar Filters.
        * @returns {*} Returns calendar filters.
        */
@@ -3327,6 +3417,28 @@
                 }, 0);
               }
             },
+            publishCalendar: {
+              text: '',
+              hint: 'Publish current view to website',
+              click: async function() {
+                var buttonEl = calendarEl.closest('body').querySelector('.fc-publishCalendar-button');
+                if (!buttonEl || buttonEl.disabled) return;
+                buttonEl.disabled = true;
+                buttonEl.classList.add('is-loading');
+                try {
+                  var result = await publishPublicCalendar(calendar);
+                  alert('Calendar published: ' + (result.url || 'public website') + ' (' + result.eventCount + ' events)');
+                  if (result.url) {
+                    window.open(result.url, '_blank', 'noopener');
+                  }
+                } catch (error) {
+                  alert('Publish failed: ' + error.message);
+                } finally {
+                  buttonEl.disabled = false;
+                  buttonEl.classList.remove('is-loading');
+                }
+              }
+            },
             googleSourceToggle: {
               text: '',
               hint: 'Toggle Google events',
@@ -3360,7 +3472,7 @@
             }
           },
           headerToolbar: {
-            left: 'prev,next focusToday refreshCalendar googleSourceToggle nextcloudSourceToggle printCalendar calendarSettings',
+            left: 'prev,next focusToday refreshCalendar googleSourceToggle nextcloudSourceToggle printCalendar publishCalendar calendarSettings',
             center: 'title',
             right: 'timeGridDay,timeGridWeek,dayGridMonth,multiMonthYear'
           },

@@ -8,5 +8,8 @@
     "stop:preview": "node ./stop-preview.mjs",
     "restart:preview": "npm run stop:preview && npm run preview",
     "check:smoke": "node --check ./build-events.mjs && node --check ./serve.mjs && node ./build-events.mjs && node ./smoke-check.mjs"
+  },
+  "dependencies": {
+    "ssh2-sftp-client": "^12.1.1"
   }
 }
