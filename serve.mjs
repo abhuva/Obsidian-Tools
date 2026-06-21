@@ -2808,10 +2808,9 @@ function resolveProjectTemplate(templatePath) {
   }
 
   const cleanPath = sanitizePathSeparators(templatePath).trim();
-  const selected =
-    templates.find((entry) => entry.path === cleanPath) ||
-    templates.find((entry) => entry.isDefault) ||
-    templates[0];
+  const selected = cleanPath
+    ? templates.find((entry) => entry.path === cleanPath)
+    : templates.find((entry) => entry.isDefault) || templates[0];
   if (!selected) throw new Error("Projekt-Template wurde nicht gefunden");
 
   const absPath = path.resolve(VAULT_ROOT, selected.path);
@@ -2825,7 +2824,7 @@ function resolveProjectTemplate(templatePath) {
   ) {
     throw new Error("Projekt-Template liegt ausserhalb des erlaubten Template-Ordners");
   }
-  if (!fs.existsSync(absPath) || !fs.statSync(absPath).isFile()) {
+  if (!fs.existsSync(absPath) || !fs.lstatSync(absPath).isFile()) {
     throw new Error("Projekt-Template wurde nicht gefunden");
   }
 

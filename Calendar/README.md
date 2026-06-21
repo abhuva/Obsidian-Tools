@@ -89,6 +89,7 @@ Important vars:
 - `CALENDAR_PUBLIC_EXPORT_DIR` (local generated static export folder, default `public-export`)
 - `CALENDAR_PUBLIC_SFTP_URL` (SFTP target directory, example `sftp://nica.network/public/`)
 - `CALENDAR_PUBLIC_SFTP_USER` / `CALENDAR_PUBLIC_SFTP_PASSWORD` (SFTP upload credentials; keep in `.env.local`)
+- `CALENDAR_PUBLIC_SFTP_HOST_FINGERPRINT_SHA256` (required SHA-256 host key fingerprint as hex digest, not OpenSSH base64)
 
 Important Nextcloud note:
 

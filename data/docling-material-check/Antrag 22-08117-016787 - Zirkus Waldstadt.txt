@@ -102,31 +102,31 @@ www.nica.network
 
 ## Projektleitung
 
-## Zahlungsverkehr
-
 Name:
+
+Marc Bielert
 
 Position:
 
 Telefonnr.:
 
-E-Mail:
-
-Kontoinhaber:
-
-Geldinstitut:
-
-IBAN:
-
-Marc Bielert
-
 01607760538
+
+E-Mail:
 
 marc.bielert@nica.network
 
+## Zahlungsverkehr
+
+Kontoinhaber:
+
 NICA
 
+Geldinstitut:
+
 Saalesparkasse Halle
+
+IBAN:
 
 DE40 8005 3762 1894 1371 39
 

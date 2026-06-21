@@ -57,13 +57,13 @@ const NEXTCLOUD_DEFAULT_CREATE_CALENDAR_ID =
 const BOOKMARKS_FILE = path.resolve(VAULT_ROOT, ".obsidian", "bookmarks.json");
 const FILTER_STATE_FILE = path.resolve(ROOT, "calendar.filter-state.json");
 const PID_FILE = path.resolve(ROOT, "calendar.preview.pid");
-const PUBLIC_EXPORT_DIR = path.resolve(
-  ROOT,
-  String(process.env.CALENDAR_PUBLIC_EXPORT_DIR || "public-export").trim() || "public-export"
-);
+const PUBLIC_EXPORT_DIR = resolvePublicExportDir(process.env.CALENDAR_PUBLIC_EXPORT_DIR);
 const PUBLIC_SFTP_URL = String(process.env.CALENDAR_PUBLIC_SFTP_URL || "").trim();
 const PUBLIC_SFTP_USER = String(process.env.CALENDAR_PUBLIC_SFTP_USER || "").trim();
 const PUBLIC_SFTP_PASSWORD = String(process.env.CALENDAR_PUBLIC_SFTP_PASSWORD || "").trim();
+const PUBLIC_SFTP_HOST_FINGERPRINT_SHA256 = String(
+  process.env.CALENDAR_PUBLIC_SFTP_HOST_FINGERPRINT_SHA256 || ""
+).trim();
 const PUBLIC_CALENDAR_URL = String(process.env.CALENDAR_PUBLIC_URL || "https://calendar.nica.network").trim();
 const KALENDAR_BASES_GROUP = "Kalendar Bases";
 const API_TOKEN = String(process.env.CALENDAR_API_TOKEN || "").trim() || crypto.randomBytes(24).toString("hex");
@@ -1123,6 +1123,35 @@ function publicExportString(value) {
 }
 
 /**
+ * Resolves the local public export directory without allowing path traversal.
+ * @param {unknown} rawDir - Optional environment value.
+ * @returns {string} Absolute export directory below the Calendar tool root.
+ */
+function resolvePublicExportDir(rawDir) {
+  const raw = String(rawDir || "public-export").trim() || "public-export";
+  if (path.isAbsolute(raw) || raw.split(/[\\/]+/).includes("..")) {
+    throw new Error("CALENDAR_PUBLIC_EXPORT_DIR must be a relative path below Tools/Calendar");
+  }
+  const resolved = path.resolve(ROOT, raw);
+  const relativeToRoot = path.relative(ROOT, resolved);
+  if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) {
+    throw new Error("CALENDAR_PUBLIC_EXPORT_DIR must resolve below Tools/Calendar");
+  }
+  return resolved;
+}
+
+/**
+ * Validates the configured SFTP SHA-256 host fingerprint.
+ * @param {string} serverHash - Server host key hash supplied by ssh2.
+ * @returns {boolean} True when the hash matches exactly.
+ */
+function verifyPublicSftpHost(serverHash) {
+  const expected = PUBLIC_SFTP_HOST_FINGERPRINT_SHA256.toLowerCase();
+  const actual = String(serverHash || "").trim().toLowerCase();
+  return Boolean(expected) && actual === expected;
+}
+
+/**
  * Limits public event payload to fields needed by the static calendar.
  * @param {unknown} rawEvent - Client-supplied FullCalendar event snapshot.
  * @returns {object|null} Sanitized event payload.
@@ -1539,6 +1568,11 @@ async function uploadPublicCalendarExport(files) {
       "Public calendar SFTP is not configured. Set CALENDAR_PUBLIC_SFTP_URL, CALENDAR_PUBLIC_SFTP_USER, and CALENDAR_PUBLIC_SFTP_PASSWORD in Tools/Calendar/.env.local."
     );
   }
+  if (!PUBLIC_SFTP_HOST_FINGERPRINT_SHA256) {
+    throw new Error(
+      "Public calendar SFTP host fingerprint is not configured. Set CALENDAR_PUBLIC_SFTP_HOST_FINGERPRINT_SHA256 to the server SHA-256 fingerprint hex digest."
+    );
+  }
 
   const target = parsePublicSftpTarget();
   const client = new SftpClient("calendar-public-publish");
@@ -1548,6 +1582,8 @@ async function uploadPublicCalendarExport(files) {
       port: target.port,
       username: PUBLIC_SFTP_USER,
       password: PUBLIC_SFTP_PASSWORD,
+      hostHash: "sha256",
+      hostVerifier: verifyPublicSftpHost,
       readyTimeout: 20000
     });
     await client.mkdir(target.remoteDir, true);

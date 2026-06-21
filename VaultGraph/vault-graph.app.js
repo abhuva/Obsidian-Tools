@@ -674,8 +674,9 @@ function buildChartOption(graph, visibleNodes, visibleEdges, colorContextNodes, 
       formatter(params) {
         if (params.dataType !== "node") return "";
         const data = params.data;
+        const name = escapeHtml(data.displayName || data.name);
         return [
-          `<strong>${data.displayName || data.name}</strong>`,
+          `<strong>${name}</strong>`,
           `Depth: ${data.depth}`,
           `Direct folders: ${data.directFolderCount}`,
           `Descendants: ${data.descendantFolderCount}`
@@ -749,8 +750,9 @@ function buildTreeOption(graph, visibleNodes, colorContextNodes) {
       trigger: "item",
       formatter(params) {
         const data = params.data;
+        const name = escapeHtml(data.displayName || data.name);
         return [
-          `<strong>${data.displayName || data.name}</strong>`,
+          `<strong>${name}</strong>`,
           `Depth: ${data.depth}`,
           `Direct folders: ${data.directFolderCount}`,
           `Descendants: ${data.descendantFolderCount}`
@@ -810,8 +812,9 @@ function buildTreemapOption(graph, visibleNodes, colorContextNodes) {
       trigger: "item",
       formatter(params) {
         const data = params.data;
+        const name = escapeHtml(data.displayName || data.name);
         return [
-          `<strong>${data.displayName || data.name}</strong>`,
+          `<strong>${name}</strong>`,
           `Size: ${formatBytes(data.bytes ?? data.totalFileBytes ?? data.value)}`,
           `Files: ${data.totalFileCount ?? 0}`,
           `Folders: ${data.descendantFolderCount ?? 0}`

@@ -37,6 +37,12 @@ Alle lokalen Tools plus Obsidian-Homepage starten:
 .\startup-all.bat
 ```
 
+Hinweis: `startup-all.bat` liegt eine Ebene ueber diesem Repository und wird ausserhalb von Git gepflegt. Falls der Sammelstarter nicht vorhanden ist, starte die Homepage lokal mit:
+
+```powershell
+npm.cmd --prefix .\Tools run preview
+```
+
 Der Sammelstarter startet Homepage, Calendar, VaultGraph sowie die beiden Fava-Server fuer NICA/TOHU in eigenen Terminalfenstern und oeffnet danach `http://127.0.0.1:4174/home.html` in Obsidian.
 
 Voraussetzung fuer Website Monitoring (`updo`-Modul): Das `updo` CLI muss installiert und im `PATH` verfuegbar sein.
@@ -208,6 +214,5 @@ UI-Optionen liegen unter `ui` in den Settings:
 3. In `Tools/config/settings.default.json` Modul-Konfiguration aufnehmen.
 4. Optional in `Tools/settings.html` UI-Toggles/Felder ergaenzen.
 5. Falls Backend noetig: Endpoint in `Tools/serve.mjs` ergaenzen.
-
 
 

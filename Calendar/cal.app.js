@@ -2354,7 +2354,7 @@
         if (!event || !event.start || !view || !view.activeStart || !view.activeEnd) return true;
         var start = event.start;
         var end = event.end || event.start;
-        return start < view.activeEnd && end >= view.activeStart;
+        return start < view.activeEnd && end > view.activeStart;
       }
 
       /**
@@ -2387,7 +2387,7 @@
             meta: {
               title: calendar.view && calendar.view.title ? calendar.view.title : 'NICA Calendar',
               initialView: calendar.view && calendar.view.type ? calendar.view.type : 'dayGridMonth',
-              initialDate: calendar.getDate ? calendar.getDate().toISOString().slice(0, 10) : '',
+              initialDate: calendar.getDate ? localIsoDateKey(calendar.getDate()) : '',
               activeStart: calendar.view && calendar.view.activeStart ? calendar.view.activeStart.toISOString() : '',
               activeEnd: calendar.view && calendar.view.activeEnd ? calendar.view.activeEnd.toISOString() : ''
             }

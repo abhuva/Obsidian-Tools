@@ -10,6 +10,7 @@ const __dirname = path.dirname(__filename);
 const HOST = process.env.VAULTGRAPH_HOST || "127.0.0.1";
 const PORT = Number(process.env.VAULTGRAPH_PORT || 4175);
 const ROOT = __dirname;
+const ROOT_REAL = fs.realpathSync(ROOT);
 const PID_FILE = path.resolve(ROOT, "vault-graph.preview.pid");
 
 const MIME_TYPES = {
@@ -62,7 +63,8 @@ function safeResolve(urlPath) {
   }
   const normalized = decoded === "/" ? "/vault-graph.html" : decoded;
   const resolved = path.resolve(ROOT, `.${normalized}`);
-  if (!resolved.startsWith(ROOT)) return null;
+  const relativeToRoot = path.relative(ROOT, resolved);
+  if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) return null;
   return resolved;
 }
 
@@ -140,11 +142,26 @@ const server = http.createServer((req, res) => {
     sendText(res, 404, "Not found");
     return;
   }
+  const realFilePath = fs.realpathSync(filePath);
+  const relativeToRealRoot = path.relative(ROOT_REAL, realFilePath);
+  if (relativeToRealRoot.startsWith("..") || path.isAbsolute(relativeToRealRoot)) {
+    sendText(res, 403, "Forbidden");
+    return;
+  }
 
   const ext = path.extname(filePath).toLowerCase();
   const contentType = MIME_TYPES[ext] || "application/octet-stream";
   res.writeHead(200, { "Content-Type": contentType });
-  fs.createReadStream(filePath).pipe(res);
+  const stream = fs.createReadStream(filePath);
+  stream.on("error", (error) => {
+    console.error(`VaultGraph static file read failed: ${error?.message || error}`);
+    if (!res.headersSent) {
+      sendText(res, 500, "Could not read static file");
+    } else {
+      res.destroy(error);
+    }
+  });
+  stream.pipe(res);
 });
 
 server.on("error", (error) => {

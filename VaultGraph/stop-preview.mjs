@@ -38,6 +38,44 @@ function killPid(pid) {
 }
 
 /**
+ * Reads process metadata for a process id.
+ * @param {number} pid - Process id to inspect.
+ * @returns {object|null} Process metadata or null when unavailable.
+ */
+function getProcessByPid(pid) {
+  if (!Number.isInteger(pid) || pid <= 0) return null;
+  try {
+    if (process.platform === "win32") {
+      const ps = [
+        "$ErrorActionPreference='Stop';",
+        `$proc = Get-CimInstance Win32_Process -Filter 'ProcessId = ${pid}';`,
+        "if ($proc) {",
+        "  [PSCustomObject]@{",
+        "    pid = [int]$proc.ProcessId;",
+        "    name = [string]$proc.Name;",
+        "    commandLine = [string]$proc.CommandLine",
+        "  } | ConvertTo-Json -Compress",
+        "}"
+      ].join(" ");
+      const raw = execSync(`powershell -NoProfile -Command "${ps}"`, {
+        encoding: "utf8",
+        stdio: "pipe"
+      }).trim();
+      return raw ? JSON.parse(raw) : null;
+    }
+    const raw = execSync(`ps -p ${pid} -o pid=,comm=,args=`, {
+      encoding: "utf8",
+      stdio: "pipe"
+    }).trim();
+    if (!raw) return null;
+    const [pidText, name, ...commandParts] = raw.split(/\s+/);
+    return { pid: Number(pidText), name, commandLine: commandParts.join(" ") };
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Deletes the preview PID file.
  * @returns {void}
  */
@@ -61,8 +99,8 @@ function listListenerProcessesOnPort(port) {
       "$ErrorActionPreference='Stop';",
       `$pids = Get-NetTCPConnection -LocalPort ${port} -State Listen | Select-Object -ExpandProperty OwningProcess -Unique;`,
       "$items = @();",
-      "foreach ($pid in $pids) {",
-      "  $proc = Get-CimInstance Win32_Process -Filter \"ProcessId = $pid\";",
+      "foreach ($currentPid in $pids) {",
+      "  $proc = Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -eq $currentPid };",
       "  if ($proc) {",
       "    $items += [PSCustomObject]@{",
       "      pid = [int]$proc.ProcessId;",
@@ -122,6 +160,20 @@ if (!pid) {
     );
   } else {
     console.log("No preview PID file found.");
+  }
+  process.exit(0);
+}
+
+const pidProcess = getProcessByPid(pid);
+if (!looksLikeVaultGraphServerProcess(pidProcess)) {
+  clearPidFile();
+  const result = stopLegacyVaultGraphByPort();
+  if (result.stopped > 0) {
+    console.log(
+      `Preview PID ${pid} did not match VaultGraph; stopped ${result.stopped} matching process(es) on port ${PORT} (pid: ${result.candidates.join(", ")}).`
+    );
+  } else {
+    console.log(`Preview PID ${pid} did not match VaultGraph; cleared stale PID file.`);
   }
   process.exit(0);
 }

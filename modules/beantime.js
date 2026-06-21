@@ -346,17 +346,19 @@ export async function renderBeantimeModule(shell) {
         const text = await response.text();
         throw new Error(text || "Start fehlgeschlagen");
       }
-      const knownStartIso = String(runningMeta?.startedAt || "").trim() || new Date().toISOString();
-      running = true;
-      runningMeta = {
-        account,
-        personAccount,
-        summary,
-        startedAt: knownStartIso
-      };
-      syncUiState();
       setStatus(response.status === 409 ? "Timer laeuft bereits." : "Timer gestartet.", "ok");
-      publishBeantimeState({ running: runningMeta });
+      if (response.status !== 409) {
+        const knownStartIso = String(runningMeta?.startedAt || "").trim() || new Date().toISOString();
+        running = true;
+        runningMeta = {
+          account,
+          personAccount,
+          summary,
+          startedAt: knownStartIso
+        };
+        syncUiState();
+        publishBeantimeState({ running: runningMeta });
+      }
       await loadMeta().catch(() => {});
     } finally {
       isStarting = false;
