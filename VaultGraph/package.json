@@ -1,0 +1,12 @@
+{
+  "name": "obsidian-vault-graph",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:graph": "node ./build-graph.mjs",
+    "preview": "npm run stop:preview && npm run build:graph && node ./serve.mjs",
+    "stop:preview": "node ./stop-preview.mjs",
+    "restart:preview": "npm run stop:preview && npm run preview",
+    "check:smoke": "node --check ./build-graph.mjs && node --check ./serve.mjs && node --check ./stop-preview.mjs && node --check ./smoke-check.mjs && node --check ./vault-graph.app.js && node ./build-graph.mjs && node ./smoke-check.mjs"
+  }
+}

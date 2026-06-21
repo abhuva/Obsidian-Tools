@@ -85,6 +85,11 @@ Important vars:
 - `NEXTCLOUD_CALDAV_APP_PASSWORD` (Nextcloud app password)
 - `NEXTCLOUD_CALDAV_CALENDARS` (comma list of calendar slugs or full CalDAV calendar URLs)
 - `NEXTCLOUD_CREATE_CALENDAR_ID` (optional default target calendar for new Nextcloud events)
+- `CALENDAR_PUBLIC_URL` (public browser URL after upload, default `https://calendar.nica.network`)
+- `CALENDAR_PUBLIC_EXPORT_DIR` (local generated static export folder, default `public-export`)
+- `CALENDAR_PUBLIC_SFTP_URL` (SFTP target directory, example `sftp://nica.network/public/`)
+- `CALENDAR_PUBLIC_SFTP_USER` / `CALENDAR_PUBLIC_SFTP_PASSWORD` (SFTP upload credentials; keep in `.env.local`)
+- `CALENDAR_PUBLIC_SFTP_HOST_FINGERPRINT_SHA256` (required SHA-256 host key fingerprint as hex digest, not OpenSSH base64)
 
 Important Nextcloud note:
 
@@ -146,6 +151,7 @@ Write:
 - `POST /api/events/open-map`
 - `POST /api/events/create`
 - `POST /api/events/rebuild`
+- `POST /api/events/publish-public`
 
 Write-route protections:
 
@@ -168,6 +174,7 @@ Write-route protections:
   - `N` button toggles Nextcloud event visibility
   - buttons show clear on/off visual state and mirror settings values
 - Source visibility toggles were moved out of settings popover; visibility is controlled from toolbar buttons only.
+- Publish button uploads the current rendered calendar view/selection as a static read-only bundle via SFTP.
 - Create-event modal uses per-target tabs:
   - `md`: create markdown event note
   - `google`: choose color from currently loaded Google event colors, then create
@@ -192,6 +199,7 @@ Write-route protections:
 - `calendar.filter-state.json` (local persisted filter)
 - `calendar.preview.pid` (runtime)
 - `preview.log` (optional runtime log)
+- `public-export/` (generated static website files for public calendar upload)
 
 ## Troubleshooting
 

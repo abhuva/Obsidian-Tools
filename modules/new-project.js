@@ -162,6 +162,9 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     const typeSelect = document.createElement("select");
     typeSelect.className = "input";
 
+    const templateSelect = document.createElement("select");
+    templateSelect.className = "input";
+
     const fundingInput = document.createElement("input");
     fundingInput.className = "input";
     fundingInput.type = "text";
@@ -197,6 +200,7 @@ export async function renderNewProjectModule(shell, moduleSettings) {
     formGrid.appendChild(createLabeledField("Jahr", yearInput));
     formGrid.appendChild(createLabeledField("Verein", societySelect));
     formGrid.appendChild(createLabeledField("Projektart", typeSelect));
+    formGrid.appendChild(createLabeledField("Template", templateSelect));
     formGrid.appendChild(createLabeledField("Foerderkuerzel", fundingInput));
     const titleField = createLabeledField("Projekt-Titel", titleInput);
     titleField.classList.add("new-project-field-full");
@@ -286,6 +290,7 @@ export async function renderNewProjectModule(shell, moduleSettings) {
       const societies = Array.isArray(data?.options?.societies) ? data.options.societies : [];
       const types = Array.isArray(data?.options?.types) ? data.options.types : [];
       const fundingCodes = Array.isArray(data?.options?.fundingCodes) ? data.options.fundingCodes : [];
+      const templates = Array.isArray(data?.templates) ? data.templates : [];
 
       yearInput.value = String((years[0] && years[0].value) || now.getFullYear());
 
@@ -315,6 +320,14 @@ export async function renderNewProjectModule(shell, moduleSettings) {
         option.value = "funding";
         option.textContent = "funding";
         typeSelect.appendChild(option);
+      }
+
+      templateSelect.innerHTML = "";
+      for (const item of templates) {
+        const option = document.createElement("option");
+        option.value = item.path;
+        option.textContent = item.label || item.path;
+        templateSelect.appendChild(option);
       }
 
       fundingHints.innerHTML = "";
@@ -357,6 +370,7 @@ export async function renderNewProjectModule(shell, moduleSettings) {
         fundingCode: cleanText(fundingInput.value),
         title: cleanText(titleInput.value),
         projectType: cleanText(typeSelect.value).toLowerCase(),
+        templatePath: cleanText(templateSelect.value),
         openInNewTab
       };
 
@@ -370,6 +384,10 @@ export async function renderNewProjectModule(shell, moduleSettings) {
       }
       if (payload.projectType === "funding" && (!payload.fundingCode || payload.fundingCode === "-")) {
         setFormStatus("Foerderkuerzel fehlt.", "err");
+        return;
+      }
+      if (!payload.templatePath) {
+        setFormStatus("Template fehlt.", "err");
         return;
       }
 

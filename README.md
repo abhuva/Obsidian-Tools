@@ -31,6 +31,20 @@ Von Repository-Root:
 npm.cmd --prefix .\Tools run preview
 ```
 
+Alle lokalen Tools plus Obsidian-Homepage starten:
+
+```powershell
+.\startup-all.bat
+```
+
+Hinweis: `startup-all.bat` liegt eine Ebene ueber diesem Repository und wird ausserhalb von Git gepflegt. Falls der Sammelstarter nicht vorhanden ist, starte die Homepage lokal mit:
+
+```powershell
+npm.cmd --prefix .\Tools run preview
+```
+
+Der Sammelstarter startet Homepage, Calendar, VaultGraph sowie die beiden Fava-Server fuer NICA/TOHU in eigenen Terminalfenstern und oeffnet danach `http://127.0.0.1:4174/home.html` in Obsidian.
+
 Voraussetzung fuer Website Monitoring (`updo`-Modul): Das `updo` CLI muss installiert und im `PATH` verfuegbar sein.
 
 Stoppen:
@@ -71,8 +85,8 @@ obsidian web url="http://127.0.0.1:4174/settings.html"
 - `POST /api/bookmarks/open`: Oeffnet Bookmark in Obsidian ueber Bookmark-Plugin-API.
 - `GET /api/obsidian/theme`: Liefert einen Theme-Snapshot aus Obsidian (fuer `mirror-obsidian`).
 - `POST /api/search/open`: Oeffnet konfigurierte Header-Suche in Obsidian.
-- `GET /api/projects/meta`: Liefert Vorschlagswerte fuer neue Projekte (Year/Society/Type/Foerderkuerzel).
-- `POST /api/projects/create`: Erstellt neuen Projektordner + MOC-Datei per Projekt-Template und oeffnet die Datei.
+- `GET /api/projects/meta`: Liefert Vorschlagswerte fuer neue Projekte (Year/Society/Type/Foerderkuerzel) und verfuegbare Projekt-Templates.
+- `POST /api/projects/create`: Erstellt neuen Projektordner + MOC-Datei per ausgewaehltem Projekt-Template und oeffnet die Datei.
 - `GET /api/updo/snapshot`: Liefert Monitoring-Snapshot fuer das `updo`-Modul.
 - `GET /api/updo/history`: Liefert komprimierte Langzeitdaten + Incident-Liste (`rangeDays` optional).
   - Enthält bei TLS-Fehlern ein `sslIssue`-Objekt (z. B. `ERR_TLS_CERT_ALTNAME_INVALID`).
@@ -102,11 +116,15 @@ Damit sind spaetere Features stabil erweiterbar (neue Module, neue Optionen).
   - Optional: Oeffnen in neuem Tab (`openInNewTab`) an/aus.
   - Optional: Kartenbreite (`cardMaxWidth`, 205-420 px).
 - `clock` (Uhrzeit): Live-Digitaluhr im Header/Banner.
-- `newProject` (Neues Projekt erstellen): Dialog fuer neue Projekte in `2. Projektverwaltung` inkl. Naming-Validierung.
+- `newProject` (Neues Projekt erstellen): Dialog fuer neue Projekte in `2. Projektverwaltung` inkl. Template-Auswahl und Naming-Validierung.
+  - Projekt-Templates werden aus `6. Obsidian/_template/project/*.md` geladen.
+  - Angezeigt werden die Dateinamen ohne `.md`; `Projekt.md` steht standardmaessig oben, falls vorhanden.
 - `beantime` (Beancount): Start/Stop-Timer mit Konten- und Personenauswahl; schreibt beim Stop eine fertige `HR`-Buchung inkl. Metadaten in eine Beancount-Datei.
   - Standard-Ziel fuer Laufzeitbuchungen: `Tools/data/beantime/zeit.beancount` (lokal, git-ignored).
   - Vorlage fuer Kontenstruktur: `Tools/beantime/zeit.beancount` (Repository-Template).
   - Enthaelt den Button `Show`, der Fava auf Port `3464` oeffnet.
+- `vaultGraph`: Bindet die separate VaultGraph-Preview (`http://127.0.0.1:4175/vault-graph.html`) als Homepage-Tab ein.
+  - Voraussetzung: `npm.cmd --prefix .\Tools\VaultGraph run preview` laeuft.
 - `updo` (Website Monitoring): Statuskarten + Latenz/Verfuegbarkeits-Charts fuer konfigurierten URL-Satz.
   - Live-Ansicht: 15m / 1h / 6h aus In-Memory-Ringpuffer.
   - Langzeit-Ansicht: 7d / 30d / 90d aus komprimierten Persistenzdaten.
@@ -196,6 +214,5 @@ UI-Optionen liegen unter `ui` in den Settings:
 3. In `Tools/config/settings.default.json` Modul-Konfiguration aufnehmen.
 4. Optional in `Tools/settings.html` UI-Toggles/Felder ergaenzen.
 5. Falls Backend noetig: Endpoint in `Tools/serve.mjs` ergaenzen.
-
 
 

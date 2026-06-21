@@ -1,0 +1,203 @@
+## Projektkalkulation mit festen Beträgen
+
+Antragstellende Organisation:
+
+Antragsnummer in "Kumasta":
+
+## Geplante Ausgaben für alle Kalenderjahre
+
+Zunächst sehen Sie eine Zusammenfassung - in diese müssen Sie nichts eintragen. Die Zusammenfassung berechnet automatisch alle Angaben für den Antrag in "Kumasta". Im unteren Teil dieses Dokuments tragen Sie die geplanten Aktivitäten Ihres Projekts ein. Bitte beachten Sie dabei auch die Hinweise zur Finanzierung und zur Antragstellung.
+
+Haben Sie im unteren Bereich dieses Dokuments alle Aktivitäten eingetragen? Dann übernehmen Sie folgende Werte in den Abschnitt "Geplante Ausgaben" von "Kumasta". Bitte geben Sie dort als Erläuterung für Honorare und Sachausgaben "siehe Kalkulation" an. Der Stundensatz bei "Honorare" dient nur der Kalkulation und ist für Sie nicht verbindlich.
+
+| Honorare                          | Honorare          |
+|-----------------------------------|-------------------|
+| Anzahl der Stunden gesamt         | 0                 |
+| Zeiteinheit                       | 60 Min.           |
+| Höhe der Stundensätze             | 35 €              |
+| Gesamtsumme (automatisch)         | 0,00 €            |
+| Erläuterung (wörtlich übernehmen) | siehe Kalkulation |
+
+## Personalausgaben
+
+Bitte tragen Sie unter diesem Punkt nichts ein.
+
+## Aufwandsentschädigungen
+
+Bitte tragen Sie unter diesem Punkt nichts ein.
+
+| Sachausgaben                      | Sachausgaben      |
+|-----------------------------------|-------------------|
+| Summe                             | 0,00 €            |
+| Erläuterung (wörtlich übernehmen) | siehe Kalkulation |
+
+## Investitionen
+
+Bitte tragen Sie unter diesem Punkt nichts ein.
+
+## Eigenmittel / Mittel Dritter
+
+Es müssen keine Eigenmittel/Drittmittel eingebracht werden.
+
+| Veranstaltungspauschalen für Transfer- und Vernetzungsaktivitäten   | Veranstaltungspauschalen für Transfer- und Vernetzungsaktivitäten   |
+|---------------------------------------------------------------------|---------------------------------------------------------------------|
+| Transfer- und Vernetzung: Treffen                                   | Transfer- und Vernetzung: Treffen                                   |
+| Anzahl der Treffen                                                  | nichts eintragen                                                    |
+| Anzahl der Teilnahmen                                               | nichts eintragen                                                    |
+| Gesamtausgaben (automatisch)                                        | nichts eintragen                                                    |
+| Erläuterung (wörtlich übernehmen)                                   | nichts eintragen                                                    |
+| Transfer- und Vernetzung: Workshop                                  | Transfer- und Vernetzung: Workshop                                  |
+| Anzahl der Workshops                                                | nichts eintragen                                                    |
+| Anzahl der Teilnahmen                                               | nichts eintragen                                                    |
+| Gesamtausgaben (automatisch)                                        | nichts eintragen                                                    |
+| Erläuterung (wörtlich übernehmen)                                   | nichts eintragen                                                    |
+
+Bitte laden Sie diese Kalkulation anschließend als Excel-Dokument unter "Unterlagen" hoch.
+
+| gesamt   | 2023   | 2024   | 2025   | 2026   | 2027   |
+|----------|--------|--------|--------|--------|--------|
+| 0 €      | 0 €    | 0 €    | 0 €    | 0 €    | 0 €    |
+
+## Projektkalkulation mit festen Beträgen
+
+Antragstellende Organisation:
+
+Antragsnummer in "Kumasta":
+
+## Geplante Aktivitäten im Kalenderjahr 2026
+
+- [ ] Teilnehmer*innen
+
+x
+
+- [ ] Termine x
+
+- [ ] 14 Euro  =
+
+0,00 €
+
+- [ ] Teilnehmer*innen x
+
+- [ ] Termine
+
+x
+
+- [ ] 14 Euro  =
+
+0,00 €
+
+- [ ] Teilnehmer*innen
+
+x
+
+- [ ] Termine x
+
+- [ ] 14 Euro  =
+
+0,00 €
+
+- [ ] Teilnehmer*innen x
+
+- [ ] Tage
+
+x
+
+- [ ] 56 Euro  =
+
+0,00 €
+
+- [ ] Teilnehmer*innen
+
+x
+
+Tage
+
+x
+
+56
+
+Euro  =
+
+0,00 €
+
+- [ ] Teilnehmer*innen
+
+x
+
+Tage
+
+x
+
+56
+
+Euro  =
+
+0,00 €
+
+Übernachtungen bei Workshops
+
+- [ ] Teilnehmer*innen
+
+- [ ] x
+
+- [ ] Übern. x
+
+42
+
+Euro  =
+
+0,00 €
+
+- [ ] Teilnehmer*innen
+
+x
+
+- [ ] Übern.
+
+x
+
+42
+
+Euro  =
+
+0,00 €
+
+- [ ] Teilnehmer*innen x
+
+- [ ] Übern. x
+
+42
+
+Euro  =
+
+0,00 €
+
+Schnupperangebote
+
+Schnupperangebote (max. 1 Angebot/Tag)
+
+x
+
+- [ ] 280 Euro  =
+
+0,00 €
+
+Kompetenznachweis Kultur
+
+- [ ] ausgestellte Kompetenznachweise Kultur
+
+x
+
+280
+
+Euro  =
+
+0,00 €
+
+Gesamtausgaben im Kalenderjahr 2026:
+
+0,00 €
+
+Nachmittagskurse (mind. 1,5 Stunden/Termin)
+
+Wochenend-/Ferienworkshops (mind. 6 Stunden/Tag)

@@ -4,6 +4,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import SftpClient from "ssh2-sftp-client";
 import { loadDotEnvFile } from "./lib/env.mjs";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -56,6 +57,14 @@ const NEXTCLOUD_DEFAULT_CREATE_CALENDAR_ID =
 const BOOKMARKS_FILE = path.resolve(VAULT_ROOT, ".obsidian", "bookmarks.json");
 const FILTER_STATE_FILE = path.resolve(ROOT, "calendar.filter-state.json");
 const PID_FILE = path.resolve(ROOT, "calendar.preview.pid");
+const PUBLIC_EXPORT_DIR = resolvePublicExportDir(process.env.CALENDAR_PUBLIC_EXPORT_DIR);
+const PUBLIC_SFTP_URL = String(process.env.CALENDAR_PUBLIC_SFTP_URL || "").trim();
+const PUBLIC_SFTP_USER = String(process.env.CALENDAR_PUBLIC_SFTP_USER || "").trim();
+const PUBLIC_SFTP_PASSWORD = String(process.env.CALENDAR_PUBLIC_SFTP_PASSWORD || "").trim();
+const PUBLIC_SFTP_HOST_FINGERPRINT_SHA256 = String(
+  process.env.CALENDAR_PUBLIC_SFTP_HOST_FINGERPRINT_SHA256 || ""
+).trim();
+const PUBLIC_CALENDAR_URL = String(process.env.CALENDAR_PUBLIC_URL || "https://calendar.nica.network").trim();
 const KALENDAR_BASES_GROUP = "Kalendar Bases";
 const API_TOKEN = String(process.env.CALENDAR_API_TOKEN || "").trim() || crypto.randomBytes(24).toString("hex");
 const googleOauthStateStore = new Map();
@@ -1102,6 +1111,505 @@ function rebuildEventsFile(baseFilter) {
     encoding: "utf8",
     stdio: "pipe"
   });
+}
+
+/**
+ * Removes control characters and trims metadata strings for the public export.
+ * @param {unknown} value - Raw metadata value.
+ * @returns {string} Safe single-line string.
+ */
+function publicExportString(value) {
+  return String(value || "").replace(/[\u0000-\u001f\u007f]/g, " ").trim();
+}
+
+/**
+ * Resolves the local public export directory without allowing path traversal.
+ * @param {unknown} rawDir - Optional environment value.
+ * @returns {string} Absolute export directory below the Calendar tool root.
+ */
+function resolvePublicExportDir(rawDir) {
+  const raw = String(rawDir || "public-export").trim() || "public-export";
+  if (path.isAbsolute(raw) || raw.split(/[\\/]+/).includes("..")) {
+    throw new Error("CALENDAR_PUBLIC_EXPORT_DIR must be a relative path below Tools/Calendar");
+  }
+  const resolved = path.resolve(ROOT, raw);
+  const relativeToRoot = path.relative(ROOT, resolved);
+  if (relativeToRoot.startsWith("..") || path.isAbsolute(relativeToRoot)) {
+    throw new Error("CALENDAR_PUBLIC_EXPORT_DIR must resolve below Tools/Calendar");
+  }
+  return resolved;
+}
+
+/**
+ * Validates the configured SFTP SHA-256 host fingerprint.
+ * @param {string} serverHash - Server host key hash supplied by ssh2.
+ * @returns {boolean} True when the hash matches exactly.
+ */
+function verifyPublicSftpHost(serverHash) {
+  const expected = PUBLIC_SFTP_HOST_FINGERPRINT_SHA256.toLowerCase();
+  const actual = String(serverHash || "").trim().toLowerCase();
+  return Boolean(expected) && actual === expected;
+}
+
+/**
+ * Limits public event payload to fields needed by the static calendar.
+ * @param {unknown} rawEvent - Client-supplied FullCalendar event snapshot.
+ * @returns {object|null} Sanitized event payload.
+ */
+function sanitizePublicEvent(rawEvent) {
+  if (!rawEvent || typeof rawEvent !== "object") return null;
+  const start = publicExportString(rawEvent.start);
+  if (!start) return null;
+  const event = {
+    title: publicExportString(rawEvent.title),
+    start,
+    allDay: rawEvent.allDay === true
+  };
+  const end = publicExportString(rawEvent.end);
+  if (end) event.end = end;
+  const id = publicExportString(rawEvent.id);
+  if (id) event.id = id;
+  const display = publicExportString(rawEvent.display);
+  if (display) event.display = display;
+  const backgroundColor = publicExportString(rawEvent.backgroundColor);
+  if (backgroundColor) event.backgroundColor = backgroundColor;
+  const borderColor = publicExportString(rawEvent.borderColor);
+  if (borderColor) event.borderColor = borderColor;
+  const textColor = publicExportString(rawEvent.textColor);
+  if (textColor) event.textColor = textColor;
+  if (Array.isArray(rawEvent.classNames)) {
+    event.classNames = rawEvent.classNames.map(publicExportString).filter(Boolean).slice(0, 20);
+  }
+  if (rawEvent.extendedProps && typeof rawEvent.extendedProps === "object") {
+    const props = rawEvent.extendedProps;
+    event.extendedProps = {};
+    for (const key of [
+      "sourcePath",
+      "externalSource",
+      "isRecurring",
+      "isRecurringOverride",
+      "coordinates",
+      "googleDescription",
+      "googleLocation",
+      "nextcloudDescription",
+      "nextcloudLocation",
+      "nextcloudUrl"
+    ]) {
+      if (typeof props[key] === "boolean") {
+        event.extendedProps[key] = props[key];
+      } else {
+        const value = publicExportString(props[key]);
+        if (value) event.extendedProps[key] = value;
+      }
+    }
+    if (!Object.keys(event.extendedProps).length) delete event.extendedProps;
+  }
+  return event;
+}
+
+/**
+ * Creates static public calendar files from the current client-side snapshot.
+ * @param {object} payload - Publish payload from the browser.
+ * @returns {{dir: string, files: string[], eventCount: number}} Export details.
+ */
+function writePublicCalendarExport(payload) {
+  const rawEvents = Array.isArray(payload?.events) ? payload.events : [];
+  const events = rawEvents.map(sanitizePublicEvent).filter(Boolean);
+  if (!events.length) throw new Error("No events were provided for public export");
+
+  const meta = payload?.meta && typeof payload.meta === "object" ? payload.meta : {};
+  const initialView = publicExportString(meta.initialView) || "dayGridMonth";
+  const initialDate = publicExportString(meta.initialDate) || new Date().toISOString().slice(0, 10);
+  const title = publicExportString(meta.title) || "NICA Calendar";
+  const publishedAt = new Date().toISOString();
+
+  fs.rmSync(PUBLIC_EXPORT_DIR, { recursive: true, force: true });
+  fs.mkdirSync(PUBLIC_EXPORT_DIR, { recursive: true });
+
+  const publicEventsJs = [
+    "window.CALENDAR_PUBLIC_EXPORT = ",
+    JSON.stringify(
+      {
+        title,
+        publishedAt,
+        initialView,
+        initialDate,
+        events
+      },
+      null,
+      2
+    ),
+    ";\n"
+  ].join("");
+
+  const indexHtml = `<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>${title.replace(/[<>&"]/g, "")}</title>
+    <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.20/index.global.min.js"></script>
+    <link rel="stylesheet" href="./cal.css" />
+    <script src="./public-events.js"></script>
+    <script src="./public-calendar.js" defer></script>
+  </head>
+  <body class="calendar-public">
+    <main class="calendar-public-shell">
+      <header class="calendar-public-header">
+        <p class="calendar-public-kicker">NICA Kalender</p>
+        <h1>${title.replace(/[<>&"]/g, "")}</h1>
+        <p>Veröffentlicht: <time datetime="${publishedAt}">${publishedAt.slice(0, 10)}</time></p>
+      </header>
+      <div id="calendar"></div>
+    </main>
+  </body>
+</html>
+`;
+
+  const publicCalendarJs = `(function() {
+  function eventClassNames(arg) {
+    var classes = [];
+    var event = arg && arg.event;
+    if (!event) return classes;
+    classes.push(event.display === 'background' ? 'ev-background' : 'ev-solid');
+    var props = event.extendedProps || {};
+    if (props.isRecurring) classes.push('ev-recurring');
+    if (props.isRecurringOverride) classes.push('ev-recurring-override');
+    var sourcePath = String(props.sourcePath || '').toUpperCase();
+    if (sourcePath.indexOf(' TOHU ') >= 0 || sourcePath.indexOf('/TOHU ') >= 0) classes.push('ev-society-tohu');
+    if (sourcePath.indexOf(' NICA ') >= 0 || sourcePath.indexOf('/NICA ') >= 0) classes.push('ev-society-nica');
+    return classes;
+  }
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, function(ch) {
+      return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[ch];
+    });
+  }
+  function formatEventDate(event) {
+    if (!event || !event.start) return '';
+    var options = event.allDay
+      ? { year: 'numeric', month: '2-digit', day: '2-digit' }
+      : { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' };
+    var start = event.start;
+    var end = event.end;
+    var text = start.toLocaleString('de-DE', options);
+    if (end) text += ' - ' + end.toLocaleString('de-DE', options);
+    return text;
+  }
+  function getEventDetails(event) {
+    var props = event && event.extendedProps ? event.extendedProps : {};
+    var source = String(props.externalSource || '').toLowerCase();
+    var description = '';
+    var location = '';
+    if (source === 'google') {
+      description = String(props.googleDescription || '').trim();
+      location = String(props.googleLocation || '').trim();
+    } else if (source === 'nextcloud') {
+      description = String(props.nextcloudDescription || '').trim();
+      location = String(props.nextcloudLocation || '').trim();
+    }
+    return {
+      source: source,
+      description: description,
+      location: location,
+      sourcePath: String(props.sourcePath || '').trim()
+    };
+  }
+  function closePopover() {
+    var popover = document.getElementById('public-event-popover');
+    if (!popover) return;
+    popover.hidden = true;
+    popover.setAttribute('aria-hidden', 'true');
+    popover.style.left = '';
+    popover.style.top = '';
+  }
+  function placePopover(popover, nativeEvent) {
+    var margin = 12;
+    var x = nativeEvent && typeof nativeEvent.clientX === 'number' ? nativeEvent.clientX : window.innerWidth / 2;
+    var y = nativeEvent && typeof nativeEvent.clientY === 'number' ? nativeEvent.clientY : window.innerHeight / 2;
+    popover.hidden = false;
+    popover.setAttribute('aria-hidden', 'false');
+    popover.style.left = '0px';
+    popover.style.top = '0px';
+    var rect = popover.getBoundingClientRect();
+    var left = Math.min(Math.max(margin, x + margin), Math.max(margin, window.innerWidth - rect.width - margin));
+    var top = Math.min(Math.max(margin, y + margin), Math.max(margin, window.innerHeight - rect.height - margin));
+    popover.style.left = left + 'px';
+    popover.style.top = top + 'px';
+  }
+  function showEventPopover(info) {
+    var event = info && info.event;
+    if (!event || event.display === 'background') return;
+    var popover = document.getElementById('public-event-popover');
+    if (!popover) return;
+    var details = getEventDetails(event);
+    var bodyParts = [];
+    if (details.description) {
+      bodyParts.push('<p>' + escapeHtml(details.description).replace(/\\r?\\n/g, '<br />') + '</p>');
+    }
+    if (details.location) {
+      bodyParts.push('<p><strong>Ort:</strong> ' + escapeHtml(details.location) + '</p>');
+    }
+    if (details.sourcePath) {
+      bodyParts.push('<p class="public-event-popover__muted">' + escapeHtml(details.sourcePath) + '</p>');
+    }
+    if (!bodyParts.length) {
+      bodyParts.push('<p class="public-event-popover__muted">Keine weiteren Details hinterlegt.</p>');
+    }
+    popover.querySelector('.public-event-popover__title').textContent = event.title || 'Termin';
+    popover.querySelector('.public-event-popover__date').textContent = formatEventDate(event);
+    popover.querySelector('.public-event-popover__body').innerHTML = bodyParts.join('');
+    placePopover(popover, info && info.jsEvent);
+  }
+  document.addEventListener('DOMContentLoaded', function() {
+    var data = window.CALENDAR_PUBLIC_EXPORT || {};
+    var calendarEl = document.getElementById('calendar');
+    if (!calendarEl || !window.FullCalendar) return;
+    var popover = document.createElement('div');
+    popover.id = 'public-event-popover';
+    popover.className = 'public-event-popover';
+    popover.setAttribute('role', 'dialog');
+    popover.setAttribute('aria-hidden', 'true');
+    popover.hidden = true;
+    popover.innerHTML = '<button class="public-event-popover__close" type="button" aria-label="Schliessen">x</button><h3 class="public-event-popover__title"></h3><p class="public-event-popover__date"></p><div class="public-event-popover__body"></div>';
+    document.body.appendChild(popover);
+    popover.querySelector('.public-event-popover__close').addEventListener('click', closePopover);
+    document.addEventListener('mousedown', function(event) {
+      if (!popover.hidden && !popover.contains(event.target) && !(event.target && event.target.closest && event.target.closest('.fc-event'))) {
+        closePopover();
+      }
+    });
+    document.addEventListener('keydown', function(event) {
+      if (event.key === 'Escape') closePopover();
+    });
+    var calendar = new FullCalendar.Calendar(calendarEl, {
+      initialView: data.initialView || 'dayGridMonth',
+      initialDate: data.initialDate || undefined,
+      firstDay: 1,
+      fixedWeekCount: false,
+      height: 'auto',
+      dayMaxEvents: false,
+      dayMaxEventRows: false,
+      editable: false,
+      selectable: false,
+      events: Array.isArray(data.events) ? data.events : [],
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'timeGridDay,timeGridWeek,dayGridMonth,multiMonthYear'
+      },
+      eventClassNames: eventClassNames,
+      eventClick: showEventPopover,
+      eventContent: function(arg) {
+        var event = arg && arg.event;
+        if (!event || event.display === 'background') return;
+        return { html: '<div class="ev-content"><span class="ev-title">' + escapeHtml(event.title || '') + '</span></div>' };
+      }
+    });
+    calendar.render();
+  });
+})();\n`;
+
+  const publicCss = `${fs.readFileSync(path.join(ROOT, "cal.css"), "utf8")}
+
+.calendar-public {
+  margin: 0;
+  min-height: 100%;
+  height: auto;
+  overflow: auto;
+  display: block;
+  background: #f5f1e8;
+}
+.calendar-public,
+.calendar-public * {
+  box-sizing: border-box;
+}
+.calendar-public-shell {
+  min-height: 100vh;
+  padding: 24px;
+}
+.calendar-public-header {
+  margin: 0 auto 18px;
+  max-width: 1200px;
+}
+.calendar-public-kicker {
+  margin: 0 0 4px;
+  color: #6d5f45;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.calendar-public-header h1 {
+  margin: 0;
+  color: #241f17;
+  font-size: clamp(1.5rem, 3vw, 2.6rem);
+}
+.calendar-public-header p {
+  margin: 6px 0 0;
+  color: #6d5f45;
+}
+.calendar-public #calendar {
+  margin: 0 auto;
+  max-width: 1200px;
+  min-height: calc(100vh - 150px);
+  height: auto;
+  overflow: visible;
+  padding: 0;
+}
+.calendar-public .fc {
+  min-height: calc(100vh - 150px);
+  height: auto;
+}
+.calendar-public .fc .fc-view-harness {
+  min-height: 640px;
+  height: auto !important;
+}
+.calendar-public .fc .fc-scroller {
+  overflow: visible !important;
+}
+.public-event-popover {
+  position: fixed;
+  z-index: 10000;
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(520px, calc(100vh - 24px));
+  overflow: auto;
+  padding: 16px;
+  border: 1px solid var(--cal-border);
+  border-radius: calc(var(--cal-radius) + 8px);
+  background: var(--cal-surface);
+  color: var(--cal-text);
+  box-shadow: 0 18px 44px rgba(21, 45, 94, 0.24);
+}
+.public-event-popover[hidden] {
+  display: none;
+}
+.public-event-popover__close {
+  position: absolute;
+  top: 8px;
+  right: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--cal-text-soft);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+.public-event-popover__title {
+  margin: 0 26px 6px 0;
+  color: var(--cal-text);
+  font-size: 1rem;
+  line-height: 1.25;
+}
+.public-event-popover__date {
+  margin: 0 0 12px;
+  color: var(--cal-text-soft);
+  font-size: 0.82rem;
+}
+.public-event-popover__body {
+  color: var(--cal-text);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+.public-event-popover__body p {
+  margin: 0 0 10px;
+}
+.public-event-popover__body p:last-child {
+  margin-bottom: 0;
+}
+.public-event-popover__muted {
+  color: var(--cal-text-soft);
+  font-size: 0.82rem;
+}
+`;
+
+  const files = [
+    ["index.html", indexHtml],
+    ["public-events.js", publicEventsJs],
+    ["public-calendar.js", publicCalendarJs],
+    ["cal.css", publicCss]
+  ];
+  for (const [name, content] of files) {
+    fs.writeFileSync(path.join(PUBLIC_EXPORT_DIR, name), content, "utf8");
+  }
+
+  return { dir: PUBLIC_EXPORT_DIR, files: files.map(([name]) => name), eventCount: events.length };
+}
+
+/**
+ * Parses SFTP target URL into connection and remote directory parts.
+ * @returns {{host: string, port: number, remoteDir: string}} Parsed SFTP target.
+ */
+function parsePublicSftpTarget() {
+  let parsed;
+  try {
+    parsed = new URL(PUBLIC_SFTP_URL);
+  } catch {
+    throw new Error("CALENDAR_PUBLIC_SFTP_URL must be a valid SFTP URL, for example sftp://nica.network/public/");
+  }
+  if (parsed.protocol !== "sftp:") {
+    throw new Error("CALENDAR_PUBLIC_SFTP_URL must start with sftp://");
+  }
+  const host = publicExportString(parsed.hostname);
+  if (!host) throw new Error("CALENDAR_PUBLIC_SFTP_URL is missing a host");
+  const remoteDir = decodeURIComponent(parsed.pathname || "/").replace(/\/?$/, "/") || "/";
+  const port = Number(parsed.port || 22);
+  return { host, port, remoteDir };
+}
+
+/**
+ * Uploads generated public calendar files via SFTP.
+ * @param {string[]} files - File names relative to PUBLIC_EXPORT_DIR.
+ * @returns {Promise<void>}
+ */
+async function uploadPublicCalendarExport(files) {
+  if (!PUBLIC_SFTP_URL || !PUBLIC_SFTP_USER || !PUBLIC_SFTP_PASSWORD) {
+    throw new Error(
+      "Public calendar SFTP is not configured. Set CALENDAR_PUBLIC_SFTP_URL, CALENDAR_PUBLIC_SFTP_USER, and CALENDAR_PUBLIC_SFTP_PASSWORD in Tools/Calendar/.env.local."
+    );
+  }
+  if (!PUBLIC_SFTP_HOST_FINGERPRINT_SHA256) {
+    throw new Error(
+      "Public calendar SFTP host fingerprint is not configured. Set CALENDAR_PUBLIC_SFTP_HOST_FINGERPRINT_SHA256 to the server SHA-256 fingerprint hex digest."
+    );
+  }
+
+  const target = parsePublicSftpTarget();
+  const client = new SftpClient("calendar-public-publish");
+  try {
+    await client.connect({
+      host: target.host,
+      port: target.port,
+      username: PUBLIC_SFTP_USER,
+      password: PUBLIC_SFTP_PASSWORD,
+      hostHash: "sha256",
+      hostVerifier: verifyPublicSftpHost,
+      readyTimeout: 20000
+    });
+    await client.mkdir(target.remoteDir, true);
+    for (const file of files) {
+      const localPath = path.join(PUBLIC_EXPORT_DIR, file);
+      const remotePath = `${target.remoteDir}${file}`;
+      await client.put(localPath, remotePath);
+    }
+  } finally {
+    try {
+      await client.end();
+    } catch {
+      // ignore disconnect errors after upload failure
+    }
+  }
+}
+
+/**
+ * Builds and uploads the public static calendar snapshot.
+ * @param {object} payload - Publish payload from browser.
+ * @returns {Promise<{dir: string, files: string[], eventCount: number, url: string}>} Publish result.
+ */
+async function publishPublicCalendar(payload) {
+  const result = writePublicCalendarExport(payload);
+  await uploadPublicCalendarExport(result.files);
+  return { ...result, url: PUBLIC_CALENDAR_URL };
 }
 
 /**
@@ -3181,6 +3689,35 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (req.method === "POST" && req.url === "/api/events/publish-public") {
+    readRequestBody(req)
+      .then((rawBody) => {
+        let payload;
+        try {
+          payload = JSON.parse(rawBody || "{}");
+        } catch {
+          res.writeHead(400, { "Content-Type": "text/plain; charset=utf-8" });
+          res.end("Invalid JSON payload");
+          return;
+        }
+
+        publishPublicCalendar(payload)
+          .then((result) => {
+            res.writeHead(200, { "Content-Type": "application/json; charset=utf-8" });
+            res.end(JSON.stringify({ ok: true, ...result }));
+          })
+          .catch((error) => {
+            res.writeHead(502, { "Content-Type": "text/plain; charset=utf-8" });
+            res.end(error.message || "Could not publish public calendar");
+          });
+      })
+      .catch((error) => {
+        res.writeHead(500, { "Content-Type": "text/plain; charset=utf-8" });
+        res.end(error.message || "Unknown error while publishing public calendar");
+      });
+    return;
+  }
+
   const target = safeResolve(req.url || "/");
   if (!target) {
     res.writeHead(403, { "Content-Type": "text/plain; charset=utf-8" });
@@ -3220,7 +3757,7 @@ server.listen(PORT, HOST, () => {
   writePidFile();
   console.log(`Calendar preview server: http://${HOST}:${PORT}/cal.html`);
   console.log(
-    "Calendar API endpoints ready: GET /api/ping, GET /api/obsidian/theme, GET /api/calendar/filters, GET /api/google-calendar/config, GET /api/google-calendar/events, GET /api/google-oauth/status, GET /api/google-oauth/start, GET /api/google-oauth/callback, GET /api/nextcloud-calendar/config, GET /api/nextcloud-calendar/events, GET /api/session, GET /api/events/preview, POST /api/google-oauth/disconnect, POST /api/google-calendar/events/create, POST /api/google-calendar/events/update, POST /api/google-calendar/events/delete, POST /api/nextcloud-calendar/events/create, POST /api/nextcloud-calendar/events/update, POST /api/nextcloud-calendar/events/delete, POST /api/events/update-dates, POST /api/events/open-note, POST /api/events/open-map, POST /api/events/create, POST /api/events/rebuild"
+    "Calendar API endpoints ready: GET /api/ping, GET /api/obsidian/theme, GET /api/calendar/filters, GET /api/google-calendar/config, GET /api/google-calendar/events, GET /api/google-oauth/status, GET /api/google-oauth/start, GET /api/google-oauth/callback, GET /api/nextcloud-calendar/config, GET /api/nextcloud-calendar/events, GET /api/session, GET /api/events/preview, POST /api/google-oauth/disconnect, POST /api/google-calendar/events/create, POST /api/google-calendar/events/update, POST /api/google-calendar/events/delete, POST /api/nextcloud-calendar/events/create, POST /api/nextcloud-calendar/events/update, POST /api/nextcloud-calendar/events/delete, POST /api/events/update-dates, POST /api/events/open-note, POST /api/events/open-map, POST /api/events/create, POST /api/events/rebuild, POST /api/events/publish-public"
   );
 });
 

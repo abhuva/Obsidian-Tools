@@ -123,7 +123,6 @@ window.CALENDAR_EVENTS = [
       "milliseconds": 10800000
     },
     "exdate": [
-      "2026-04-02T09:00:00+02:00",
       "2026-05-28T09:00:00+02:00",
       "2026-07-09T09:00:00+02:00",
       "2026-07-16T09:00:00+02:00",
@@ -385,6 +384,16 @@ window.CALENDAR_EVENTS = [
     "end": "2026-05-30"
   },
   {
+    "id": "2. Projektverwaltung/2026 NICA - Fachtagung Kassel/Fachtagung Kassel.md",
+    "title": "Fachtagung Kassel",
+    "allDay": true,
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA - Fachtagung Kassel/Fachtagung Kassel.md"
+    },
+    "start": "2026-06-04",
+    "end": "2026-06-07"
+  },
+  {
     "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Roxy.md#rdate-2026-06-09",
     "title": "Roxy",
     "start": "2026-06-09",
@@ -398,6 +407,26 @@ window.CALENDAR_EVENTS = [
       "recurrenceDaysCount": 0,
       "isRecurringOverride": true
     }
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA - Feté de Circus/Feté de Circus.md",
+    "title": "Feté de Circus",
+    "allDay": true,
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA - Feté de Circus/Feté de Circus.md"
+    },
+    "start": "2026-06-21",
+    "end": "2026-06-22"
+  },
+  {
+    "id": "6. Obsidian/Inbox/Feté de Circus.md",
+    "title": "Feté de Circus",
+    "allDay": true,
+    "extendedProps": {
+      "sourcePath": "6. Obsidian/Inbox/Feté de Circus.md"
+    },
+    "start": "2026-06-21",
+    "end": "2026-06-22"
   },
   {
     "id": "2. Projektverwaltung/2026 NICA BKJ - Verborgene Stärken/Roxy.md#rdate-2026-06-23",
@@ -1044,19 +1073,6 @@ window.CALENDAR_EVENTS = [
     "end": "2026-10-24"
   },
   {
-    "id": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Zirkus Waldstadt - Ferienwoche 4.md",
-    "title": "Ferien 4",
-    "allDay": true,
-    "extendedProps": {
-      "sourcePath": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Zirkus Waldstadt - Ferienwoche 4.md",
-      "coordinates": "51.46884, 11.99226"
-    },
-    "backgroundColor": "blue",
-    "borderColor": "blue",
-    "start": "2026-10-19",
-    "end": "2026-10-24"
-  },
-  {
     "id": "6. Obsidian/Inbox/Herbstferien 2026.md",
     "title": "Herbstferien",
     "allDay": true,
@@ -1067,6 +1083,19 @@ window.CALENDAR_EVENTS = [
     "borderColor": "orange",
     "display": "background",
     "start": "2026-10-19",
+    "end": "2026-10-31"
+  },
+  {
+    "id": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Zirkus Waldstadt - Ferienwoche 4.md",
+    "title": "Ferien 4",
+    "allDay": true,
+    "extendedProps": {
+      "sourcePath": "2. Projektverwaltung/2026 NICA ZMS - Zirkus Waldstadt/Zirkus Waldstadt - Ferienwoche 4.md",
+      "coordinates": "51.46884, 11.99226"
+    },
+    "backgroundColor": "blue",
+    "borderColor": "blue",
+    "start": "2026-10-26",
     "end": "2026-10-31"
   }
 ];

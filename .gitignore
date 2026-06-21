@@ -10,5 +10,8 @@ Thumbs.db
 .env.*
 Calendar/.env
 Calendar/calendar.preview.pid
+VaultGraph/graph.generated.js
+VaultGraph/graph.generated.json
+VaultGraph/vault-graph.preview.pid
 data/updo/
 data/beantime/

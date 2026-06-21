@@ -41,6 +41,11 @@
       "stateFile": "data/beantime/state.json",
       "bookableAccountPrefix": "Projekte:"
     },
+    "vaultGraph": {
+      "enabled": true,
+      "title": "VaultGraph",
+      "url": "http://127.0.0.1:4175/vault-graph.html"
+    },
     "updo": {
       "enabled": true,
       "title": "Website Monitoring",

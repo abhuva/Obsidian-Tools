@@ -1,2 +1,3 @@
 google-oauth-token.json
 .env.local
+public-export/

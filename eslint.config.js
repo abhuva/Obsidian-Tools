@@ -5,6 +5,9 @@ export default [
     ignores: [
       "data/**",
       "Calendar/events.generated.js",
+      "Calendar/public-export/**",
+      "VaultGraph/graph.generated.js",
+      "VaultGraph/graph.generated.json",
       "Calendar/build-events-backup-260329.zip",
       "**/*.html",
       "**/*.css",

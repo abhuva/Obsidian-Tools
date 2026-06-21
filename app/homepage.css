@@ -403,6 +403,26 @@ html[data-theme-mode="mirror-obsidian"] body {
   background: transparent;
 }
 
+.vaultgraph-module-body {
+  padding: 0;
+}
+
+.vaultgraph-hint {
+  margin: 0;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--empty-bg);
+  font-size: 0.84rem;
+}
+
+.vaultgraph-embed-frame {
+  display: block;
+  width: 100%;
+  min-height: 78vh;
+  border: 0;
+  background: #111315;
+}
+
 .new-project-modal-overlay {
   position: fixed;
   inset: 0;
